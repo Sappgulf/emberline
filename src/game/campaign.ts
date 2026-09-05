@@ -1,6 +1,6 @@
-import { CREEPS, type CreepKind, type PropKind, type WaveSpawn } from "./config";
+import { CREEPS, type CreepKind, type PropKind, type WaveSpawn } from "./config.ts";
 
-export type RelicId = "purse" | "timber" | "whet" | "oil" | "cold" | "glass" | "salt" | "ember" | "adze";
+export type RelicId = "purse" | "timber" | "whet" | "oil" | "cold" | "glass" | "salt" | "ember" | "adze" | "cord" | "flint";
 
 export interface ShopItem {
   id: RelicId;
@@ -44,12 +44,14 @@ export const SHOP: ShopItem[] = [
   { id: "purse", name: "Copper purse", cost: 80, blurb: "+50 gold at the start of every map." },
   { id: "timber", name: "Spare timber", cost: 70, blurb: "+2 keep lives on every map." },
   { id: "whet", name: "Whetstone", cost: 100, blurb: "All towers deal 12% more damage." },
-  { id: "oil", name: "Horn oil", cost: 60, blurb: "Horn cools in 10s instead of 16." },
-  { id: "cold", name: "Cold iron", cost: 90, blurb: "Frost bites harder and longer." },
+  { id: "oil", name: "Horn oil", cost: 60, blurb: "Horn cools in 10s instead of 14. Moves cost 10g." },
+  { id: "cold", name: "Cold iron", cost: 90, blurb: "Frost chill lasts longer and holds harder. Not extra damage." },
   { id: "glass", name: "Scout glass", cost: 85, blurb: "Every tower sees 12% farther." },
   { id: "salt", name: "Witch salt", cost: 75, blurb: "Shamans heal half as much." },
   { id: "ember", name: "Ember flask", cost: 95, blurb: "Mortars and oil hit 20% harder." },
   { id: "adze", name: "Keep adze", cost: 70, blurb: "Tower upgrades cost 18% less." },
+  { id: "cord", name: "Watch cord", cost: 80, blurb: "Lined towers hit 15% per neighbor instead of 10%." },
+  { id: "flint", name: "Gate flint", cost: 70, blurb: "Each tower's first shot of a wave hits 40% harder." },
 ];
 
 const UNLOCK: Record<RelicId, number> = {
@@ -62,7 +64,11 @@ const UNLOCK: Record<RelicId, number> = {
   salt: 1,
   ember: 2,
   adze: 0,
+  cord: 1,
+  flint: 2,
 };
+
+export const RELIC_IDS = SHOP.map((s) => s.id);
 
 export function shopFor(mapIndex: number, wave: number): ShopItem[] {
   return SHOP.filter((s) => UNLOCK[s.id] <= mapIndex).map((s) => ({
@@ -130,6 +136,10 @@ export const MAPS: MapDef[] = [
         { kind: "runner", count: 4, gap: 0.36, delay: 2.4 },
       ],
       [{ kind: "shell", count: 4, gap: 1, delay: 0 }, { kind: "grub", count: 10, gap: 0.42, delay: 1 }],
+      [
+        { kind: "hound", count: 6, gap: 0.3, delay: 0 },
+        { kind: "runner", count: 8, gap: 0.28, delay: 1.6 },
+      ],
     ],
     briefing: {
       speaker: "Captain Sera Venn",
@@ -146,6 +156,7 @@ export const MAPS: MapDef[] = [
       "Hold the two bends.",
       "Runners. Aim first.",
       "Shells soak arrows. Mix a mortar.",
+      "Hounds on the last bend. Frost if you have it.",
     ],
   },
   {
@@ -189,6 +200,7 @@ export const MAPS: MapDef[] = [
       { c: 11, r: 0, kind: "pine" },
       { c: 12, r: 0, kind: "pine" },
       { c: 9, r: 8, kind: "fence" },
+      { c: 5, r: 8, kind: "lamp" },
     ],
     waves: [
       [
@@ -212,6 +224,11 @@ export const MAPS: MapDef[] = [
         { kind: "wisp", count: 10, gap: 0.26, delay: 1.4 },
         { kind: "grub", count: 10, gap: 0.28, delay: 3 },
       ],
+      [
+        { kind: "wisp", count: 10, gap: 0.24, delay: 0 },
+        { kind: "hound", count: 8, gap: 0.26, delay: 1.8 },
+        { kind: "shell", count: 4, gap: 0.55, delay: 3.2 },
+      ],
     ],
     briefing: {
       speaker: "Lumen Quill",
@@ -221,7 +238,7 @@ export const MAPS: MapDef[] = [
     victory: {
       speaker: "Brother Ash",
       role: "Keep steward",
-      line: "The Emberlord walks the last stair himself. Buy glass if the bends feel short. Buy salt if the cloaks keep singing.",
+      line: "The stair is next. Buy glass if the bends feel short. Buy salt — the cloaks keep singing, but he does not walk yet.",
     },
     asides: [
       "The high switch. Runners and wisps together.",
@@ -229,8 +246,7 @@ export const MAPS: MapDef[] = [
       "Two shamans. Salt would have helped.",
       "Do not chase last. Aim first.",
       "The pack heals if you let it clump.",
-      "Almost the stair. Spend the bounty.",
-      "Last cut. Then the stall.",
+      "Air and hounds together. Keep the spark.",
     ],
   },
   {
@@ -274,6 +290,7 @@ export const MAPS: MapDef[] = [
       { c: 12, r: 8, kind: "oak" },
       { c: 12, r: 4, kind: "lamp" },
       { c: 2, r: 4, kind: "shroom" },
+      { c: 9, r: 3, kind: "lamp" },
     ],
     waves: [
       [
@@ -324,6 +341,7 @@ export const MAPS: MapDef[] = [
       "Do not sell the spark.",
       "The air is full of wisps.",
       "Hold the latch. Then the water.",
+      "Last rise. Spend what you have.",
     ],
   },
   {
@@ -406,37 +424,136 @@ export const MAPS: MapDef[] = [
     briefing: {
       speaker: "Brother Ash",
       role: "Keep steward",
-      line: "The ford is all water and spite. Grass is scarce. Line the dry banks. He walks last, wet to the knees.",
+      line: "The ford is water and spite. Grass is scarce. Wet banks drag the pack. He walks last, wet to the knees — three lives if he reaches the keep.",
     },
     victory: {
       speaker: "Captain Sera Venn",
       role: "Watch-captain",
-      line: "Dawn on the water. Emberford keeps the watch. Take the relics and walk it again if the night still itches.",
+      line: "The ford holds. The copse still burns. One more latch — then dawn.",
     },
     asides: [
-      "The water takes tiles. Plant on dirt.",
+      "The water takes tiles. Banks drag the pack.",
       "Wisps over the channel.",
       "Two cloaks. Salt if you bought it.",
       "The banks are the whole trick.",
       "The Emberlord in the wet. Burn the ford.",
     ],
   },
+  {
+    id: "ember-copse",
+    name: "Ember Copse",
+    place: "The last fire",
+    theme: {
+      moss: "#241c16",
+      lit: "#4a3020",
+      bank: "#1a1410",
+      path: "#6a4028",
+      pathLit: "#8a5834",
+      ink: "#120c0a",
+      water: "#2a2018",
+      waterLit: "#3a2c20",
+    },
+    water: [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [12, 8],
+      [11, 8],
+    ],
+    path: [
+      { c: 0, r: 6 },
+      { c: 3, r: 6 },
+      { c: 3, r: 1 },
+      { c: 7, r: 1 },
+      { c: 7, r: 7 },
+      { c: 10, r: 7 },
+      { c: 10, r: 2 },
+      { c: 12, r: 2 },
+    ],
+    props: [
+      { c: 0, r: 8, kind: "pine" },
+      { c: 1, r: 8, kind: "oak" },
+      { c: 5, r: 0, kind: "pine" },
+      { c: 6, r: 4, kind: "rock" },
+      { c: 8, r: 3, kind: "stump" },
+      { c: 12, r: 0, kind: "pine" },
+      { c: 4, r: 5, kind: "lamp" },
+      { c: 9, r: 0, kind: "oak" },
+      { c: 11, r: 5, kind: "shroom" },
+      { c: 1, r: 3, kind: "fence" },
+    ],
+    waves: [
+      [
+        { kind: "runner", count: 10, gap: 0.26, delay: 0 },
+        { kind: "wisp", count: 8, gap: 0.28, delay: 1.4 },
+      ],
+      [
+        { kind: "shell", count: 7, gap: 0.5, delay: 0 },
+        { kind: "shaman", count: 2, gap: 1, delay: 2 },
+      ],
+      [
+        { kind: "hound", count: 10, gap: 0.24, delay: 0 },
+        { kind: "wisp", count: 10, gap: 0.22, delay: 1.8 },
+      ],
+      [
+        { kind: "runner", count: 12, gap: 0.22, delay: 0 },
+        { kind: "shell", count: 8, gap: 0.42, delay: 2 },
+        { kind: "shaman", count: 3, gap: 0.9, delay: 3.5 },
+      ],
+      [
+        { kind: "wisp", count: 14, gap: 0.2, delay: 0 },
+        { kind: "hound", count: 8, gap: 0.24, delay: 2 },
+        { kind: "lord", count: 1, gap: 1, delay: 4.2 },
+        { kind: "shaman", count: 2, gap: 1, delay: 6 },
+        { kind: "grub", count: 12, gap: 0.22, delay: 7 },
+      ],
+    ],
+    briefing: {
+      speaker: "Lumen Quill",
+      role: "Scout",
+      line: "The ford was not the end. The true fire is here. Line the bends. Spark the air. Salt the cloaks or he walks in fat.",
+    },
+    victory: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "Dawn. Emberford keeps the watch. Take the relics and walk it again if the night still itches.",
+    },
+    asides: [
+      "The last fire. Air first.",
+      "Plate and cloaks.",
+      "Hounds in the copse.",
+      "Do not sell the line.",
+      "He walks. Burn the road.",
+    ],
+  },
 ];
 
 export const BESTIARY = [
-  { kind: "grub" as const, weak: "Anything. Bows on the bends are enough." },
-  { kind: "runner" as const, weak: "Aim First. Frost if they slip the line." },
-  { kind: "shell" as const, weak: "Mortar and Bramble. Arrows tickle the plate." },
-  { kind: "wisp" as const, weak: "Bow and Spark only. Mortar and Thorn go blind." },
-  { kind: "shaman" as const, weak: "Kill first. Salt cuts the song. Spark the clump." },
-  { kind: "hound" as const, weak: "Frost and Ward. Aim First. They slip bows if you nap." },
-  { kind: "lord" as const, weak: "Burn the road. Mix splash, spark, and time." },
+  { kind: "grub" as const, weak: "Anything. Bows on the bends are enough. A leak costs one life." },
+  { kind: "runner" as const, weak: "Aim First. Frost and Bramble catch them. A leak costs one life." },
+  { kind: "shell" as const, weak: "Mortar and Bramble. Arrows tickle plate. A leak costs two lives." },
+  { kind: "wisp" as const, weak: "Longbow and Spark only. Mortar and Bramble go blind. A leak costs one life." },
+  { kind: "shaman" as const, weak: "Kill first. Salt halves the song. Spark the clump. A leak costs two lives." },
+  { kind: "hound" as const, weak: "Frost and Ash Ward. Aim First. A leak costs one life." },
+  { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, and time. A leak costs three lives." },
 ];
 
 export function describePlan(waves: WaveSpawn[][], index: number): string {
   const plan = waves[index];
   if (!plan) return "—";
   return plan.map((p) => `${p.count} ${CREEPS[p.kind].name}`).join(" · ");
+}
+
+export function planHasAir(waves: WaveSpawn[][], index: number): boolean {
+  const plan = waves[index];
+  if (!plan) return false;
+  return plan.some((p) => CREEPS[p.kind].flying);
+}
+
+export function leakCost(kind: CreepKind): number {
+  if (kind === "lord") return 3;
+  if (kind === "shaman" || kind === "shell") return 2;
+  return 1;
 }
 
 export function pathCellsOf(path: ReadonlyArray<{ c: number; r: number }>): Set<string> {

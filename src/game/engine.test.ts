@@ -1,0 +1,399 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { COLS, CREEPS, START_GOLD, START_LIVES, TOWERS, pathCells, blockedCells } from "./config.ts";
+import { MAPS, leakCost, pathCellsOf, planHasAir, shopFor } from "./campaign.ts";
+import { EmberEngine } from "./engine.ts";
+
+function play(): EmberEngine {
+  const e = new EmberEngine();
+  e.startFromTitle();
+  e.dismissBrief();
+  e.reducedMotion = true;
+  return e;
+}
+
+function emptyGrass(e: EmberEngine): { c: number; r: number } {
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (e.canBuild(c, r)) return { c, r };
+    }
+  }
+  throw new Error("no buildable cell");
+}
+
+describe("maps and shop", () => {
+  it("ships five maps ending at the copse", () => {
+    assert.equal(MAPS.length, 5);
+    assert.equal(MAPS[4].id, "ember-copse");
+    assert.ok(shopFor(1, 0).some((s) => s.id === "cord"));
+    assert.ok(shopFor(2, 0).some((s) => s.id === "flint"));
+  });
+
+  it("keeps every map path axis-aligned and on the board", () => {
+    for (const map of MAPS) {
+      assert.ok(map.path.length >= 2);
+      for (let i = 0; i < map.path.length; i++) {
+        const p = map.path[i];
+        assert.ok(p.c >= 0 && p.c < COLS && p.r >= 0 && p.r < 9);
+        if (i === 0) continue;
+        const prev = map.path[i - 1];
+        const axis = p.c === prev.c || p.r === prev.r;
+        assert.equal(axis, true, `${map.id} segment ${i} is diagonal`);
+      }
+      const cells = pathCellsOf(map.path);
+      for (const w of map.water) {
+        assert.equal(cells.has(`${w[0]},${w[1]}`), false, `${map.id} water on path`);
+      }
+      for (const prop of map.props) {
+        assert.equal(cells.has(`${prop.c},${prop.r}`), false, `${map.id} prop on path`);
+      }
+    }
+  });
+
+  it("drops stall prices with wave and map, never below 18", () => {
+    const early = shopFor(0, 0).find((s) => s.id === "purse")!;
+    const late = shopFor(2, 8).find((s) => s.id === "purse")!;
+    assert.ok(late.cost < early.cost);
+    assert.ok(late.cost >= 18);
+    assert.ok(!shopFor(0, 0).some((s) => s.id === "ember"));
+    assert.ok(shopFor(2, 0).some((s) => s.id === "ember"));
+  });
+
+  it("legacy PATH helper still matches the first map", () => {
+    const a = [...pathCells()].sort();
+    const b = [...pathCellsOf(MAPS[0].path)].sort();
+    assert.deepEqual(a, b);
+    assert.ok(blockedCells().size > 0);
+  });
+});
+
+describe("EmberEngine", () => {
+  it("describes pierce as a form, not a damage-only upgrade", () => {
+    assert.equal(TOWERS.bow.blurb.includes("Tempered pierces"), true);
+    assert.equal(TOWERS.mortar.blurb.includes("wisps"), true);
+    assert.equal(TOWERS.ward.blurb.includes("ring"), true);
+  });
+
+  it("last stand cheapens the horn", () => {
+    const e = play();
+    e.lives = 5;
+    e.notify();
+    assert.equal(e.hud().hornCost, Math.max(20, Math.floor(45 * 0.65)));
+  });
+
+  it("strong aim prefers a shaman over a grub", () => {
+    const e = play();
+    e.gold = 400;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.towers[0].aim = "strong";
+    e.spawn("grub");
+    e.spawn("shaman");
+    for (const c of e.creeps) {
+      c.x = grass.c + 0.5;
+      c.y = grass.r + 0.5;
+    }
+    assert.equal(e.pickTarget(e.towers[0])?.kind, "shaman");
+  });
+
+  it("toggles a stamp off if you pick it twice", () => {
+    const e = play();
+    e.chooseKind("mortar");
+    assert.equal(e.selectedKind, "mortar");
+    e.chooseKind("mortar");
+    assert.equal(e.selectedKind, null);
+  });
+
+  it("starts a watch with gold, lives, and a buildable field", () => {
+    const e = play();
+    assert.equal(e.phase, "ready");
+    assert.equal(e.gold, START_GOLD);
+    assert.equal(e.lives, START_LIVES);
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    assert.equal(e.towers.length, 1);
+    assert.equal(e.gold, START_GOLD - TOWERS.bow.cost);
+  });
+
+  it("refuses path, water, props, and occupied cells", () => {
+    const e = play();
+    const path = e.path[0];
+    assert.equal(e.canBuild(path.c, path.r), false);
+    const water = e.map.water[0];
+    assert.equal(e.canBuild(water[0], water[1]), false);
+    const prop = e.map.props[0];
+    assert.equal(e.canBuild(prop.c, prop.r), false);
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    assert.equal(e.canBuild(grass.c, grass.r), false);
+  });
+
+  it("refunds a fraction of spent gold on sell", () => {
+    const e = play();
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const spent = e.towers[0].spent;
+    e.sellSelected();
+    assert.equal(e.towers.length, 0);
+    assert.equal(e.gold, START_GOLD - spent + Math.floor(spent * 0.7));
+  });
+
+  it("does not place or sell during shop or brief", () => {
+    const e = play();
+    const grass = emptyGrass(e);
+    e.phase = "shop";
+    e.gold = 400;
+    e.tapCell(grass.c, grass.r);
+    assert.equal(e.towers.length, 0);
+    e.phase = "brief";
+    e.tapCell(grass.c, grass.r);
+    assert.equal(e.towers.length, 0);
+  });
+
+  it("buys a relic once and persists unlocks after a map hold", () => {
+    const e = play();
+    e.phase = "shop";
+    e.gold = 200;
+    e.buyRelic("purse");
+    assert.equal(e.relics.has("purse"), true);
+    const gold = e.gold;
+    e.buyRelic("purse");
+    assert.equal(e.gold, gold);
+  });
+
+  it("spawns creeps on the board, not off the gate", () => {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [];
+    e.spawn("grub");
+    const c = e.creeps[0];
+    assert.ok(c.x >= 0 && c.x <= COLS);
+    assert.ok(c.y >= 0 && c.y <= 9);
+  });
+
+  it("spawns the first wave and leaks a life when a creep reaches the keep", () => {
+    const e = play();
+    e.startWave();
+    assert.equal(e.phase, "wave");
+    assert.ok(e.spawnQ.length > 0);
+    const start = e.waypoint(0);
+    e.spawnQ = [];
+    e.spawn("grub");
+    const creep = e.creeps[0];
+    creep.x = start.x;
+    creep.y = start.y;
+    creep.wp = e.path.length - 1;
+    const keep = e.waypoint(e.path.length - 1);
+    creep.x = keep.x;
+    creep.y = keep.y;
+    for (let i = 0; i < 90; i++) e.step(1 / 60);
+    assert.ok(e.lives < START_LIVES);
+  });
+
+  it("clears a wave when the queue and creeps are empty", () => {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [];
+    e.creeps = [];
+    e.finishWaveIfClear();
+    assert.equal(e.phase, "ready");
+    assert.ok(e.gold > START_GOLD);
+  });
+
+  it("kills a grub with enough bow shots and pays bounty", () => {
+    const e = play();
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.startWave();
+    e.spawnQ = [];
+    e.creeps = [];
+    e.spawn("grub");
+    const creep = e.creeps[0];
+    creep.x = grass.c + 0.5;
+    creep.y = grass.r + 0.5;
+    const gold = e.gold;
+    for (let i = 0; i < 400; i++) e.step(1 / 60);
+    assert.ok(e.gold > gold);
+    assert.equal(e.creeps.some((c) => c.alive && c.kind === "grub"), false);
+  });
+
+  it("mortar cannot target wisps", () => {
+    const e = play();
+    e.phase = "ready";
+    e.gold = 400;
+    e.chooseKind("mortar");
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.spawn("wisp");
+    const wisp = e.creeps[0];
+    wisp.x = grass.c + 0.5;
+    wisp.y = grass.r + 0.5;
+    const tower = e.towers[0];
+    assert.equal(e.pickTarget(tower), null);
+  });
+
+  it("spark can target wisps", () => {
+    const e = play();
+    e.gold = 400;
+    e.chooseKind("spark");
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.spawn("wisp");
+    const wisp = e.creeps[0];
+    wisp.x = grass.c + 0.5;
+    wisp.y = grass.r + 0.5;
+    assert.equal(e.pickTarget(e.towers[0])?.id, wisp.id);
+  });
+
+  it("clamps a bad map index and will not march past the last stall", () => {
+    const e = play();
+    e.loadMap(99);
+    assert.equal(e.mapIndex, MAPS.length - 1);
+    e.phase = "shop";
+    e.leaveShop();
+    assert.equal(e.phase, "won");
+  });
+
+  it("watch cord raises the line bonus", () => {
+    const e = play();
+    e.gold = 400;
+    const a = emptyGrass(e);
+    e.tapCell(a.c, a.r);
+    const neighbors = [
+      { c: a.c + 1, r: a.r },
+      { c: a.c - 1, r: a.r },
+      { c: a.c, r: a.r + 1 },
+      { c: a.c, r: a.r - 1 },
+    ];
+    const n = neighbors.find((p) => e.canBuild(p.c, p.r));
+    assert.ok(n);
+    e.tapCell(n.c, n.r);
+    e.relics.add("cord");
+    assert.equal(e.lineBonus(e.towers[0]), 1.15);
+  });
+
+  it("adze cuts upgrade price and timber raises max lives", () => {
+    const e = play();
+    e.relics.add("adze");
+    e.relics.add("timber");
+    assert.equal(e.maxLives(), START_LIVES + 2);
+    const raw = 27;
+    assert.equal(e.upgradePrice(raw), Math.floor(raw * 0.82));
+  });
+
+  it("retry on a later map still pays the map stipend", () => {
+    const e = play();
+    e.loadMap(1);
+    e.retryMap();
+    e.dismissBrief();
+    assert.equal(e.gold, e.startGold() + 40);
+    assert.equal(e.mapIndex, 1);
+  });
+
+  it("line bonus grows for orthogonal neighbors", () => {
+    const e = play();
+    e.gold = 400;
+    const a = emptyGrass(e);
+    e.tapCell(a.c, a.r);
+    const neighbors = [
+      { c: a.c + 1, r: a.r },
+      { c: a.c - 1, r: a.r },
+      { c: a.c, r: a.r + 1 },
+      { c: a.c, r: a.r - 1 },
+    ];
+    const n = neighbors.find((p) => e.canBuild(p.c, p.r));
+    assert.ok(n);
+    e.tapCell(n.c, n.r);
+    assert.equal(e.lineBonus(e.towers[0]), 1.1);
+  });
+
+  it("horn spends gold, slows the road, and respects cooldown", () => {
+    const e = play();
+    e.startWave();
+    e.spawn("grub");
+    const gold = e.gold;
+    e.blowHorn();
+    assert.equal(e.gold, gold - 45);
+    assert.ok(e.hornCd > 0);
+    assert.ok(e.creeps[0].slowT > 0);
+    const after = e.gold;
+    e.blowHorn();
+    assert.equal(e.gold, after);
+  });
+
+  it("undoes a fresh plant and refunds the full cost", () => {
+    const e = play();
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    assert.equal(e.canUndo(), true);
+    e.undoLast();
+    assert.equal(e.towers.length, 0);
+    assert.equal(e.gold, START_GOLD);
+  });
+
+  it("charges extra lives for a lord leak", () => {
+    assert.equal(leakCost("grub"), 1);
+    assert.equal(leakCost("shell"), 2);
+    assert.equal(leakCost("lord"), 3);
+    const e = play();
+    e.lives = 10;
+    e.phase = "wave";
+    e.spawn("lord");
+    const creep = e.creeps[0];
+    creep.wp = e.path.length - 1;
+    const keep = e.waypoint(e.path.length - 1);
+    creep.x = keep.x;
+    creep.y = keep.y;
+    for (let i = 0; i < 90; i++) e.step(1 / 60);
+    assert.equal(e.lives, 7);
+  });
+
+  it("flags air on pine cut's opening wave", () => {
+    assert.equal(planHasAir(MAPS[1].waves, 0), true);
+    assert.equal(planHasAir(MAPS[0].waves, 0), false);
+  });
+
+  it("horn oils the road", () => {
+    const e = play();
+    e.startWave();
+    e.blowHorn();
+    assert.ok(e.burns.length >= e.path.length);
+  });
+
+  it("ford banks drag ground creeps but not wisps", () => {
+    const e = play();
+    e.loadMap(3);
+    e.dismissBrief();
+    const wet = e.map.water[0];
+    assert.ok(e.fordSlow(wet[0] + 0.5, wet[1] + 0.5) < 1);
+    const wisp = e.fordSlow(wet[0] + 0.5, wet[1] + 0.5);
+    assert.equal(CREEPS.wisp.flying, true);
+    assert.ok(wisp < 1);
+    e.loadMap(2);
+    assert.equal(e.fordSlow(4, 4), 1);
+  });
+
+  it("does not leak past zero lives", () => {
+    const e = play();
+    e.lives = 1;
+    e.phase = "wave";
+    e.spawn("grub");
+    const creep = e.creeps[0];
+    creep.wp = e.path.length - 1;
+    const keep = e.waypoint(e.path.length - 1);
+    creep.x = keep.x;
+    creep.y = keep.y;
+    for (let i = 0; i < 90; i++) e.step(1 / 60);
+    assert.equal(e.phase, "lost");
+    assert.equal(e.lives, 0);
+  });
+});
+
+describe("creep stats", () => {
+  it("gives flying only to wisps", () => {
+    for (const [kind, stats] of Object.entries(CREEPS)) {
+      assert.equal(stats.flying, kind === "wisp");
+      assert.ok(stats.hp > 0 && stats.speed > 0);
+    }
+  });
+});

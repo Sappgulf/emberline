@@ -20,7 +20,9 @@ const KEYS = [
 
 export type SpriteKey = (typeof KEYS)[number];
 
-const images: Partial<Record<SpriteKey | "grass" | "path", HTMLImageElement>> = {};
+const images: Partial<Record<SpriteKey | "grass" | "path" | "shot-bow" | "shot-mortar" | "shot-frost" | "shot-bramble", HTMLImageElement>> = {};
+
+const SHOTS = ["shot-bow", "shot-mortar", "shot-frost", "shot-bramble"] as const;
 
 export function loadSprites() {
   if (typeof Image === "undefined") return;
@@ -28,6 +30,12 @@ export function loadSprites() {
     if (images[key]) continue;
     const img = new Image();
     img.src = `/assets/sprites/${key}.png?v=3`;
+    images[key] = img;
+  }
+  for (const key of SHOTS) {
+    if (images[key]) continue;
+    const img = new Image();
+    img.src = `/assets/sprites/${key}.png?v=1`;
     images[key] = img;
   }
   if (!images.grass) {
@@ -42,7 +50,7 @@ export function loadSprites() {
   }
 }
 
-export function spr(key: SpriteKey | "grass" | "path"): HTMLImageElement | null {
+export function spr(key: SpriteKey | "grass" | "path" | "shot-bow" | "shot-mortar" | "shot-frost" | "shot-bramble"): HTMLImageElement | null {
   const img = images[key];
   if (!img || !img.complete || img.naturalWidth < 4) return null;
   return img;

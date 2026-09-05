@@ -1,6 +1,6 @@
-import { COLS, ROWS, rangeAt, towerForm, type PropKind } from "./config";
-import { type Creep, type EmberEngine, type Tower } from "./engine";
-import { drawSprite, spr } from "./sprites";
+import { COLS, MAX_UPGRADE, ROWS, rangeAt, towerForm, type PropKind } from "./config.ts";
+import { type Creep, type EmberEngine, type Tower } from "./engine.ts";
+import { drawSprite, spr } from "./sprites.ts";
 
 const PATH_EDGE = "#4a3a22";
 const PARCHMENT = "#e8dcc4";
@@ -47,6 +47,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     ctx.arc(lx, ly, cell * 1.35, 0, Math.PI * 2);
     ctx.fill();
   }
+  drawLines(ctx, engine, cell);
   drawHover(ctx, engine, cell);
 
   const actors: Array<{ y: number; z: number; draw: () => void }> = [];
@@ -76,22 +77,37 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
 
   for (const burn of engine.burns) {
     ctx.save();
-    ctx.globalAlpha = Math.max(0.12, burn.life / 2.4) * 0.45;
+    ctx.globalAlpha = Math.max(0.1, burn.life / 2.4) * 0.28;
     ctx.fillStyle = EMBER;
     ctx.beginPath();
-    ctx.ellipse(burn.x * cell, burn.y * cell, burn.r * cell, burn.r * cell * 0.55, 0, 0, Math.PI * 2);
+    ctx.ellipse(burn.x * cell, burn.y * cell, burn.r * cell * 0.85, burn.r * cell * 0.42, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
   for (const s of engine.shots) drawShot(ctx, s, cell);
   for (const b of engine.beams) {
     ctx.save();
-    ctx.globalAlpha = Math.max(0, b.life / b.max);
+    const a = Math.max(0, b.life / b.max);
+    ctx.globalAlpha = a;
+    const x1 = b.x1 * cell;
+    const y1 = b.y1 * cell;
+    const x2 = b.x2 * cell;
+    const y2 = b.y2 * cell;
     ctx.strokeStyle = b.color;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = "round";
     ctx.beginPath();
-    ctx.moveTo(b.x1 * cell, b.y1 * cell);
-    ctx.lineTo(b.x2 * cell, b.y2 * cell);
+    ctx.moveTo(x1, y1);
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const nx = -dy * 0.08;
+    const ny = dx * 0.08;
+    ctx.lineTo(x1 + dx * 0.33 + nx, y1 + dy * 0.33 + ny);
+    ctx.lineTo(x1 + dx * 0.66 - nx, y1 + dy * 0.66 - ny);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.globalAlpha = a * 0.45;
+    ctx.lineWidth = 8;
     ctx.stroke();
     ctx.restore();
   }
@@ -108,11 +124,26 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     ctx.restore();
   }
 
+  const night = engine.phase === "wave" && engine.wave % 4 === 0;
+  const lastStand = engine.lives <= 5;
   const vg = ctx.createRadialGradient(w * 0.5, h * 0.45, cell * 2, w * 0.5, h * 0.5, Math.max(w, h) * 0.72);
   vg.addColorStop(0, "rgba(0,0,0,0)");
-  vg.addColorStop(1, engine.map.id === "keep-stair" ? "rgba(22,14,12,0.55)" : "rgba(18,22,15,0.42)");
+  vg.addColorStop(
+    1,
+    lastStand
+      ? "rgba(48,12,10,0.62)"
+      : night
+        ? "rgba(8,10,16,0.58)"
+        : engine.map.id === "keep-stair"
+          ? "rgba(22,14,12,0.55)"
+          : "rgba(18,22,15,0.42)",
+  );
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, w, h);
+  if (night && !engine.reducedMotion) {
+    ctx.fillStyle = "rgba(24, 28, 48, 0.12)";
+    ctx.fillRect(0, 0, w, h);
+  }
   ctx.strokeStyle = "rgba(58,68,50,0.9)";
   ctx.lineWidth = 2;
   ctx.strokeRect(1, 1, COLS * cell - 2, ROWS * cell - 2);
@@ -134,7 +165,7 @@ function drawGround(ctx: CanvasRenderingContext2D, cell: number, time: number, e
   const grass = spr("grass");
   if (grass) {
     ctx.save();
-    ctx.globalAlpha = 0.18;
+    ctx.globalAlpha = 0.12;
     ctx.drawImage(grass, 0, 0, COLS * cell, ROWS * cell);
     ctx.restore();
   }
@@ -143,7 +174,7 @@ function drawGround(ctx: CanvasRenderingContext2D, cell: number, time: number, e
       if (engine.pathSet.has(`${c},${r}`)) continue;
       if (nearPath(c, r, engine)) {
         ctx.fillStyle = engine.map.theme.bank;
-        ctx.globalAlpha = 0.55;
+        ctx.globalAlpha = 0.32;
         ctx.fillRect(c * cell, r * cell, cell + 0.6, cell + 0.6);
         ctx.globalAlpha = 1;
       }
@@ -188,13 +219,27 @@ function drawWater(ctx: CanvasRenderingContext2D, cell: number, time: number, en
 
 function strokeRoute(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
   const path = engine.path;
+  if (path.length < 2) return;
   ctx.beginPath();
-  path.forEach((p, i) => {
-    const x = (p.c + 0.5) * cell;
-    const y = (p.r + 0.5) * cell;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
+  const pts = path.map((p) => ({ x: (p.c + 0.5) * cell, y: (p.r + 0.5) * cell }));
+  ctx.moveTo(pts[0].x, pts[0].y);
+  const rad = cell * 0.42;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const prev = pts[i - 1];
+    const cur = pts[i];
+    const next = pts[i + 1];
+    const inDx = cur.x - prev.x;
+    const inDy = cur.y - prev.y;
+    const outDx = next.x - cur.x;
+    const outDy = next.y - cur.y;
+    const inLen = Math.hypot(inDx, inDy) || 1;
+    const outLen = Math.hypot(outDx, outDy) || 1;
+    const r = Math.min(rad, inLen * 0.45, outLen * 0.45);
+    ctx.lineTo(cur.x - (inDx / inLen) * r, cur.y - (inDy / inLen) * r);
+    ctx.quadraticCurveTo(cur.x, cur.y, cur.x + (outDx / outLen) * r, cur.y + (outDy / outLen) * r);
+  }
+  const last = pts[pts.length - 1];
+  ctx.lineTo(last.x, last.y);
 }
 
 function drawPath(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
@@ -204,6 +249,16 @@ function drawPath(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngi
   ctx.lineWidth = cell * 0.94;
   strokeRoute(ctx, engine, cell);
   ctx.stroke();
+  const tile = spr("path");
+  if (tile) {
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    for (const key of engine.pathSet) {
+      const [cs, rs] = key.split(",");
+      ctx.drawImage(tile, Number(cs) * cell, Number(rs) * cell, cell, cell);
+    }
+    ctx.restore();
+  }
   ctx.strokeStyle = engine.map.theme.pathLit;
   ctx.lineWidth = cell * 0.62;
   strokeRoute(ctx, engine, cell);
@@ -214,13 +269,44 @@ function drawPath(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngi
   strokeRoute(ctx, engine, cell);
   ctx.stroke();
   ctx.globalAlpha = 1;
-  ctx.strokeStyle = "rgba(212,160,84,0.3)";
+  ctx.strokeStyle = engine.wave % 4 === 0 && engine.phase === "wave" ? "rgba(224,120,56,0.45)" : "rgba(212,160,84,0.3)";
   ctx.lineWidth = Math.max(1.4, cell * 0.04);
   ctx.setLineDash([cell * 0.26, cell * 0.2]);
   ctx.lineDashOffset = -engine.time * 22;
   strokeRoute(ctx, engine, cell);
   ctx.stroke();
   ctx.setLineDash([]);
+}
+
+function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
+  if (engine.towers.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = "rgba(212,160,84,0.35)";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 6]);
+  for (let i = 0; i < engine.towers.length; i++) {
+    const a = engine.towers[i];
+    for (let j = i + 1; j < engine.towers.length; j++) {
+      const b = engine.towers[j];
+      if (Math.abs(a.c - b.c) + Math.abs(a.r - b.r) !== 1) continue;
+      ctx.beginPath();
+      ctx.moveTo((a.c + 0.5) * cell, (a.r + 0.5) * cell);
+      ctx.lineTo((b.c + 0.5) * cell, (b.r + 0.5) * cell);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+  for (const t of engine.towers) {
+    if (t.kind !== "ward") continue;
+    const range = rangeAt(t.kind, t.dmgLvl) * (engine.relics.has("glass") ? 1.12 : 1) * (t.empowered ? 1.18 : 1);
+    ctx.save();
+    ctx.globalAlpha = 0.1 + Math.sin(engine.time * 3 + t.id) * 0.04;
+    ctx.fillStyle = COPPER;
+    ctx.beginPath();
+    ctx.arc((t.c + 0.5) * cell, (t.r + 0.5) * cell, range * cell, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawProp(ctx: CanvasRenderingContext2D, c: number, r: number, kind: PropKind, cell: number, time: number) {
@@ -291,6 +377,8 @@ function drawKeep(ctx: CanvasRenderingContext2D, x: number, y: number, cell: num
     ctx.fillStyle = lives <= 6 ? BLOOD : PARCHMENT;
     ctx.font = `700 ${Math.max(9, cell * 0.2)}px Figtree, sans-serif`;
     ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(18,22,15,0.9)";
+    ctx.shadowBlur = 5;
     ctx.fillText(String(lives), x, y + cell * 0.38);
     return;
   }
@@ -311,12 +399,13 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   const glass = engine.relics.has("glass") ? 1.12 : 1;
   const selected = engine.selectedTower();
   if (selected) {
-    const range = rangeAt(selected.kind, selected.dmgLvl) * glass;
+    const range = rangeAt(selected.kind, selected.dmgLvl) * glass * (selected.empowered ? 1.18 : 1);
     ctx.beginPath();
     ctx.arc((selected.c + 0.5) * cell, (selected.r + 0.5) * cell, range * cell, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(212,160,84,0.08)";
+    const ink = selected.kind === "frost" ? "106,168,180" : selected.kind === "mortar" ? "224,120,56" : "212,160,84";
+    ctx.fillStyle = `rgba(${ink},0.08)`;
     ctx.fill();
-    ctx.strokeStyle = "rgba(212,160,84,0.5)";
+    ctx.strokeStyle = `rgba(${ink},0.55)`;
     ctx.lineWidth = 1.6;
     ctx.stroke();
   }
@@ -330,7 +419,7 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
       }
     }
   }
-  if (engine.selectedKind && engine.towers.length < 4 && (engine.phase === "ready" || engine.phase === "wave")) {
+  if (engine.selectedKind && (engine.phase === "ready" || engine.phase === "wave")) {
     const glow = 0.07 + Math.sin(engine.time * 3.2) * 0.04;
     ctx.fillStyle = `rgba(212,160,84,${glow})`;
     for (let r = 0; r < ROWS; r++) {
@@ -359,24 +448,105 @@ function easeOutBack(t: number) {
   return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
 }
 
+function kindInk(kind: Tower["kind"]) {
+  if (kind === "frost") return FROST;
+  if (kind === "spark") return COPPER;
+  if (kind === "mortar") return EMBER;
+  if (kind === "ward") return "#c4a060";
+  if (kind === "bramble") return "#4a6a32";
+  return "#6d8a4a";
+}
+
+function drawFormKit(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, form: number, time: number) {
+  const ink = kindInk(tower.kind);
+  ctx.strokeStyle = ink;
+  ctx.fillStyle = ink;
+  ctx.lineWidth = 1.6;
+  if (tower.kind === "bow" && form >= 2) {
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.22, -cell * 0.02);
+    ctx.quadraticCurveTo(0, -cell * (0.18 + form * 0.04), cell * 0.22, -cell * 0.02);
+    ctx.stroke();
+  }
+  if (tower.kind === "mortar" && form >= 2) {
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.arc(0, -cell * 0.18, cell * (0.08 + form * 0.02), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  if (tower.kind === "frost" && form >= 2) {
+    for (let i = 0; i < form; i++) {
+      const a = time * 0.6 + i * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * cell * 0.12, -cell * 0.1 + Math.sin(a) * cell * 0.08);
+      ctx.lineTo(Math.cos(a) * cell * 0.28, -cell * 0.22 + Math.sin(a) * cell * 0.16);
+      ctx.stroke();
+    }
+  }
+  if (tower.kind === "spark" && form >= 2) {
+    ctx.globalAlpha = 0.55 + Math.sin(time * 8 + tower.id) * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.16, -cell * 0.22);
+    ctx.lineTo(0, -cell * 0.08);
+    ctx.lineTo(cell * 0.1, -cell * 0.28);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  if (tower.kind === "bramble" && form >= 2) {
+    for (let i = 0; i < form + 1; i++) {
+      const a = -0.8 + i * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(0, cell * 0.06);
+      ctx.lineTo(Math.cos(a) * cell * 0.28, Math.sin(a) * cell * 0.2 - cell * 0.08);
+      ctx.stroke();
+    }
+  }
+  if (tower.kind === "ward" && form >= 2) {
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.arc(0, 0, cell * (0.2 + form * 0.05), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  if (tower.empowered) {
+    ctx.fillStyle = EMBER;
+    ctx.beginPath();
+    ctx.moveTo(0, -cell * 0.56);
+    ctx.quadraticCurveTo(cell * 0.08, -cell * 0.4, 0, -cell * 0.28);
+    ctx.quadraticCurveTo(-cell * 0.08, -cell * 0.4, 0, -cell * 0.56);
+    ctx.fill();
+  } else if (form >= 4) {
+    ctx.fillStyle = COPPER;
+    ctx.beginPath();
+    ctx.moveTo(0, -cell * 0.5);
+    ctx.lineTo(cell * 0.09, -cell * 0.34);
+    ctx.lineTo(-cell * 0.09, -cell * 0.34);
+    ctx.fill();
+  }
+}
+
 function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, selected: boolean, time: number, engine: EmberEngine) {
   const x = (tower.c + 0.5) * cell;
   const y = (tower.r + 0.5) * cell;
   const pop = easeOutBack(Math.min(1, tower.build));
+  const form = towerForm(tower.dmgLvl, tower.rateLvl);
+  const kick = tower.recoil * cell * 0.08;
   ctx.save();
-  ctx.translate(x, y + Math.sin(time * 2.1 + tower.id) * 1.1);
-  ctx.scale(pop, pop);
+  ctx.translate(x - Math.cos(tower.angle) * kick, y + Math.sin(time * 2.1 + tower.id) * 0.8 - Math.sin(tower.angle) * kick);
+  ctx.scale(pop * (1 + form * 0.04), pop * (1 + form * 0.04));
   ctx.fillStyle = "rgba(18,22,15,0.38)";
   ctx.beginPath();
-  ctx.ellipse(0, cell * 0.22, cell * 0.3, cell * 0.11, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, cell * 0.22, cell * (0.26 + form * 0.03), cell * 0.11, 0, 0, Math.PI * 2);
   ctx.fill();
   if (selected) {
     ctx.strokeStyle = `rgba(232,220,196,${0.45 + Math.sin(time * 4) * 0.2})`;
     ctx.lineWidth = 2;
-    ctx.strokeRect(-cell * 0.38, -cell * 0.44, cell * 0.76, cell * 0.74);
+    ctx.beginPath();
+    ctx.roundRect(-cell * 0.4, -cell * 0.48, cell * 0.8, cell * 0.8, 6);
+    ctx.stroke();
   }
-  const form = towerForm(tower.dmgLvl, tower.rateLvl);
-  const size = cell * (0.84 + form * 0.07);
+  const size = cell * (0.82 + form * 0.08 + (tower.empowered ? 0.06 : 0));
   if (form >= 2) {
     ctx.strokeStyle = form >= 4 ? EMBER : form === 3 ? COPPER : "rgba(212,160,84,0.55)";
     ctx.lineWidth = form >= 3 ? 2.4 : 1.6;
@@ -384,60 +554,80 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
     ctx.ellipse(0, cell * 0.2, cell * (0.22 + form * 0.03), cell * 0.09, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
-  if (form >= 3) {
+  if (form >= 3 || tower.empowered) {
     ctx.globalAlpha = 0.28 + Math.sin(time * 5 + tower.id) * 0.08;
-    ctx.fillStyle = form >= 4 ? EMBER : COPPER;
+    ctx.fillStyle = tower.empowered ? EMBER : form >= 4 ? EMBER : COPPER;
     ctx.beginPath();
-    ctx.arc(0, -cell * 0.08, cell * 0.34, 0, Math.PI * 2);
+    ctx.arc(0, -cell * 0.08, cell * (tower.empowered ? 0.42 : 0.34), 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
-  if (drawSprite(ctx, tower.kind, 0, cell * 0.12, size)) {
-    if (form >= 4) {
-      ctx.fillStyle = COPPER;
-      ctx.beginPath();
-      ctx.moveTo(0, -cell * 0.48);
-      ctx.lineTo(cell * 0.08, -cell * 0.34);
-      ctx.lineTo(-cell * 0.08, -cell * 0.34);
-      ctx.fill();
-    }
-    for (let i = 0; i < form; i++) {
-      ctx.fillStyle = i < tower.dmgLvl ? EMBER : COPPER;
-      ctx.fillRect(-cell * 0.16 + i * cell * 0.09, cell * 0.22, cell * 0.07, cell * 0.05);
-    }
-    if (selected) {
-      ctx.fillStyle = PARCHMENT;
-      ctx.font = `700 ${Math.max(8, cell * 0.16)}px Figtree, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(
-        (tower.aim ?? "first") === "close" ? "NEAR" : (tower.aim ?? "first") === "strong" ? "TOUGH" : (tower.aim ?? "first").toUpperCase(),
-        0,
-        -cell * 0.46,
-      );
-    }
-    ctx.restore();
-    return;
+  drawSprite(ctx, tower.kind, 0, cell * 0.12, size);
+  drawFormKit(ctx, tower, cell, form, time);
+  for (let i = 0; i < MAX_UPGRADE; i++) {
+    ctx.fillStyle = i < tower.dmgLvl ? EMBER : "rgba(58,68,50,0.9)";
+    ctx.fillRect(-cell * 0.18 + i * cell * 0.1, cell * 0.22, cell * 0.08, cell * 0.045);
+    ctx.fillStyle = i < tower.rateLvl ? COPPER : "rgba(58,68,50,0.9)";
+    ctx.fillRect(-cell * 0.18 + i * cell * 0.1, cell * 0.28, cell * 0.08, cell * 0.035);
   }
-  ctx.fillStyle = BARK;
-  ctx.beginPath();
-  ctx.ellipse(0, cell * 0.14, cell * 0.24, cell * 0.1, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = tower.kind === "frost" ? FROST : tower.kind === "spark" ? COPPER : tower.kind === "ward" ? "#c4a060" : tower.kind === "bramble" ? "#4a6a32" : "#6d8a4a";
-  ctx.beginPath();
-  ctx.arc(0, -cell * 0.08, cell * 0.16, 0, Math.PI * 2);
-  ctx.fill();
+  if (selected) {
+    ctx.fillStyle = PARCHMENT;
+    ctx.font = `700 ${Math.max(8, cell * 0.16)}px Figtree, sans-serif`;
+    ctx.textAlign = "center";
+    const aim = tower.aim ?? "first";
+    ctx.fillText(aim === "close" ? "NEAR" : aim === "strong" ? "TOUGH" : aim.toUpperCase(), 0, -cell * 0.5);
+  }
   ctx.restore();
 }
 
 function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pathLen: number) {
   const px = creep.x * cell;
   const py = creep.y * cell;
-  const fade = creep.alive ? 1 : Math.max(0, creep.death);
-  const size = (creep.kind === "lord" ? 0.38 : creep.kind === "shell" ? 0.28 : creep.kind === "hound" ? 0.22 : 0.2) * cell;
+  const fade = creep.alive ? 1 : Math.max(0, creep.death / 0.28);
+  const size =
+    (creep.kind === "lord" ? 0.4 : creep.kind === "shell" ? 0.3 : creep.kind === "hound" ? 0.23 : creep.kind === "shaman" ? 0.24 : 0.2) *
+    cell;
+  const bob = creep.kind === "wisp" ? Math.sin(creep.progress * 6) * 3 : Math.sin(creep.progress * 10) * 1.2;
+  const stretch = 1 + Math.sin(creep.progress * 10) * (creep.kind === "hound" ? 0.08 : 0.03);
   ctx.save();
-  ctx.translate(px, py);
-  ctx.rotate(creep.facing);
-  ctx.globalAlpha = fade;
+  ctx.translate(px, py + bob);
+  ctx.rotate(creep.kind === "wisp" ? 0 : creep.facing);
+  ctx.scale(creep.squash, creep.squash * stretch);
+  ctx.globalAlpha = fade * (creep.alive ? Math.max(0.4, creep.spawn) : 1);
+  if (creep.kind === "lord" && creep.alive) {
+    ctx.globalAlpha = 0.22 * fade;
+    ctx.fillStyle = EMBER;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = fade;
+  }
+  if (creep.kind === "shaman" && creep.alive) {
+    ctx.strokeStyle = "rgba(122,90,168,0.55)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * (1.35 + Math.sin(creep.healT * 6) * 0.08), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  if (creep.kind === "shell") {
+    ctx.fillStyle = "rgba(90,100,80,0.45)";
+    ctx.beginPath();
+    ctx.ellipse(0, size * 0.05, size * 1.05, size * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (creep.slowT > 0 && creep.alive) {
+    ctx.fillStyle = "rgba(106,168,180,0.28)";
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (creep.rootT > 0 && creep.alive) {
+    ctx.strokeStyle = "#4a6a32";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   if (creep.alive && creep.progress >= pathLen - 2.2) {
     ctx.strokeStyle = BLOOD;
     ctx.globalAlpha = 0.45 * fade;
@@ -452,15 +642,24 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
   ctx.ellipse(0, size * 0.7, size * 0.85, size * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
   if (drawSprite(ctx, creep.kind, 0, size * 0.35, size * 2.15, { alpha: fade, flip: Math.cos(creep.facing) < 0 })) {
+    if (creep.alive && creep.flash > 0) {
+      ctx.globalAlpha = creep.flash * 0.35;
+      ctx.fillStyle = "#fff6e0";
+      ctx.beginPath();
+      ctx.ellipse(0, -size * 0.15, size * 0.55, size * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
-    ctx.save();
-    ctx.globalAlpha = fade;
-    const barW = size * 1.55;
-    ctx.fillStyle = "rgba(18,22,15,0.72)";
-    ctx.fillRect(px - barW / 2, py - size - 8, barW, 4);
-    ctx.fillStyle = creep.hp / creep.maxHp > 0.4 ? "#7a9a58" : BLOOD;
-    ctx.fillRect(px - barW / 2, py - size - 8, barW * Math.max(0, creep.hp / creep.maxHp), 4);
-    ctx.restore();
+    if (creep.alive && creep.hp < creep.maxHp) {
+      ctx.save();
+      ctx.globalAlpha = fade;
+      const barW = size * 1.55;
+      ctx.fillStyle = "rgba(18,22,15,0.72)";
+      ctx.fillRect(px - barW / 2, py - size - 8, barW, 4);
+      ctx.fillStyle = creep.hp / creep.maxHp > 0.4 ? "#7a9a58" : BLOOD;
+      ctx.fillRect(px - barW / 2, py - size - 8, barW * Math.max(0, creep.hp / creep.maxHp), 4);
+      ctx.restore();
+    }
     return;
   }
   ctx.fillStyle =
@@ -471,22 +670,109 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
   ctx.restore();
 }
 
-function drawShot(ctx: CanvasRenderingContext2D, shot: { x: number; y: number; px: number; py: number; kind: string }, cell: number) {
-  const color = shot.kind === "frost" ? FROST : shot.kind === "mortar" ? EMBER : COPPER;
+function loftOf(shot: { x: number; y: number; ox?: number; oy?: number; tx?: number; ty?: number; kind: string }) {
+  if (shot.kind !== "mortar" || shot.ox == null || shot.oy == null || shot.tx == null || shot.ty == null) return 0;
+  const tot = Math.hypot(shot.tx - shot.ox, shot.ty - shot.oy) || 1;
+  const done = Math.min(1, Math.hypot(shot.x - shot.ox, shot.y - shot.oy) / tot);
+  return Math.sin(done * Math.PI) * 0.55;
+}
+
+function drawShot(
+  ctx: CanvasRenderingContext2D,
+  shot: {
+    x: number;
+    y: number;
+    px: number;
+    py: number;
+    kind: string;
+    angle?: number;
+    ox?: number;
+    oy?: number;
+    tx?: number;
+    ty?: number;
+  },
+  cell: number,
+) {
+  const loft = loftOf(shot);
+  const x = shot.x * cell;
+  const y = (shot.y - loft) * cell;
+  const ang = shot.angle ?? Math.atan2(shot.y - shot.py, shot.x - shot.px);
+  const key =
+    shot.kind === "bow"
+      ? "shot-bow"
+      : shot.kind === "mortar"
+        ? "shot-mortar"
+        : shot.kind === "frost"
+          ? "shot-frost"
+          : shot.kind === "bramble"
+            ? "shot-bramble"
+            : null;
+  const img = key ? spr(key) : null;
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.35;
-  ctx.lineWidth = shot.kind === "mortar" ? 7 : 5;
-  ctx.beginPath();
-  ctx.moveTo(shot.px * cell, shot.py * cell);
-  ctx.lineTo(shot.x * cell, shot.y * cell);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  ctx.lineWidth = shot.kind === "mortar" ? 3.2 : 2;
-  ctx.beginPath();
-  ctx.moveTo(shot.px * cell, shot.py * cell);
-  ctx.lineTo(shot.x * cell, shot.y * cell);
-  ctx.stroke();
+  ctx.translate(x, y);
+  ctx.rotate(shot.kind === "mortar" ? ang * 0.18 : ang);
+  if (img) {
+    const grow = 1 + (((shot as { form?: number }).form ?? 1) - 1) * 0.07;
+    const h =
+      (shot.kind === "mortar" ? cell * 0.4 : shot.kind === "bow" ? cell * 0.32 : shot.kind === "frost" ? cell * 0.36 : cell * 0.34) *
+      grow;
+    const w = (img.naturalWidth / img.naturalHeight) * h;
+    ctx.drawImage(img, -w * 0.55, -h / 2, w, h);
+    ctx.restore();
+    return;
+  }
+  if (shot.kind === "bow") {
+    ctx.strokeStyle = "#8a6a42";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.22, 0);
+    ctx.lineTo(cell * 0.16, 0);
+    ctx.stroke();
+    ctx.fillStyle = COPPER;
+    ctx.beginPath();
+    ctx.moveTo(cell * 0.22, 0);
+    ctx.lineTo(cell * 0.1, -cell * 0.05);
+    ctx.lineTo(cell * 0.1, cell * 0.05);
+    ctx.fill();
+    ctx.strokeStyle = "#6a3040";
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.22, 0);
+    ctx.lineTo(-cell * 0.28, -cell * 0.06);
+    ctx.moveTo(-cell * 0.22, 0);
+    ctx.lineTo(-cell * 0.28, cell * 0.06);
+    ctx.stroke();
+  } else if (shot.kind === "mortar") {
+    ctx.fillStyle = "#3a3a38";
+    ctx.beginPath();
+    ctx.arc(0, 0, cell * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = COPPER;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = EMBER;
+    ctx.beginPath();
+    ctx.moveTo(0, -cell * 0.12);
+    ctx.lineTo(cell * 0.04, -cell * 0.2);
+    ctx.stroke();
+  } else if (shot.kind === "frost") {
+    ctx.fillStyle = FROST;
+    ctx.beginPath();
+    ctx.moveTo(cell * 0.2, 0);
+    ctx.lineTo(-cell * 0.08, -cell * 0.08);
+    ctx.lineTo(-cell * 0.16, 0);
+    ctx.lineTo(-cell * 0.08, cell * 0.08);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.fillStyle = "#4a6a32";
+    ctx.beginPath();
+    ctx.moveTo(cell * 0.2, 0);
+    ctx.lineTo(-cell * 0.14, -cell * 0.06);
+    ctx.lineTo(-cell * 0.1, 0);
+    ctx.lineTo(-cell * 0.14, cell * 0.06);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -495,9 +781,18 @@ function drawParticles(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell:
     ctx.save();
     ctx.globalAlpha = Math.max(0, p.life / p.max);
     ctx.fillStyle = p.color;
+    ctx.strokeStyle = p.color;
+    const rad = Math.max(1, p.size * cell);
     ctx.beginPath();
-    ctx.arc(p.x * cell, p.y * cell, Math.max(1, p.size * cell), 0, Math.PI * 2);
-    ctx.fill();
+    if (p.kind === "ring") {
+      ctx.globalAlpha *= 0.7;
+      ctx.lineWidth = 2;
+      ctx.arc(p.x * cell, p.y * cell, rad * (1.2 + (1 - p.life / p.max) * 1.6), 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.arc(p.x * cell, p.y * cell, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 }
@@ -507,11 +802,13 @@ function drawFloaters(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: 
     ctx.save();
     ctx.globalAlpha = Math.max(0, f.life / f.max);
     ctx.fillStyle = f.color;
-    ctx.font = `700 ${Math.max(10, cell * 0.22)}px Figtree, sans-serif`;
+    ctx.font = `700 ${Math.min(16, Math.max(11, cell * 0.14))}px Figtree, sans-serif`;
     ctx.textAlign = "center";
     ctx.shadowColor = "rgba(18,22,15,0.8)";
-    ctx.shadowBlur = 6;
-    ctx.fillText(f.text, f.x * cell, f.y * cell);
+    ctx.shadowBlur = 4;
+    const fx = Math.min(COLS * cell - 8, Math.max(8, f.x * cell));
+    const fy = Math.min(ROWS * cell - 8, Math.max(14, f.y * cell));
+    ctx.fillText(f.text, fx, fy);
     ctx.restore();
   }
 }
