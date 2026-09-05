@@ -904,13 +904,17 @@ export class EmberEngine {
   fire(tower: Tower, target: Creep) {
     const def = TOWERS[tower.kind];
     const form = towerForm(tower.dmgLvl, tower.rateLvl);
-    const dmg =
+    let dmg =
       damageAt(tower.kind, tower.dmgLvl) *
       (this.relics.has("whet") ? 1.12 : 1) *
       (this.relics.has("ember") && (tower.kind === "mortar" || tower.kind === "spark") ? 1.2 : 1) *
       (1 + (form - 1) * 0.06) *
       this.lineBonus(tower) *
       (this.focusId === target.id ? 1.1 : 1);
+    if (tower.kind === "mortar" && target.kind === "shell") dmg *= 1.28;
+    if ((tower.kind === "frost" || tower.kind === "ward") && target.kind === "hound") dmg *= 1.22;
+    if ((tower.kind === "spark" || tower.kind === "bow") && target.kind === "wisp") dmg *= 1.18;
+    if (tower.kind === "bramble" && target.kind === "runner") dmg *= 1.2;
     this.focusId = target.id;
     const rate = rateAt(tower.kind, tower.rateLvl);
     tower.cooldown = 1 / rate;
