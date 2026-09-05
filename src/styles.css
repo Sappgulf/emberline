@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #12160f;
+  --color-bark: #1c2318;
+  --color-moss: #2a3524;
+  --color-leaf: #5a7a48;
+  --color-parchment: #e8dcc4;
+  --color-dust: #b7ab90;
+  --color-copper: #d4a054;
+  --color-ember: #e07838;
+  --color-blood: #c45c4a;
+  --color-frost: #6aa8b4;
+  --color-line: #3a4432;
+  --font-display: "Fraunces", "Times New Roman", serif;
+  --font-sans: "Figtree", "Segoe UI", sans-serif;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.125rem;
+}
+
+@layer base {
+  html,
+  body,
+  #app {
+    min-height: 100%;
+    background: var(--color-ink);
+    color: var(--color-parchment);
+  }
+
+  html,
+  body {
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@layer utilities {
+  .pressable {
+    transition:
+      transform 160ms ease-out,
+      background-color 160ms ease-out,
+      border-color 160ms ease-out,
+      box-shadow 160ms ease-out,
+      opacity 160ms ease-out;
+  }
+  .pressable:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-copper) 55%, var(--color-line));
+  }
+  .pressable:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+.stage-frame {
+  box-shadow:
+    0 0 0 1px #2a3224,
+    0 0 0 3px #1a2016,
+    0 0 0 4px #8a6a38,
+    0 28px 60px rgba(0, 0, 0, 0.45);
+}
+
+.plaque {
+  background:
+    linear-gradient(180deg, rgba(232, 220, 196, 0.05), transparent 38%),
+    var(--color-bark);
+  border: 1px solid var(--color-line);
+  box-shadow:
+    inset 0 1px 0 rgba(232, 220, 196, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.dock {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(212, 160, 84, 0.07), transparent 46%),
+    var(--color-bark);
+}
+
+.stat-chip {
+  background:
+    linear-gradient(180deg, rgba(232, 220, 196, 0.07), transparent),
+    var(--color-ink);
+  border: 1px solid var(--color-line);
+  box-shadow: inset 0 1px 0 rgba(232, 220, 196, 0.06);
+}
+
+.overlay-in > * {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: rise-in 480ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+.overlay-in > *:nth-child(1) {
+  animation-delay: 40ms;
+}
+.overlay-in > *:nth-child(2) {
+  animation-delay: 140ms;
+}
+.overlay-in > *:nth-child(3) {
+  animation-delay: 240ms;
+}
+.overlay-in > *:nth-child(4) {
+  animation-delay: 320ms;
+}
+
+@keyframes rise-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes torch {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(224 120 56 / 0.28);
+  }
+  50% {
+    box-shadow: 0 0 22px 3px rgb(224 120 56 / 0.3);
+  }
+}
+
+.ember-glow {
+  animation: torch 2.4s ease-in-out infinite;
+}
+
+.veil {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(212, 160, 84, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(18, 22, 15, 0.72), rgba(12, 14, 10, 0.92));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay-in > *,
+  .ember-glow {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    box-shadow: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
