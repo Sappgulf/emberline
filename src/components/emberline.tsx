@@ -409,7 +409,7 @@ export function Emberline() {
           ) : hud.towerCount > 0 ? (
             <button
               type="button"
-              className="pressable min-h-9 rounded-xl border border-line text-xs text-dust"
+              className="pressable min-h-11 rounded-xl border border-line text-xs text-dust"
               onClick={() => engine.inspectLast()}
             >
               Tap next tower to upgrade
@@ -436,7 +436,7 @@ export function Emberline() {
                     unlockAudio();
                     engine.chooseKind(kind);
                   }}
-                  className={`pressable min-h-11 rounded-xl border px-1 py-1 text-center ${
+                  className={`pressable min-h-12 rounded-xl border px-1 py-1.5 text-center ${
                     on ? "border-copper bg-moss" : "border-line bg-ink/40"
                   } ${broke ? "opacity-45" : ""}`}
                 >
@@ -450,7 +450,7 @@ export function Emberline() {
           <div className="grid grid-cols-6 gap-1">
             <button
               type="button"
-              className="pressable min-h-9 rounded-xl border border-line text-[10px] text-dust"
+              className="pressable min-h-11 rounded-xl border border-line text-xs text-dust"
               disabled={!playing}
               onClick={() => engine.setAim(AIMS[(AIMS.indexOf(hud.towerAim) + 1) % AIMS.length])}
             >
@@ -458,7 +458,7 @@ export function Emberline() {
             </button>
             <button
               type="button"
-              className="pressable min-h-9 rounded-xl border border-line text-[10px] text-dust"
+              className="pressable min-h-11 rounded-xl border border-line text-xs text-dust"
               disabled={!playing}
               onClick={() => engine.togglePause()}
             >
@@ -466,7 +466,7 @@ export function Emberline() {
             </button>
             <button
               type="button"
-              className={`pressable min-h-9 rounded-xl border text-[10px] ${
+              className={`pressable min-h-11 rounded-xl border text-xs ${
                 hud.speed !== 1 ? "border-copper bg-moss" : "border-line text-dust"
               }`}
               disabled={!playing}
@@ -476,7 +476,7 @@ export function Emberline() {
             </button>
             <button
               type="button"
-              className="pressable min-h-9 rounded-xl border border-line text-[10px] text-dust disabled:opacity-40"
+              className="pressable min-h-11 rounded-xl border border-line text-xs text-dust disabled:opacity-40"
               disabled={!playing || hud.hornCd > 0 || hud.gold < hud.hornCost}
               onClick={() => {
                 unlockAudio();
@@ -487,7 +487,7 @@ export function Emberline() {
             </button>
             <button
               type="button"
-              className="pressable min-h-9 rounded-xl border border-line text-[10px] text-dust disabled:opacity-40"
+              className="pressable min-h-11 rounded-xl border border-line text-xs text-dust disabled:opacity-40"
               disabled={hud.phase !== "ready" || hud.wave < 1}
               onClick={() => engine.openStall()}
             >
@@ -495,7 +495,7 @@ export function Emberline() {
             </button>
             <button
               type="button"
-              className="pressable min-h-9 rounded-xl border border-line text-[10px] text-dust disabled:opacity-40"
+              className="pressable min-h-11 rounded-xl border border-line text-xs text-dust disabled:opacity-40"
               disabled={(hud.phase !== "ready" && hud.phase !== "wave") || hud.lives >= hud.maxLives || hud.gold < hud.mendCost}
               onClick={() => {
                 unlockAudio();
