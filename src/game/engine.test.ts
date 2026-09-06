@@ -104,6 +104,60 @@ describe("EmberEngine", () => {
     assert.equal(e.selectedKind, null);
   });
 
+  it("hydrates saved progress into the initial HUD snapshot", () => {
+    const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    const stored = JSON.stringify({ relics: ["purse"], unlocked: 3, muted: false });
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => stored,
+        setItem: () => undefined,
+      } satisfies Pick<Storage, "getItem" | "setItem">,
+    });
+
+    try {
+      const e = new EmberEngine();
+      e.readSave();
+
+      assert.equal(e.hud().unlocked, 3);
+      assert.deepEqual(e.hud().relics, ["purse"]);
+    } finally {
+      if (previous) {
+        Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous });
+      } else {
+        Reflect.deleteProperty(globalThis, "localStorage");
+      }
+    }
+  });
+
+  it("exposes the current route and next-wave threat forecast", () => {
+    const e = play();
+    const initial = e.hud();
+
+    assert.equal(initial.route.length, MAPS.length);
+    assert.equal(initial.route[0].state, "current");
+    assert.equal(initial.route[1].state, "locked");
+    assert.equal(initial.previewWave, 1);
+    assert.deepEqual(initial.wavePreview, [{ kind: "grub", count: 8 }]);
+    assert.equal(initial.threatTier, "light");
+    assert.equal(initial.waveTotal, 0);
+    assert.equal(initial.waveProgress, 0);
+
+    e.startWave();
+    const firstWave = e.hud();
+    assert.equal(firstWave.phase, "wave");
+    assert.equal(firstWave.wave, 1);
+    assert.equal(firstWave.waveTotal, 8);
+    assert.equal(firstWave.waveProgress, 0);
+
+    e.unlocked = 2;
+    e.loadMap(1);
+    e.notify();
+    assert.equal(e.hud().route[0].state, "held");
+    assert.equal(e.hud().route[1].state, "current");
+    assert.equal(e.hud().route[2].state, "locked");
+  });
+
   it("starts a watch with gold, lives, and a buildable field", () => {
     const e = play();
     assert.equal(e.phase, "ready");

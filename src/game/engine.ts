@@ -33,6 +33,38 @@ function blockedCellsFrom(map: MapDef) {
   return set;
 }
 export type Phase = "title" | "brief" | "ready" | "wave" | "shop" | "stall" | "won" | "lost";
+export type ThreatTier = "light" | "mixed" | "severe";
+
+export interface RouteNodeSnap {
+  id: string;
+  name: string;
+  place: string;
+  state: "held" | "current" | "locked";
+}
+
+export interface WavePreviewSnap {
+  kind: CreepKind;
+  count: number;
+}
+
+function wavePreviewFor(plan: MapDef["waves"][number] | undefined): WavePreviewSnap[] {
+  return plan?.map(({ kind, count }) => ({ kind, count })) ?? [];
+}
+
+function waveTotalFor(plan: MapDef["waves"][number] | undefined): number {
+  return plan?.reduce((sum, entry) => sum + entry.count, 0) ?? 0;
+}
+
+function threatTierFor(plan: MapDef["waves"][number] | undefined): ThreatTier {
+  if (!plan) return "light";
+  const total = plan.reduce((sum, entry) => sum + entry.count, 0);
+  const severe = plan.some((entry) => entry.kind === "lord") || total >= 24;
+  if (severe) return "severe";
+  const mixed = plan.some(
+    (entry) => entry.kind === "shell" || entry.kind === "shaman" || entry.kind === "hound" || CREEPS[entry.kind].flying,
+  );
+  return total >= 12 || mixed ? "mixed" : "light";
+}
 
 export interface Tower {
   id: number;
@@ -137,6 +169,8 @@ export interface HudSnap {
   selectedTower: Tower | null;
   formName: string;
   remaining: number;
+  waveTotal: number;
+  waveProgress: number;
   nextCosts: { dmg: number; rate: number } | null;
   aim: Aim;
   paused: boolean;
@@ -167,6 +201,10 @@ export interface HudSnap {
   airCovered: boolean;
   sellRefund: number;
   muted: boolean;
+  route: RouteNodeSnap[];
+  previewWave: number;
+  wavePreview: WavePreviewSnap[];
+  threatTier: ThreatTier;
 }
 
 export interface Burn {
@@ -269,6 +307,7 @@ export class EmberEngine {
         this.muted = true;
         setMuted(true);
       }
+      this.notify();
     } catch {
       /* ignore */
     }
@@ -302,6 +341,17 @@ export class EmberEngine {
     const t = this.selectedTower();
     const upcoming = this.phase === "wave" ? Math.max(0, this.wave - 1) : this.wave;
     const map = this.map;
+    const previewIndex = Math.min(upcoming, Math.max(0, map.waves.length - 1));
+    const previewPlan = map.waves[previewIndex];
+    const livePlan = this.wave > 0 ? map.waves[this.wave - 1] : undefined;
+    const remaining = this.creeps.filter((c) => c.alive).length + this.spawnQ.length;
+    const waveTotal = waveTotalFor(livePlan);
+    const waveProgress =
+      this.phase === "wave" && waveTotal > 0
+        ? Math.min(1, Math.max(0, 1 - remaining / waveTotal))
+        : this.phase !== "title" && this.wave > 0
+          ? 1
+          : 0;
     return {
       gold: this.gold,
       lives: this.lives,
@@ -311,7 +361,9 @@ export class EmberEngine {
       selectedKind: this.selectedKind,
       selectedTower: t,
       formName: t ? FORM_NAME[towerForm(t.dmgLvl, t.rateLvl)] : "",
-      remaining: this.creeps.filter((c) => c.alive).length + this.spawnQ.length,
+      remaining,
+      waveTotal,
+      waveProgress,
       nextCosts: t
         ? {
             dmg: t.dmgLvl >= MAX_UPGRADE ? 0 : this.upgradePrice(upgradeDamageCost(t.kind, t.dmgLvl + 1)),
@@ -321,7 +373,7 @@ export class EmberEngine {
       aim: this.aim,
       paused: this.paused,
       speed: this.speed,
-      nextWave: describePlan(map.waves, Math.min(upcoming, map.waves.length - 1)),
+      nextWave: describePlan(map.waves, previewIndex),
       streak: this.streak,
       hornCd: this.hornCd,
       hornCost:
@@ -344,10 +396,17 @@ export class EmberEngine {
       towerAim: t?.aim ?? this.aim,
       codex: this.codex,
       canUndo: this.canUndo(),
-      nextAir: planHasAir(map.waves, Math.min(upcoming, map.waves.length - 1)),
+      nextAir: planHasAir(map.waves, previewIndex),
       airCovered: this.towers.some((tw) => TOWERS[tw.kind].hitsAir),
       sellRefund: t ? this.refundFor(t) : 0,
       muted: this.muted,
+      route: MAPS.map((entry, index) => {
+        const state: RouteNodeSnap["state"] = index === this.mapIndex ? "current" : index < this.unlocked ? "held" : "locked";
+        return { id: entry.id, name: entry.name, place: entry.place, state };
+      }),
+      previewWave: previewIndex + 1,
+      wavePreview: wavePreviewFor(previewPlan),
+      threatTier: threatTierFor(previewPlan),
     };
   }
 

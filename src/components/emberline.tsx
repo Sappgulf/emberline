@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RotateCcw } from "lucide-react";
-import { COLS, CREEPS, MAX_UPGRADE, ROWS, TOWERS, type Aim, type TowerKind } from "@/game/config";
+import { COLS, CREEPS, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type TowerKind } from "@/game/config";
 import { BESTIARY, type RelicId } from "@/game/campaign";
 import { EmberEngine, type HudSnap } from "@/game/engine";
 import { drawWorld } from "@/game/render";
@@ -28,8 +28,13 @@ function useHud(): HudSnap {
 export function Emberline() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const readyActionRef = useRef<HTMLButtonElement>(null);
   const hud = useHud();
   const [cell, setCell] = useState(40);
+
+  useEffect(() => {
+    if (hud.phase === "ready") readyActionRef.current?.focus();
+  }, [hud.phase]);
 
   useEffect(() => {
     loadSprites();
@@ -174,9 +179,11 @@ export function Emberline() {
     ? "Horn available during a wave"
     : hud.hornCd > 0
       ? `Horn cooling down for ${Math.ceil(hud.hornCd)} seconds`
-      : hud.hornCost === 0
+        : hud.hornCost === 0
         ? "Use free horn"
         : `Use horn for ${hud.hornCost} gold`;
+  const waveProgressLabel = hud.phase === "wave" ? `Wave ${hud.wave}` : hud.wave > 0 ? `Wave ${hud.wave} held` : "First watch";
+  const waveProgressStatus = hud.phase === "wave" ? `${hud.remaining} left` : hud.wave > 0 ? "Road clear" : "Ready";
   const menu =
     hud.codex ||
     hud.phase === "title" ||
@@ -209,6 +216,22 @@ export function Emberline() {
         </div>
         {hud.phase !== "title" && (
           <>
+            <div className="watch-progress" aria-label={`${waveProgressLabel} progress`}>
+              <div className="watch-progress-label">
+                <span>{waveProgressLabel}</span>
+                <span>{waveProgressStatus}</span>
+              </div>
+              <div
+                className="watch-progress-track"
+                role="progressbar"
+                aria-label={`${waveProgressLabel} progress`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(hud.waveProgress * 100)}
+              >
+                <span style={{ width: `${Math.round(hud.waveProgress * 100)}%` }} />
+              </div>
+            </div>
             <div className="watch-stat" title="Lives">
               <img className="hud-ico" src="/ui/icon-heart.png" alt="" />
               <span className={`n ${hud.lives <= 5 ? "hurt" : ""}`}>{hud.lives}</span>
@@ -244,6 +267,8 @@ export function Emberline() {
           )}
         </div>
       </header>
+
+      {!hud.codex && <CampaignRail route={hud.route} />}
 
       <div className="flex min-h-0 flex-1 flex-col">
         <div
@@ -298,6 +323,12 @@ export function Emberline() {
             >
               {hud.hero.who}: {hud.hero.line}
             </p>
+          )}
+          {playing && (
+            <div className="intel-stack" aria-label="Watch intelligence">
+              <ThreatPanel hud={hud} />
+              {hud.selectedTower && <TowerIntel hud={hud} />}
+            </div>
           )}
           {hud.codex && (
             <Overlay wide kicker="Codex" title="Bestiary" onClose={() => engine.toggleCodex()} close="Close">
@@ -563,6 +594,7 @@ export function Emberline() {
               </button>
               <button
                 type="button"
+                ref={readyActionRef}
                 className="pressable send-flag min-h-12 px-5 text-sm disabled:opacity-35"
                 title={hud.nextWave}
                 disabled={hud.phase !== "ready" && !(hud.phase === "wave" && hud.remaining === 0)}
@@ -611,6 +643,125 @@ function TowerMark({ kind }: { kind: TowerKind }) {
     kind === "bow" ? "bg-leaf" : kind === "mortar" ? "bg-ember" : kind === "frost" ? "bg-frost" : kind === "spark" ? "bg-copper" : kind === "ward" ? "bg-copper" : "bg-leaf";
   const shape = kind === "mortar" || kind === "spark" ? "rounded-full" : "rounded-[3px]";
   return <span className={`mx-auto block h-1.5 w-7 ${fill} ${shape}`} aria-hidden="true" />;
+}
+
+const THREAT_LABEL: Record<HudSnap["threatTier"], string> = {
+  light: "Light pressure",
+  mixed: "Mixed pressure",
+  severe: "Heavy pressure",
+};
+
+const THREAT_NOTE: Record<HudSnap["threatTier"], string> = {
+  light: "The road is quiet. Build for the bend.",
+  mixed: "Mixed bodies on the road. Cover the air and armor.",
+  severe: "Heavy pressure ahead. Keep the horn ready.",
+};
+
+function CampaignRail({ route }: { route: HudSnap["route"] }) {
+  return (
+    <nav className="campaign-rail" aria-label="Campaign watch route">
+      <ol className="campaign-rail-list">
+        {route.map((node, index) => (
+          <li key={node.id} className="route-node" data-state={node.state} aria-current={node.state === "current" ? "step" : undefined}>
+            <div className="route-marker" aria-hidden="true">
+              <img src="/assets/sprites/gate.png" alt="" />
+              <span>{index + 1}</span>
+            </div>
+            <div className="route-copy">
+              <span className="route-state">{node.state === "current" ? "Current" : node.state === "held" ? "Held" : "Ahead"}</span>
+              <span className="route-name">{node.name}</span>
+              <span className="route-place">{node.place}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+function ThreatPanel({ hud }: { hud: HudSnap }) {
+  const uncoveredAir = hud.nextAir && !hud.airCovered;
+  return (
+    <section className="threat-panel" aria-label={`Wave ${hud.previewWave} threat forecast`} role="status">
+      <div className="intel-heading">
+        <span className="intel-kicker">Next threat</span>
+        <span className={`threat-tier threat-${hud.threatTier}`}>{THREAT_LABEL[hud.threatTier]}</span>
+      </div>
+      <div className="threat-title">
+        <h2>Wave {hud.previewWave}</h2>
+        <span>{hud.phase === "wave" ? "In progress" : "Ready to send"}</span>
+      </div>
+      <div className="threat-meter" data-tier={hud.threatTier} aria-hidden="true">
+        <span />
+      </div>
+      <div className="threat-items">
+        {hud.wavePreview.map((item) => {
+          const creep = CREEPS[item.kind];
+          return (
+            <div key={item.kind} className="threat-item" aria-label={`${item.count} ${creep.name}${creep.flying ? ", flying" : ""}`}>
+              <img src={`/assets/sprites/${item.kind}.png`} alt="" />
+              <span className="threat-count">{item.count}</span>
+              <span className="threat-name">{creep.name}</span>
+              {creep.flying && <span className="threat-tag">Air</span>}
+              {!creep.flying && creep.armor > 0 && <span className="threat-tag">Armor</span>}
+            </div>
+          );
+        })}
+      </div>
+      <p className={uncoveredAir ? "threat-note threat-note-alert" : "threat-note"}>
+        {uncoveredAir ? "Air sightline needed — choose Bow or Frost." : THREAT_NOTE[hud.threatTier]}
+      </p>
+    </section>
+  );
+}
+
+function TowerIntel({ hud }: { hud: HudSnap }) {
+  const tower = hud.selectedTower;
+  if (!tower) return null;
+  const def = TOWERS[tower.kind];
+  const form = towerForm(tower.dmgLvl, tower.rateLvl);
+  const power = Math.round(
+    damageAt(tower.kind, tower.dmgLvl) *
+      (hud.relics.includes("whet") ? 1.12 : 1) *
+      (hud.relics.includes("ember") && tower.kind === "mortar" ? 1.2 : 1) *
+      (1 + (form - 1) * 0.06) *
+      hud.lineBonus,
+  );
+  const range = rangeAt(tower.kind, tower.dmgLvl) * (hud.relics.includes("glass") ? 1.12 : 1) * (tower.empowered ? 1.18 : 1);
+  return (
+    <section className="tower-intel" aria-label={`${def.name} selected tower details`}>
+      <div className="tower-intel-heading">
+        <div>
+          <span className="intel-kicker">Selected tower</span>
+          <h2>{def.name}</h2>
+        </div>
+        <span className="tower-form">{hud.formName}</span>
+      </div>
+      <div className="tower-intel-body">
+        <div className="tower-intel-art">
+          <img src={`/assets/sprites/${tower.kind}.png`} alt="" />
+        </div>
+        <dl className="tower-stats">
+          <div>
+            <dt>Power</dt>
+            <dd>{power}</dd>
+          </div>
+          <div>
+            <dt>Rate</dt>
+            <dd>{rateAt(tower.kind, tower.rateLvl).toFixed(2)}×</dd>
+          </div>
+          <div>
+            <dt>Reach</dt>
+            <dd>{range.toFixed(1)}</dd>
+          </div>
+        </dl>
+      </div>
+      <p className="tower-intel-copy">{def.blurb}</p>
+      <p className="tower-intel-meta">
+        Aim {AIM_LABEL[hud.towerAim]} <span aria-hidden="true">·</span> Line +{Math.round((hud.lineBonus - 1) * 100)}%
+      </p>
+    </section>
+  );
 }
 
 function Overlay({
