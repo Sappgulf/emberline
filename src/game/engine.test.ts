@@ -198,6 +198,7 @@ describe("EmberEngine", () => {
     e.finishWaveIfClear();
     assert.equal(e.phase, "ready");
     assert.ok(e.gold > START_GOLD);
+    assert.match(e.grade ?? "", new RegExp(`${e.gold}g`));
   });
 
   it("kills a grub with enough bow shots and pays bounty", () => {
@@ -358,6 +359,26 @@ describe("EmberEngine", () => {
     e.startWave();
     e.blowHorn();
     assert.ok(e.burns.length >= e.path.length);
+  });
+
+  it("keeps the horn reserved for live waves", () => {
+    const e = play();
+    const goldBefore = e.gold;
+
+    e.blowHorn();
+
+    assert.equal(e.gold, goldBefore);
+    assert.equal(e.hornCd, 0);
+  });
+
+  it("clears timed hero guidance from the HUD when it expires", () => {
+    const e = play();
+    e.hero = { kind: "mend", who: "Brother Ash", line: "Keep the gate standing." };
+    e.heroT = 0.01;
+    e.notify();
+    assert.ok(e.hud().hero);
+    e.tick(1 / 60);
+    assert.equal(e.hud().hero, null);
   });
 
   it("ford banks drag ground creeps but not wisps", () => {

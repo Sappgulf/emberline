@@ -10,7 +10,6 @@ const FROST = "#6aa8b4";
 const BLOOD = "#c45c4a";
 const STONE = "#4a5244";
 const STONE_LIT = "#6a7460";
-const BARK = "#1c2318";
 
 function nsin(t: number, seed: number) {
   return Math.sin(t * seed) * 0.55 + Math.sin(t * seed * 1.73 + seed) * 0.45;
@@ -35,6 +34,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   const base = engine.path[engine.path.length - 1];
   drawPortal(ctx, (spawn.c + 0.5) * cell, (spawn.r + 0.5) * cell, cell, engine.time, engine.phase === "wave");
   drawKeep(ctx, (base.c + 0.5) * cell, (base.r + 0.5) * cell, cell, engine.time, engine.lives);
+  drawRouteTags(ctx, cell, engine);
   for (const prop of engine.props) {
     if (prop.kind !== "lamp") continue;
     const lx = (prop.c + 0.5) * cell;
@@ -62,7 +62,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     actors.push({
       y: t.r + 0.5,
       z: 0,
-      draw: () => drawTower(ctx, t, cell, t.id === engine.selectedId, engine.time, engine),
+      draw: () => drawTower(ctx, t, cell, t.id === engine.selectedId, engine.time),
     });
   }
   for (const c of engine.creeps) {
@@ -194,7 +194,7 @@ function drawGround(ctx: CanvasRenderingContext2D, cell: number, time: number, e
 }
 
 function drawWater(ctx: CanvasRenderingContext2D, cell: number, time: number, engine: EmberEngine) {
-  const wet = new Set(engine.map.water.map(([c, r]) => `${c},${r}`));
+  const wet = engine.waterSet;
   for (const [c, r] of engine.map.water) {
     const x = (c + 0.5) * cell;
     const y = (r + 0.5) * cell;
@@ -395,6 +395,28 @@ function drawKeep(ctx: CanvasRenderingContext2D, x: number, y: number, cell: num
   ctx.restore();
 }
 
+function drawRouteTags(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
+  if (engine.phase !== "ready" && engine.phase !== "wave") return;
+  const spawn = engine.path[0];
+  const base = engine.path[engine.path.length - 1];
+  const size = Math.max(8, cell * 0.13);
+  const tagY = (r: number) => Math.max(cell * 0.22, (r + 0.5) * cell - cell * 0.54);
+  ctx.save();
+  ctx.font = `700 ${size}px Figtree, sans-serif`;
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(18,22,15,0.9)";
+  ctx.shadowBlur = 4;
+
+  ctx.fillStyle = "rgba(232,220,196,0.76)";
+  ctx.textAlign = "left";
+  ctx.fillText("ENTRY", Math.max(4, (spawn.c + 0.12) * cell), tagY(spawn.r));
+
+  ctx.fillStyle = engine.lives <= 6 ? "rgba(196,92,74,0.9)" : "rgba(212,160,84,0.9)";
+  ctx.textAlign = "right";
+  ctx.fillText("KEEP", Math.min(COLS * cell - 4, (base.c + 0.88) * cell), tagY(base.r));
+  ctx.restore();
+}
+
 function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
   const glass = engine.relics.has("glass") ? 1.12 : 1;
   const selected = engine.selectedTower();
@@ -526,7 +548,7 @@ function drawFormKit(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, 
   }
 }
 
-function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, selected: boolean, time: number, engine: EmberEngine) {
+function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, selected: boolean, time: number) {
   const x = (tower.c + 0.5) * cell;
   const y = (tower.r + 0.5) * cell;
   const pop = easeOutBack(Math.min(1, tower.build));

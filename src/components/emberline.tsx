@@ -50,6 +50,10 @@ export function Emberline() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (engine.codex) {
+        if (e.key === "Escape") engine.toggleCodex();
+        return;
+      }
       if (e.key === "1") engine.chooseKind("bow");
       if (e.key === "2") engine.chooseKind("mortar");
       if (e.key === "3") engine.chooseKind("frost");
@@ -107,26 +111,25 @@ export function Emberline() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
       engine.tick(dt);
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        const w = COLS * cell;
-        const h = ROWS * cell;
-        if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
-          canvas.width = Math.floor(w * dpr);
-          canvas.height = Math.floor(h * dpr);
-          canvas.style.width = `${w}px`;
-          canvas.style.height = `${h}px`;
-        }
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        drawWorld(ctx, engine, cell, w, h);
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = COLS * cell;
+      const h = ROWS * cell;
+      if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
       }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawWorld(ctx, engine, cell, w, h);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -167,6 +170,13 @@ export function Emberline() {
   };
 
   const playing = hud.phase === "ready" || hud.phase === "wave";
+  const hornLabel = hud.phase !== "wave"
+    ? "Horn available during a wave"
+    : hud.hornCd > 0
+      ? `Horn cooling down for ${Math.ceil(hud.hornCd)} seconds`
+      : hud.hornCost === 0
+        ? "Use free horn"
+        : `Use horn for ${hud.hornCost} gold`;
   const menu =
     hud.codex ||
     hud.phase === "title" ||
@@ -179,9 +189,13 @@ export function Emberline() {
   const packets = Object.keys(TOWERS) as TowerKind[];
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-[#10140c] text-parchment">
+    <div
+      className="game-shell relative flex h-dvh flex-col overflow-hidden bg-[#10140c] text-parchment"
+      data-phase={hud.phase}
+    >
       <header className="watch-bar flex shrink-0 items-stretch">
-        <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-2">
+        <div className="watch-title flex min-w-0 flex-1 flex-col justify-center px-4 py-2">
+          <span className="watch-overline">Duskward watch</span>
           <p className="truncate font-display text-xl leading-none text-copper">
             {hud.phase === "title" ? "Emberline" : hud.mapName}
           </p>
@@ -193,25 +207,34 @@ export function Emberline() {
             </div>
           )}
         </div>
-        <div className="watch-stat" title="Lives">
-          <img className="hud-ico" src="/ui/icon-heart.png" alt="" />
-          <span className={`n ${hud.lives <= 5 ? "hurt" : ""}`}>{hud.lives}</span>
-          <span className="u">lives</span>
-        </div>
-        <div className="watch-stat" title="Gold">
-          <img className="hud-ico" src="/ui/icon-coin.png" alt="" />
-          <span className="n gold">{hud.gold}</span>
-          <span className="u">gold</span>
-        </div>
-        <div className="watch-stat" title="Wave">
-          <img className="hud-ico" src="/ui/icon-wave.png" alt="" />
-          <span className="n">
-            {hud.phase === "wave" ? hud.remaining : `${hud.wave}/${hud.totalWaves}`}
-          </span>
-          <span className="u">{hud.phase === "wave" ? "left" : "wave"}</span>
-        </div>
-        <div className="flex items-center gap-1 px-3">
-          <button type="button" className="pressable packet px-2 py-1 text-[10px] text-dust" onClick={() => engine.toggleMute()}>
+        {hud.phase !== "title" && (
+          <>
+            <div className="watch-stat" title="Lives">
+              <img className="hud-ico" src="/ui/icon-heart.png" alt="" />
+              <span className={`n ${hud.lives <= 5 ? "hurt" : ""}`}>{hud.lives}</span>
+              <span className="u">lives</span>
+            </div>
+            <div className="watch-stat" title="Gold">
+              <img className="hud-ico" src="/ui/icon-coin.png" alt="" />
+              <span className="n gold">{hud.gold}</span>
+              <span className="u">gold</span>
+            </div>
+            <div className="watch-stat" title="Wave">
+              <img className="hud-ico" src="/ui/icon-wave.png" alt="" />
+              <span className="n">
+                {hud.phase === "wave" ? hud.remaining : `${hud.wave}/${hud.totalWaves}`}
+              </span>
+              <span className="u">{hud.phase === "wave" ? "left" : "wave"}</span>
+            </div>
+          </>
+        )}
+        <div className="watch-actions flex items-center gap-1 px-3">
+          <button
+            type="button"
+            className="pressable packet px-2 py-1 text-[10px] text-dust"
+            aria-pressed={hud.muted}
+            onClick={() => engine.toggleMute()}
+          >
             {hud.muted ? "Muted" : "Sound"}
           </button>
           {playing && (
@@ -225,11 +248,13 @@ export function Emberline() {
       <div className="flex min-h-0 flex-1 flex-col">
         <div
           ref={wrapRef}
-          className="relative mx-3 mt-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+          className="playfield-wrap relative mx-3 mt-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden"
         >
           <canvas
             ref={canvasRef}
             className={`stage-frame touch-none xl:max-h-full ${hud.selectedKind ? "cursor-crosshair" : "cursor-pointer"}`}
+            aria-label="Emberline tower defense board. Use number keys to choose a tower, then click grass beside the road to plant it."
+            tabIndex={0}
             onPointerMove={onMove}
             onPointerDown={(e) => {
               if (e.button === 1) {
@@ -257,13 +282,20 @@ export function Emberline() {
           />
 
           {hud.paused && playing && (
-            <div className="pointer-events-none absolute inset-4 flex items-center justify-center">
-              <p className="bg-ink/80 px-6 py-2 font-display text-2xl text-copper">Paused</p>
+            <div className="pointer-events-none absolute inset-4 flex items-center justify-center" role="status" aria-live="polite">
+              <div className="pause-plaque bg-ink/90 px-8 py-4 text-center">
+                <p className="font-display text-2xl text-copper">Paused</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-dust">Press P or Resume</p>
+              </div>
             </div>
           )}
 
           {playing && hud.hero && (
-            <p className="pointer-events-none absolute left-2 top-2 z-10 max-w-[70%] bg-ink/80 px-3 py-1.5 text-[12px] text-copper">
+            <p
+              className="pointer-events-none absolute left-2 top-2 z-10 max-w-[70%] bg-ink/80 px-3 py-1.5 text-[12px] text-copper"
+              role="status"
+              aria-live="polite"
+            >
               {hud.hero.who}: {hud.hero.line}
             </p>
           )}
@@ -280,7 +312,7 @@ export function Emberline() {
             </Overlay>
           )}
 
-          {hud.phase === "title" && (
+          {hud.phase === "title" && !hud.codex && (
             <Overlay kicker="Keep watch" title="Emberline">
               <p className="max-w-sm text-sm leading-relaxed text-dust">
                 Plant on grass. Line two towers. Hold five maps until dawn. Space to begin.
@@ -379,11 +411,14 @@ export function Emberline() {
                 <p className="font-display text-lg leading-none text-copper">
                   {TOWERS[hud.selectedTower.kind].name}
                   <span className="ml-2 font-sans text-[11px] tracking-wide text-dust">
-                    {hud.formName}
+                    · {hud.formName}
                     {hud.selectedTower.empowered ? " · Emberlit" : ""}
                   </span>
                 </p>
-                <p className="mt-1 max-w-lg text-[11px] text-dust">{formBlurb(hud.selectedTower.kind, hud.formName)}</p>
+                <p className="mt-1 max-w-lg text-[11px] text-dust">
+                  {formBlurb(hud.selectedTower.kind, hud.formName)}
+                  {playing && hud.phase === "ready" && <span className="ml-2 text-copper">Next: {hud.nextWave}</span>}
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
                 <button
@@ -431,13 +466,22 @@ export function Emberline() {
               )}
             </div>
           ) : (
-            <p className="max-w-2xl bg-ink/60 px-2 py-1 text-[11px] text-parchment">
-              {hud.selectedKind ? TOWERS[hud.selectedKind].blurb : playing && hud.phase === "ready" ? `Next: ${hud.nextWave}` : "Pick a packet, plant on grass beside the road."}
+              <p className="max-w-2xl bg-ink/60 px-2 py-1 text-[11px] text-parchment" aria-live="polite">
+              {hud.selectedKind ? (
+                <>
+                  {TOWERS[hud.selectedKind].blurb}
+                  {playing && hud.phase === "ready" && <span className="ml-2 text-copper">Next: {hud.nextWave}</span>}
+                </>
+              ) : playing && hud.phase === "ready" ? (
+                `Next: ${hud.nextWave}`
+              ) : (
+                "Pick a packet, plant on grass beside the road."
+              )}
             </p>
           )}
 
           <div className="flex flex-wrap items-end gap-2">
-            <div className="flex min-w-0 flex-1 flex-wrap gap-1">
+            <div className="packet-row flex min-w-0 flex-1 flex-wrap gap-1">
               {packets.map((kind, i) => {
                 const def = TOWERS[kind];
                 return (
@@ -446,6 +490,8 @@ export function Emberline() {
                     type="button"
                     disabled={!playing}
                     data-on={hud.selectedKind === kind}
+                    aria-pressed={hud.selectedKind === kind}
+                    aria-label={`${def.name} tower, costs ${def.cost} gold${hud.selectedKind === kind ? ", selected" : ""}`}
                     onClick={() => {
                       unlockAudio();
                       engine.chooseKind(kind);
@@ -460,24 +506,46 @@ export function Emberline() {
                 );
               })}
             </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <button type="button" className="pressable packet min-h-11 px-2 text-[11px] text-dust" disabled={!playing} onClick={() => engine.setAim(AIMS[(AIMS.indexOf(hud.towerAim) + 1) % AIMS.length])}>
+            <div className="command-row flex flex-wrap items-center gap-1">
+              <button
+                type="button"
+                className="pressable packet min-h-11 px-2 text-[11px] text-dust"
+                aria-label={`Tower targeting: ${AIM_LABEL[hud.towerAim]}. Activate to cycle targeting mode.`}
+                title={`Targeting ${AIM_LABEL[hud.towerAim]}`}
+                disabled={!playing}
+                onClick={() => engine.setAim(AIMS[(AIMS.indexOf(hud.towerAim) + 1) % AIMS.length])}
+              >
                 Aim {AIM_LABEL[hud.towerAim]}
               </button>
-              <button type="button" className="pressable packet min-h-11 px-2 text-[11px] text-dust" disabled={!playing} onClick={() => engine.cycleSpeed()}>
+              <button
+                type="button"
+                className="pressable packet min-h-11 px-2 text-[11px] text-dust"
+                aria-label={`Game speed ${hud.speed}x. Activate to cycle speed.`}
+                title={`Game speed ${hud.speed}x`}
+                disabled={!playing}
+                onClick={() => engine.cycleSpeed()}
+              >
                 {hud.speed}×
               </button>
               <button
                 type="button"
                 className="pressable packet min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
-                disabled={!playing || hud.hornCd > 0 || hud.gold < hud.hornCost}
+                aria-label={hornLabel}
+                title={hornLabel}
+                disabled={hud.phase !== "wave" || hud.hornCd > 0 || hud.gold < hud.hornCost}
                 onClick={() => {
                   unlockAudio();
                   engine.blowHorn();
                 }}
               >
                 <img className="mx-auto mb-0.5 h-5 w-5 object-contain" src="/ui/icon-horn.png" alt="" />
-                {hud.hornCd > 0 ? `${Math.ceil(hud.hornCd)}s` : hud.hornCost === 0 ? "Horn" : `${hud.hornCost}g`}
+                {hud.phase !== "wave"
+                  ? "Wave only"
+                  : hud.hornCd > 0
+                    ? `${Math.ceil(hud.hornCd)}s`
+                    : hud.hornCost === 0
+                      ? "Horn"
+                      : `${hud.hornCost}g`}
               </button>
               <button type="button" className="pressable packet min-h-11 px-2 text-[11px] text-dust disabled:opacity-40" disabled={hud.phase !== "ready" || hud.wave < 1} onClick={() => engine.openStall()}>
                 Stall
@@ -566,16 +634,51 @@ function Overlay({
   onClose?: () => void;
   dimmer?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusables = () =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+    focusables()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    dialog.addEventListener("keydown", onKeyDown);
+    return () => {
+      dialog.removeEventListener("keydown", onKeyDown);
+      previous?.focus();
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title ?? kicker ?? "Emberline"}>
       <div
-        className="absolute inset-0 bg-ink/80"
+        className="veil absolute inset-0"
         onClick={() => {
           if (dimmer && onAction) onAction();
         }}
       />
       <div
-        className={`overlay-in dispatch relative flex w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[82dvh] flex-col items-center gap-3 overflow-y-auto px-8 py-8 text-center`}
+        ref={dialogRef}
+        className={`overlay-in dispatch relative flex w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[90dvh] flex-col items-center gap-3 overflow-y-auto px-8 py-8 text-center`}
       >
         <img className="wax" src="/ui/wax.png" alt="" />
         {kicker && <p className="dispatch-kicker">{kicker}</p>}
@@ -606,7 +709,7 @@ function ShopList({
   gold: number;
 }) {
   return (
-    <div className="grid w-full grid-cols-2 gap-1.5 text-left">
+    <div className="grid w-full grid-cols-2 gap-1.5 text-left md:grid-cols-3">
       {items.map((item) => {
         const owned = relics.includes(item.id);
         return (

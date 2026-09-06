@@ -435,7 +435,7 @@ export class EmberEngine {
   }
 
   blowHorn() {
-    if (!this.playing()) return;
+    if (this.phase !== "wave") return;
     const free = this.heroT > 0 && this.hero?.kind === "horn";
     const cost = free ? 0 : this.lives <= 5 ? Math.max(20, Math.floor(HORN_COST * 0.65)) : HORN_COST;
     if (this.hornCd > 0 || this.gold < cost) {
@@ -1441,7 +1441,6 @@ export class EmberEngine {
     this.creeps = [];
     this.shots = [];
     this.beams = [];
-    this.scoreGrade();
     if (this.wave >= this.map.waves.length) {
       if (this.mapIndex < MAPS.length - 1) {
         this.phase = "shop";
@@ -1473,6 +1472,7 @@ export class EmberEngine {
         this.selectedKind = null;
       }
     }
+    this.scoreGrade();
     this.notify();
   }
 
@@ -1525,7 +1525,8 @@ export class EmberEngine {
   }
 
   maybeNotify() {
-    const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${this.canUndo()}`;
+    const heroKey = this.heroT > 0 ? this.hero?.kind ?? "active" : "none";
+    const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${heroKey}|${this.canUndo()}`;
     if (key !== this.hudKey) {
       this.hudKey = key;
       this.notify();
