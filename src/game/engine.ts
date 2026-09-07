@@ -22,7 +22,7 @@ import {
   type CreepKind,
   type TowerKind,
 } from "./config.ts";
-import { MAPS, RELIC_IDS, describePlan, leakCost, pathCellsOf, planHasAir, shopFor, type MapDef, type RelicId } from "./campaign.ts";
+import { MAPS, RELIC_IDS, describePlan, leakCost, pathCellsOf, planHasAir, shopFor, type MapDef, type MapMarker, type RelicId } from "./campaign.ts";
 import { sfx, setMuted } from "./audio.ts";
 
 const FIRST = MAPS[0];
@@ -39,12 +39,32 @@ export interface RouteNodeSnap {
   id: string;
   name: string;
   place: string;
+  marker: MapMarker;
   state: "held" | "current" | "locked";
+  ruleLabel: string;
+  objectiveTitle: string;
+  objectiveReward: number;
 }
 
 export interface WavePreviewSnap {
   kind: CreepKind;
   count: number;
+}
+
+export interface WaveResultSnap {
+  wave: number;
+  kills: number;
+  leaks: number;
+  earned: number;
+}
+
+export interface ObjectiveSnap {
+  title: string;
+  detail: string;
+  current: number;
+  target: number;
+  reward: number;
+  complete: boolean;
 }
 
 function wavePreviewFor(plan: MapDef["waves"][number] | undefined): WavePreviewSnap[] {
@@ -171,6 +191,11 @@ export interface HudSnap {
   remaining: number;
   waveTotal: number;
   waveProgress: number;
+  bannerText: string | null;
+  lastResult: WaveResultSnap | null;
+  field: MapDef["profile"];
+  objective: ObjectiveSnap;
+  fieldBoost: { damage: number; rate: number; range: number } | null;
   nextCosts: { dmg: number; rate: number } | null;
   aim: Aim;
   paused: boolean;
@@ -205,6 +230,7 @@ export interface HudSnap {
   previewWave: number;
   wavePreview: WavePreviewSnap[];
   threatTier: ThreatTier;
+  campaign: boolean;
 }
 
 export interface Burn {
@@ -270,6 +296,12 @@ export class EmberEngine {
   lastPlaceT = -99;
   muted = false;
   autoPaused = false;
+  waveKills = 0;
+  waveLeaks = 0;
+  waveEarned = 0;
+  lastResult: WaveResultSnap | null = null;
+  killCounts: Partial<Record<CreepKind, number>> = {};
+  campaignOpen = false;
 
   private acc = 0;
   private listeners = new Set<() => void>();
@@ -337,6 +369,135 @@ export class EmberEngine {
     return this.snap;
   }
 
+  renderText() {
+    const hud = this.hud();
+    return JSON.stringify({
+      coordinateSystem: "origin top-left; x increases right; y increases down; board is 13 columns by 9 rows",
+      phase: hud.phase,
+      map: hud.mapName,
+      field: hud.field,
+      wave: {
+        current: hud.wave,
+        total: hud.totalWaves,
+        remaining: hud.remaining,
+        progress: Math.round(hud.waveProgress * 100),
+        queued: this.spawnQ.length,
+      },
+      keep: { lives: hud.lives, maxLives: hud.maxLives },
+      gold: hud.gold,
+      selectedPacket: hud.selectedKind,
+      selectedTower: hud.selectedTower
+        ? {
+            id: hud.selectedTower.id,
+            kind: hud.selectedTower.kind,
+            cell: { c: hud.selectedTower.c, r: hud.selectedTower.r },
+            damageLevel: hud.selectedTower.dmgLvl,
+            rateLevel: hud.selectedTower.rateLvl,
+            aim: hud.selectedTower.aim,
+            empowered: hud.selectedTower.empowered,
+          }
+        : null,
+      towers: this.towers.map((tower) => ({
+        id: tower.id,
+        kind: tower.kind,
+        cell: { c: tower.c, r: tower.r },
+        damageLevel: tower.dmgLvl,
+        rateLevel: tower.rateLvl,
+        aim: tower.aim,
+        empowered: tower.empowered,
+      })),
+      creeps: this.creeps
+        .filter((creep) => creep.alive)
+        .slice(0, 24)
+        .map((creep) => ({
+          id: creep.id,
+          kind: creep.kind,
+          x: Number(creep.x.toFixed(2)),
+          y: Number(creep.y.toFixed(2)),
+          hp: Math.ceil(creep.hp),
+          maxHp: creep.maxHp,
+          progress: Number(creep.progress.toFixed(2)),
+        })),
+      controls: { aim: hud.towerAim, speed: hud.speed, paused: hud.paused, canUndo: hud.canUndo, nextWave: hud.nextWave },
+      banner: hud.bannerText,
+      lastResult: hud.lastResult,
+      objective: hud.objective,
+      campaign: hud.campaign,
+    });
+  }
+
+  objectiveProgress() {
+    const rule = this.map.profile.rule;
+    let current = 0;
+    if (rule.id === "lantern-aura") {
+      current = this.towers.some((tower) => this.inLanternAura(tower)) ? 1 : 0;
+    } else if (rule.id === "pine-fog") {
+      current = Math.min(rule.target, this.killCounts.wisp ?? 0);
+    } else if (rule.id === "stone-latch") {
+      current = Math.min(rule.target, this.linkedTowerCount());
+    } else if (rule.id === "ford-banks") {
+      current = this.wave > 0 && this.phase !== "wave" && this.waveLeaks === 0 ? 1 : 0;
+    } else if (rule.id === "emberfall") {
+      current = this.towers.some((tower) => towerForm(tower.dmgLvl, tower.rateLvl) >= 4) ? 1 : 0;
+    }
+    return { current, target: rule.target, complete: current >= rule.target };
+  }
+
+  objectiveSnapshot(): ObjectiveSnap {
+    const rule = this.map.profile.rule;
+    const progress = this.objectiveProgress();
+    return {
+      title: rule.objectiveTitle,
+      detail: rule.objectiveDetail,
+      current: progress.current,
+      target: progress.target,
+      reward: rule.reward,
+      complete: progress.complete,
+    };
+  }
+
+  inLanternAura(tower: Tower) {
+    return this.props.some(
+      (prop) => prop.kind === "lamp" && Math.abs(prop.c - tower.c) + Math.abs(prop.r - tower.r) <= 2,
+    );
+  }
+
+  besidePath(tower: Tower) {
+    return (
+      this.pathSet.has(`${tower.c + 1},${tower.r}`) ||
+      this.pathSet.has(`${tower.c - 1},${tower.r}`) ||
+      this.pathSet.has(`${tower.c},${tower.r + 1}`) ||
+      this.pathSet.has(`${tower.c},${tower.r - 1}`)
+    );
+  }
+
+  linkedTowerCount() {
+    return Math.min(
+      this.towers.length,
+      this.towers.filter((tower) =>
+        this.towers.some(
+          (other) =>
+            other.id !== tower.id && Math.abs(other.c - tower.c) + Math.abs(other.r - tower.r) === 1,
+        ),
+      ).length,
+    );
+  }
+
+  fieldDamageMultiplier(tower: Tower) {
+    if (this.map.profile.rule.id === "stone-latch" && this.besidePath(tower)) return 1.12;
+    if (this.map.profile.rule.id === "emberfall" && towerForm(tower.dmgLvl, tower.rateLvl) >= 4) return 1.16;
+    return 1;
+  }
+
+  fieldRateMultiplier(tower: Tower) {
+    return this.map.profile.rule.id === "lantern-aura" && this.inLanternAura(tower) ? 1.18 : 1;
+  }
+
+  fieldRangeMultiplier(tower: Tower) {
+    if (this.map.profile.rule.id !== "pine-fog") return 1;
+    return tower.kind === "spark" ? 1.12 : 0.9;
+  }
+
   buildHud(): HudSnap {
     const t = this.selectedTower();
     const upcoming = this.phase === "wave" ? Math.max(0, this.wave - 1) : this.wave;
@@ -364,6 +525,17 @@ export class EmberEngine {
       remaining,
       waveTotal,
       waveProgress,
+      bannerText: this.banner?.text ?? null,
+      lastResult: this.lastResult,
+      field: map.profile,
+      objective: this.objectiveSnapshot(),
+      fieldBoost: t
+        ? {
+            damage: this.fieldDamageMultiplier(t),
+            rate: this.fieldRateMultiplier(t),
+            range: this.fieldRangeMultiplier(t),
+          }
+        : null,
       nextCosts: t
         ? {
             dmg: t.dmgLvl >= MAX_UPGRADE ? 0 : this.upgradePrice(upgradeDamageCost(t.kind, t.dmgLvl + 1)),
@@ -402,11 +574,21 @@ export class EmberEngine {
       muted: this.muted,
       route: MAPS.map((entry, index) => {
         const state: RouteNodeSnap["state"] = index === this.mapIndex ? "current" : index < this.unlocked ? "held" : "locked";
-        return { id: entry.id, name: entry.name, place: entry.place, state };
+        return {
+          id: entry.id,
+          name: entry.name,
+          place: entry.place,
+          marker: entry.profile.marker,
+          state,
+          ruleLabel: entry.profile.rule.label,
+          objectiveTitle: entry.profile.rule.objectiveTitle,
+          objectiveReward: entry.profile.rule.reward,
+        };
       }),
       previewWave: previewIndex + 1,
       wavePreview: wavePreviewFor(previewPlan),
       threatTier: threatTierFor(previewPlan),
+      campaign: this.campaignOpen,
     };
   }
 
@@ -475,6 +657,35 @@ export class EmberEngine {
 
   toggleCodex() {
     this.codex = !this.codex;
+    this.campaignOpen = false;
+    this.notify();
+  }
+
+  toggleCampaign() {
+    if (this.phase !== "title") return;
+    this.campaignOpen = !this.campaignOpen;
+    this.codex = false;
+    this.notify();
+  }
+
+  selectCampaignMap(index: number) {
+    if (this.phase !== "title") return;
+    const safe = index | 0;
+    if (safe < 0 || safe > this.unlocked || safe >= MAPS.length) return;
+    this.loadMap(safe);
+    this.notify();
+  }
+
+  startSelectedMap() {
+    if (this.phase !== "title") return;
+    this.readSave();
+    const safe = Math.max(0, Math.min(this.unlocked, MAPS.length - 1, this.mapIndex));
+    this.loadMap(safe);
+    this.clearField();
+    this.gold = this.startGold() + (safe > 0 ? 40 : 0);
+    this.lives = this.maxLives();
+    this.phase = "brief";
+    this.campaignOpen = false;
     this.notify();
   }
 
@@ -607,7 +818,13 @@ export class EmberEngine {
     this.hero = null;
     this.heroT = 0;
     this.codex = false;
+    this.campaignOpen = false;
     this.autoPaused = false;
+    this.waveKills = 0;
+    this.waveLeaks = 0;
+    this.waveEarned = 0;
+    this.lastResult = null;
+    this.killCounts = {};
   }
 
   reset() {
@@ -762,7 +979,7 @@ export class EmberEngine {
     t.build = 0.5;
     this.burst(t.c + 0.5, t.r + 0.3, "#e07838", 16, "ember");
     this.float(t.c + 0.5, t.r - 0.2, "Emberlit", "#e07838");
-    sfx.place();
+    sfx.upgrade();
     this.notify();
   }
 
@@ -885,7 +1102,7 @@ export class EmberEngine {
     t.build = 0.55;
     this.burst(t.c + 0.5, t.r + 0.35, "#e07838", 10, "spark");
     if (towerForm(t.dmgLvl, t.rateLvl) >= 4) this.float(t.c + 0.5, t.r - 0.2, "Crowned", "#e07838");
-    sfx.place();
+    sfx.upgrade();
     this.notify();
   }
 
@@ -905,7 +1122,7 @@ export class EmberEngine {
     t.build = 0.55;
     this.burst(t.c + 0.5, t.r + 0.35, "#d4a054", 10, "spark");
     if (towerForm(t.dmgLvl, t.rateLvl) >= 4) this.float(t.c + 0.5, t.r - 0.2, "Crowned", "#e07838");
-    sfx.place();
+    sfx.upgrade();
     this.notify();
   }
 
@@ -928,6 +1145,10 @@ export class EmberEngine {
     this.finishWaveIfClear();
     if (this.phase !== "ready") return;
     if (this.wave >= this.map.waves.length) return;
+    this.waveKills = 0;
+    this.waveLeaks = 0;
+    this.waveEarned = 0;
+    this.lastResult = null;
     this.wave += 1;
     const plan = this.map.waves[this.wave - 1];
     this.spawnQ = [];
@@ -943,6 +1164,7 @@ export class EmberEngine {
     const tithe = Math.min(28, Math.floor(this.gold * 0.06));
     if (tithe > 0) {
       this.gold += tithe;
+      this.waveEarned += tithe;
     }
     this.trauma = Math.min(1, this.trauma + 0.08);
     const aside = this.map.asides[this.wave - 1];
@@ -962,6 +1184,7 @@ export class EmberEngine {
       } else {
         this.hero = { who: "Lumen", line: "Coin from the ditch.", kind: "gold" };
         this.gold += 22;
+        this.waveEarned += 22;
         this.float(COLS / 2, 0.7, "+22", "#d4a054");
       }
       this.heroT = 8;
@@ -1001,7 +1224,13 @@ export class EmberEngine {
       healT: 1.2,
       rootT: 0,
     });
-    this.burst(start.x, start.y, "#e07838", 3, "ember");
+    const boss = kind === "lord";
+    this.burst(start.x, start.y, "#e07838", boss ? 14 : 3, "ember");
+    if (boss) {
+      this.float(start.x, start.y - 0.65, "EMBERLORD", "#e07838");
+      this.banner = { text: "Emberlord approaching", life: 1.8, max: 1.8 };
+      sfx.boss();
+    }
   }
 
   burst(x: number, y: number, color: string, n: number, kind: Particle["kind"] = "spark") {
@@ -1064,11 +1293,15 @@ export class EmberEngine {
         this.towers.filter((t) => towerForm(t.dmgLvl, t.rateLvl) >= 4).length +
         (this.wave % 4 === 0 ? 2 : 0);
       this.gold += gold;
+      this.waveKills += 1;
+      this.waveEarned += gold;
       this.streakT = 3.2;
       this.streak += 1;
       if (this.streak >= 4 && this.streak % 2 === 0) {
         this.gold += 3;
+        this.waveEarned += 3;
         this.float(creep.x, creep.y - 0.5, `streak +3`, "#e07838");
+        sfx.combo();
       }
       if (this.streak > 0 && this.streak % 6 === 0) {
         let best: Creep | null = null;
@@ -1095,6 +1328,7 @@ export class EmberEngine {
         this.trauma = Math.min(1, this.trauma + 0.55);
         this.hitstop = Math.max(this.hitstop, 0.08);
       }
+      this.killCounts[creep.kind] = (this.killCounts[creep.kind] ?? 0) + 1;
       sfx.kill();
     } else {
       sfx.hit();
@@ -1110,6 +1344,7 @@ export class EmberEngine {
       (this.relics.has("ember") && tower.kind === "mortar" ? 1.2 : 1) *
       (1 + (form - 1) * 0.06) *
       this.lineBonus(tower) *
+      this.fieldDamageMultiplier(tower) *
       (this.focusId === target.id ? 1.1 : 1);
     if (tower.kind === "mortar" && target.kind === "shell") dmg *= 1.28;
     if (tower.kind === "bramble" && target.kind === "shell") dmg *= 1.18;
@@ -1123,7 +1358,7 @@ export class EmberEngine {
       tower.volley = false;
     }
     this.focusId = target.id;
-    const rate = rateAt(tower.kind, tower.rateLvl);
+    const rate = rateAt(tower.kind, tower.rateLvl) * this.fieldRateMultiplier(tower);
     tower.cooldown = 1 / rate;
     tower.angle = Math.atan2(target.y - (tower.r + 0.5), target.x - (tower.c + 0.5));
     tower.recoil = 1;
@@ -1131,7 +1366,11 @@ export class EmberEngine {
     const sx = tower.c + 0.5 + Math.cos(tower.angle) * muzzle;
     const sy = tower.r + 0.5 + Math.sin(tower.angle) * muzzle;
     if (tower.kind === "ward") {
-      const range = rangeAt(tower.kind, tower.dmgLvl) * (this.relics.has("glass") ? 1.12 : 1) * (tower.empowered ? 1.18 : 1);
+      const range =
+        rangeAt(tower.kind, tower.dmgLvl) *
+        (this.relics.has("glass") ? 1.12 : 1) *
+        (tower.empowered ? 1.18 : 1) *
+        this.fieldRangeMultiplier(tower);
       this.ring(tower.c + 0.5, tower.r + 0.5, "#d4a054");
       for (const c of this.creeps) {
         if (!c.alive) continue;
@@ -1215,7 +1454,11 @@ export class EmberEngine {
   }
 
   pickTarget(tower: Tower, ignore: Set<number> = new Set()): Creep | null {
-    const range = rangeAt(tower.kind, tower.dmgLvl) * (this.relics.has("glass") ? 1.12 : 1) * (tower.empowered ? 1.18 : 1);
+    const range =
+      rangeAt(tower.kind, tower.dmgLvl) *
+      (this.relics.has("glass") ? 1.12 : 1) *
+      (tower.empowered ? 1.18 : 1) *
+      this.fieldRangeMultiplier(tower);
     const cx = tower.c + 0.5;
     const cy = tower.r + 0.5;
     const r2 = range * range;
@@ -1391,6 +1634,7 @@ export class EmberEngine {
           creep.death = 0.18;
           const wound = leakCost(creep.kind);
           this.lives = Math.max(0, this.lives - wound);
+          this.waveLeaks += 1;
           this.streak = 0;
           this.trauma = Math.min(1, this.trauma + (creep.kind === "lord" ? 0.7 : 0.4));
           sfx.leak();
@@ -1500,37 +1744,58 @@ export class EmberEngine {
     this.creeps = [];
     this.shots = [];
     this.beams = [];
+    const heldWave = this.wave;
     if (this.wave >= this.map.waves.length) {
+      const objective = this.objectiveSnapshot();
+      if (objective.complete) {
+        this.gold += objective.reward;
+        this.waveEarned += objective.reward;
+        this.float(COLS / 2, 0.7, `Objective +${objective.reward}`, "#e07838");
+        this.banner = { text: `${objective.title} — +${objective.reward}g`, life: 2.4, max: 2.4 };
+        sfx.objective();
+      }
       if (this.mapIndex < MAPS.length - 1) {
         this.phase = "shop";
         this.gold += 70;
+        this.waveEarned += 70;
         this.unlocked = Math.max(this.unlocked, this.mapIndex + 1);
         this.persist();
-        this.banner = { text: `${this.map.name} held`, life: 2.2, max: 2.2 };
+        if (!objective.complete) this.banner = { text: `${this.map.name} held`, life: 2.2, max: 2.2 };
         sfx.win();
       } else {
         this.phase = "won";
         this.unlocked = Math.max(this.unlocked, MAPS.length);
         this.persist();
+        if (!objective.complete) this.banner = { text: "Dawn — the line held", life: 2.2, max: 2.2 };
         sfx.win();
       }
       this.trauma = 0.25;
     } else {
       this.phase = "ready";
-      this.gold += 42 + this.wave * 7 + this.mapIndex * 8;
+      const reward = 42 + this.wave * 7 + this.mapIndex * 8;
+      this.gold += reward;
+      this.waveEarned += reward;
       const interest = Math.floor(this.gold * 0.03);
       if (interest > 0) {
         this.gold += interest;
+        this.waveEarned += interest;
         this.float(COLS / 2, 0.55, `Interest +${interest}`, "#d4a054");
       }
       this.banner = { text: `Wave ${this.wave} held`, life: 1.6, max: 1.6 };
       this.float(COLS / 2, 0.45, "Road clear", "#d4a054");
+      sfx.waveClear();
       const last = this.towers[this.towers.length - 1];
       if (last) {
         this.selectedId = last.id;
         this.selectedKind = null;
       }
     }
+    this.lastResult = {
+      wave: heldWave,
+      kills: this.waveKills,
+      leaks: this.waveLeaks,
+      earned: this.waveEarned,
+    };
     this.scoreGrade();
     this.notify();
   }
@@ -1585,7 +1850,8 @@ export class EmberEngine {
 
   maybeNotify() {
     const heroKey = this.heroT > 0 ? this.hero?.kind ?? "active" : "none";
-    const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${heroKey}|${this.canUndo()}`;
+    const objective = this.objectiveProgress();
+    const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${heroKey}|${this.canUndo()}|${this.banner?.text ?? ""}|${this.lastResult?.wave ?? 0}|${this.waveKills}|${this.waveLeaks}|${this.waveEarned}|${objective.current}`;
     if (key !== this.hudKey) {
       this.hudKey = key;
       this.notify();

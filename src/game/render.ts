@@ -29,6 +29,8 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   drawGround(ctx, cell, engine.time, engine);
   drawPath(ctx, cell, engine);
   drawWater(ctx, cell, engine.time, engine);
+  drawAmbient(ctx, cell, engine);
+  drawFieldRule(ctx, cell, engine);
 
   const spawn = engine.path[0];
   const base = engine.path[engine.path.length - 1];
@@ -217,6 +219,123 @@ function drawWater(ctx: CanvasRenderingContext2D, cell: number, time: number, en
   }
 }
 
+function drawAmbient(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
+  const width = COLS * cell;
+  const height = ROWS * cell;
+  const time = engine.reducedMotion ? 0 : engine.time;
+  const ambient = engine.map.profile.ambient;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+
+  if (ambient === "lanterns") {
+    for (let i = 0; i < 7; i++) {
+      const x = ((i * 71 + 34) % Math.max(1, width - 12)) + 6;
+      const y = ((i * 43 + 28) % Math.max(1, height - 16)) + 8;
+      const pulse = 0.3 + (Math.sin(time * 2.2 + i * 1.7) + 1) * 0.12;
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = COPPER;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1.4, cell * 0.035), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (ambient === "pine-fog") {
+    const fog = ctx.createLinearGradient(0, height * 0.25, width, height * 0.7);
+    fog.addColorStop(0, "rgba(126,166,157,0)");
+    fog.addColorStop(0.45, "rgba(126,166,157,0.12)");
+    fog.addColorStop(1, "rgba(126,166,157,0)");
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = fog;
+    ctx.fillRect(-width * 0.1 + Math.sin(time * 0.25) * cell, height * 0.2, width * 1.2, height * 0.42);
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "#b5c8b4";
+    for (let i = 0; i < 5; i++) {
+      const y = height * (0.18 + i * 0.17) + Math.sin(time * 0.35 + i) * cell * 0.14;
+      ctx.fillRect(-cell, y, width + cell * 2, Math.max(1, cell * 0.03));
+    }
+  } else if (ambient === "keep-ash") {
+    ctx.fillStyle = "#d6c6a5";
+    for (let i = 0; i < 14; i++) {
+      const x = ((i * 53 + 19) % Math.max(1, width - 4)) + 2;
+      const y = ((i * 37 + 11 + time * (7 + (i % 3) * 3)) % Math.max(1, height - 4)) + 2;
+      ctx.globalAlpha = 0.1 + (i % 4) * 0.025;
+      ctx.fillRect(x, y, Math.max(1, cell * 0.025), Math.max(1, cell * 0.025));
+    }
+  } else if (ambient === "river-rain") {
+    ctx.strokeStyle = "#82b5ad";
+    ctx.lineWidth = Math.max(1, cell * 0.018);
+    for (let i = 0; i < 18; i++) {
+      const x = ((i * 47 + time * (18 + (i % 4) * 5)) % (width + cell * 2)) - cell;
+      const y = (i * 29) % Math.max(1, height - cell);
+      ctx.globalAlpha = 0.08 + (i % 3) * 0.02;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - cell * 0.12, y + cell * 0.42);
+      ctx.stroke();
+    }
+  } else if (ambient === "emberfall") {
+    const glow = ctx.createRadialGradient(width * 0.55, height * 0.48, 0, width * 0.55, height * 0.48, Math.max(width, height) * 0.66);
+    glow.addColorStop(0, "rgba(224,120,56,0.12)");
+    glow.addColorStop(1, "rgba(224,120,56,0)");
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = EMBER;
+    for (let i = 0; i < 16; i++) {
+      const x = ((i * 61 + 17) % Math.max(1, width - 6)) + 3;
+      const y = ((i * 31 + 9 - time * (5 + (i % 4) * 2)) % Math.max(1, height - 6)) + 3;
+      ctx.globalAlpha = 0.12 + (i % 3) * 0.04;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1, cell * 0.025 + (i % 2) * cell * 0.018), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawFieldRule(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
+  const rule = engine.map.profile.rule.id;
+  ctx.save();
+  if (rule === "lantern-aura") {
+    ctx.setLineDash([cell * 0.12, cell * 0.1]);
+    ctx.lineWidth = Math.max(1, cell * 0.018);
+    ctx.strokeStyle = "rgba(224,120,56,0.24)";
+    for (const prop of engine.props) {
+      if (prop.kind !== "lamp") continue;
+      ctx.beginPath();
+      ctx.arc((prop.c + 0.5) * cell, (prop.r + 0.5) * cell, cell * 2.02, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (rule === "stone-latch" && (engine.phase === "ready" || engine.phase === "wave")) {
+    ctx.fillStyle = "rgba(212,160,84,0.055)";
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (engine.pathSet.has(`${c},${r}`) || engine.blockedSet.has(`${c},${r}`)) continue;
+        if (!nearPath(c, r, engine)) continue;
+        ctx.fillRect(c * cell + 2, r * cell + 2, cell - 4, cell - 4);
+      }
+    }
+  } else if (rule === "emberfall") {
+    for (const tower of engine.towers) {
+      if (towerForm(tower.dmgLvl, tower.rateLvl) < 4) continue;
+      const glow = ctx.createRadialGradient(
+        (tower.c + 0.5) * cell,
+        (tower.r + 0.5) * cell,
+        cell * 0.12,
+        (tower.c + 0.5) * cell,
+        (tower.r + 0.5) * cell,
+        cell * 0.8,
+      );
+      glow.addColorStop(0, "rgba(224,120,56,0.2)");
+      glow.addColorStop(1, "rgba(224,120,56,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc((tower.c + 0.5) * cell, (tower.r + 0.5) * cell, cell * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function strokeRoute(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
   const path = engine.path;
   if (path.length < 2) return;
@@ -298,7 +417,11 @@ function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   ctx.restore();
   for (const t of engine.towers) {
     if (t.kind !== "ward") continue;
-    const range = rangeAt(t.kind, t.dmgLvl) * (engine.relics.has("glass") ? 1.12 : 1) * (t.empowered ? 1.18 : 1);
+    const range =
+      rangeAt(t.kind, t.dmgLvl) *
+      (engine.relics.has("glass") ? 1.12 : 1) *
+      (t.empowered ? 1.18 : 1) *
+      engine.fieldRangeMultiplier(t);
     ctx.save();
     ctx.globalAlpha = 0.1 + Math.sin(engine.time * 3 + t.id) * 0.04;
     ctx.fillStyle = COPPER;
@@ -421,7 +544,11 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   const glass = engine.relics.has("glass") ? 1.12 : 1;
   const selected = engine.selectedTower();
   if (selected) {
-    const range = rangeAt(selected.kind, selected.dmgLvl) * glass * (selected.empowered ? 1.18 : 1);
+    const range =
+      rangeAt(selected.kind, selected.dmgLvl) *
+      glass *
+      (selected.empowered ? 1.18 : 1) *
+      engine.fieldRangeMultiplier(selected);
     ctx.beginPath();
     ctx.arc((selected.c + 0.5) * cell, (selected.r + 0.5) * cell, range * cell, 0, Math.PI * 2);
     const ink = selected.kind === "frost" ? "106,168,180" : selected.kind === "mortar" ? "224,120,56" : "212,160,84";
@@ -623,6 +750,14 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
     ctx.arc(0, 0, size * 1.8, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = fade;
+    ctx.strokeStyle = "rgba(224,120,56,0.72)";
+    ctx.lineWidth = Math.max(1.2, cell * 0.025);
+    ctx.setLineDash([size * 0.5, size * 0.28]);
+    ctx.lineDashOffset = creep.progress * -cell * 0.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 2.05, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
   if (creep.kind === "shaman" && creep.alive) {
     ctx.strokeStyle = "rgba(122,90,168,0.55)";
@@ -664,6 +799,18 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
   ctx.ellipse(0, size * 0.7, size * 0.85, size * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
   if (drawSprite(ctx, creep.kind, 0, size * 0.35, size * 2.15, { alpha: fade, flip: Math.cos(creep.facing) < 0 })) {
+    if (creep.alive && creep.kind === "lord") {
+      ctx.save();
+      ctx.globalAlpha = 0.86 * fade;
+      ctx.fillStyle = PARCHMENT;
+      ctx.font = `700 ${Math.max(7, cell * 0.13)}px Figtree, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(18,22,15,0.9)";
+      ctx.shadowBlur = 4;
+      ctx.fillText("EMBERLORD", 0, -size * 1.48);
+      ctx.restore();
+    }
     if (creep.alive && creep.flash > 0) {
       ctx.globalAlpha = creep.flash * 0.35;
       ctx.fillStyle = "#fff6e0";

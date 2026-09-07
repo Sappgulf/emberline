@@ -1,22 +1,6 @@
-const KEYS = [
-  "bow",
-  "mortar",
-  "frost",
-  "spark",
-  "bramble",
-  "ward",
-  "grub",
-  "runner",
-  "shell",
-  "wisp",
-  "shaman",
-  "hound",
-  "lord",
-  "keep",
-  "gate",
-  "pine",
-  "rock",
-] as const;
+import { SPRITE_KEYS, spriteUrl } from "./assets.ts";
+
+const KEYS = SPRITE_KEYS;
 
 export type SpriteKey = (typeof KEYS)[number];
 
@@ -29,13 +13,13 @@ export function loadSprites() {
   for (const key of KEYS) {
     if (images[key]) continue;
     const img = new Image();
-    img.src = `/assets/sprites/${key}.png?v=3`;
+    img.src = spriteUrl(key);
     images[key] = img;
   }
   for (const key of SHOTS) {
     if (images[key]) continue;
     const img = new Image();
-    img.src = `/assets/sprites/${key}.png?v=1`;
+    img.src = spriteUrl(key);
     images[key] = img;
   }
   if (!images.grass) {

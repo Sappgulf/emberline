@@ -15,6 +15,28 @@ export interface StoryBeat {
   line: string;
 }
 
+export type MapAmbient = "lanterns" | "pine-fog" | "keep-ash" | "river-rain" | "emberfall";
+export type MapMarker = "gate" | "pine" | "keep" | "rock";
+export type FieldRuleId = "lantern-aura" | "pine-fog" | "stone-latch" | "ford-banks" | "emberfall";
+
+export interface FieldRule {
+  id: FieldRuleId;
+  label: string;
+  detail: string;
+  objectiveTitle: string;
+  objectiveDetail: string;
+  target: number;
+  reward: number;
+}
+
+export interface MapProfile {
+  label: string;
+  detail: string;
+  ambient: MapAmbient;
+  marker: MapMarker;
+  rule: FieldRule;
+}
+
 export interface MapTheme {
   moss: string;
   lit: string;
@@ -38,6 +60,7 @@ export interface MapDef {
   victory: StoryBeat;
   asides: string[];
   theme: MapTheme;
+  profile: MapProfile;
 }
 
 export const SHOP: ShopItem[] = [
@@ -91,6 +114,21 @@ export const MAPS: MapDef[] = [
       ink: "#12160f",
       water: "#2a3c3a",
       waterLit: "#3d5a52",
+    },
+    profile: {
+      label: "Lantern bends",
+      detail: "Two warm turns. Keep the line close.",
+      ambient: "lanterns",
+      marker: "gate",
+      rule: {
+        id: "lantern-aura",
+        label: "Lantern aura",
+        detail: "Towers within a lantern's glow fire faster.",
+        objectiveTitle: "Light the bends",
+        objectiveDetail: "Build one tower within a lantern's glow.",
+        target: 1,
+        reward: 35,
+      },
     },
     water: [
       [0, 7],
@@ -172,6 +210,21 @@ export const MAPS: MapDef[] = [
       ink: "#0e1612",
       water: "#1c3336",
       waterLit: "#2e4e4c",
+    },
+    profile: {
+      label: "High pine switch",
+      detail: "Cold air over the cut. Watch the sky.",
+      ambient: "pine-fog",
+      marker: "pine",
+      rule: {
+        id: "pine-fog",
+        label: "Pine fog",
+        detail: "Spark cuts through the fog; other towers lose a little reach.",
+        objectiveTitle: "Break the fog",
+        objectiveDetail: "Clear three Wisps before the map ends.",
+        target: 3,
+        reward: 45,
+      },
     },
     water: [
       [12, 8],
@@ -262,6 +315,21 @@ export const MAPS: MapDef[] = [
       ink: "#160e0c",
       water: "#2a2420",
       waterLit: "#3a3028",
+    },
+    profile: {
+      label: "Stone latch",
+      detail: "Tight stair. The last turn comes fast.",
+      ambient: "keep-ash",
+      marker: "keep",
+      rule: {
+        id: "stone-latch",
+        label: "Stone latch",
+        detail: "Towers beside the road strike harder.",
+        objectiveTitle: "Link the latch",
+        objectiveDetail: "Build two towers beside the road so their line overlaps.",
+        target: 2,
+        reward: 50,
+      },
     },
     water: [],
     path: [
@@ -358,6 +426,21 @@ export const MAPS: MapDef[] = [
       water: "#1a3a40",
       waterLit: "#2e5a58",
     },
+    profile: {
+      label: "Wet banks",
+      detail: "Water drags the ground road.",
+      ambient: "river-rain",
+      marker: "rock",
+      rule: {
+        id: "ford-banks",
+        label: "Ford banks",
+        detail: "Water drags ground creeps; Wisps ignore the current.",
+        objectiveTitle: "Hold dry",
+        objectiveDetail: "Clear one wave without a breach.",
+        target: 1,
+        reward: 55,
+      },
+    },
     water: [
       [0, 0],
       [1, 0],
@@ -452,6 +535,21 @@ export const MAPS: MapDef[] = [
       ink: "#120c0a",
       water: "#2a2018",
       waterLit: "#3a2c20",
+    },
+    profile: {
+      label: "Last fire",
+      detail: "Ash in the air. Burn the road bright.",
+      ambient: "emberfall",
+      marker: "keep",
+      rule: {
+        id: "emberfall",
+        label: "Emberfall",
+        detail: "Crowned towers scorch the last fire for extra damage.",
+        objectiveTitle: "Crown the line",
+        objectiveDetail: "Reach Crowned with at least one tower.",
+        target: 1,
+        reward: 65,
+      },
     },
     water: [
       [0, 0],
@@ -571,4 +669,3 @@ export function pathCellsOf(path: ReadonlyArray<{ c: number; r: number }>): Set<
   }
   return set;
 }
-

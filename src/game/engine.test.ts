@@ -29,6 +29,23 @@ describe("maps and shop", () => {
     assert.ok(shopFor(2, 0).some((s) => s.id === "flint"));
   });
 
+  it("ships a visual field profile for every campaign map", () => {
+    for (const map of MAPS) {
+      assert.ok(map.profile.label.length > 0);
+      assert.ok(map.profile.detail.length > 0);
+      assert.ok(["lanterns", "pine-fog", "keep-ash", "river-rain", "emberfall"].includes(map.profile.ambient));
+      assert.ok(["gate", "pine", "keep", "rock"].includes(map.profile.marker));
+      assert.ok(map.profile.rule.label.length > 0);
+      assert.ok(map.profile.rule.objectiveTitle.length > 0);
+      assert.ok(map.profile.rule.target > 0);
+      assert.ok(map.profile.rule.reward > 0);
+    }
+
+    const e = play();
+    assert.deepEqual(e.hud().field, MAPS[0].profile);
+    assert.match(e.renderText(), /"field":\{"label":"Lantern bends"/);
+  });
+
   it("keeps every map path axis-aligned and on the board", () => {
     for (const map of MAPS) {
       assert.ok(map.path.length >= 2);
@@ -255,6 +272,21 @@ describe("EmberEngine", () => {
     assert.match(e.grade ?? "", new RegExp(`${e.gold}g`));
   });
 
+  it("records a wave result and exposes deterministic text state", () => {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [];
+    e.creeps = [];
+    e.finishWaveIfClear();
+
+    assert.deepEqual(e.hud().lastResult, { wave: 1, kills: 0, leaks: 0, earned: e.hud().lastResult?.earned });
+    assert.ok((e.hud().lastResult?.earned ?? 0) > 0);
+    const text = JSON.parse(e.renderText()) as { coordinateSystem: string; phase: string; wave: { progress: number } };
+    assert.match(text.coordinateSystem, /origin top-left/);
+    assert.equal(text.phase, "ready");
+    assert.equal(text.wave.progress, 100);
+  });
+
   it("kills a grub with enough bow shots and pays bounty", () => {
     const e = play();
     const grass = emptyGrass(e);
@@ -406,6 +438,53 @@ describe("EmberEngine", () => {
   it("flags air on pine cut's opening wave", () => {
     assert.equal(planHasAir(MAPS[1].waves, 0), true);
     assert.equal(planHasAir(MAPS[0].waves, 0), false);
+  });
+
+  it("applies the lantern aura to towers near a lamp", () => {
+    const e = play();
+    const lamp = e.map.props.find((prop) => prop.kind === "lamp");
+    assert.ok(lamp);
+    const spot = [{ c: lamp.c + 1, r: lamp.r }, { c: lamp.c - 1, r: lamp.r }, { c: lamp.c, r: lamp.r + 1 }].find((cell) => e.canBuild(cell.c, cell.r));
+    assert.ok(spot);
+    e.tapCell(spot.c, spot.r);
+    const tower = e.towers[0];
+    assert.equal(e.fieldRateMultiplier(tower), 1.18);
+    assert.equal(e.hud().objective.complete, true);
+  });
+
+  it("makes spark the reach answer in pine fog", () => {
+    const e = play();
+    e.loadMap(1);
+    e.phase = "ready";
+    e.clearField();
+    e.gold = 500;
+    e.chooseKind("spark");
+    const sparkSpot = emptyGrass(e);
+    e.tapCell(sparkSpot.c, sparkSpot.r);
+    const spark = e.towers[0];
+    e.chooseKind("bow");
+    const bowSpot = emptyGrass(e);
+    e.tapCell(bowSpot.c, bowSpot.r);
+    const bow = e.towers[1];
+    assert.equal(e.fieldRangeMultiplier(spark), 1.12);
+    assert.equal(e.fieldRangeMultiplier(bow), 0.9);
+  });
+
+  it("rewards a completed map objective", () => {
+    const e = play();
+    const lamp = e.map.props.find((prop) => prop.kind === "lamp");
+    assert.ok(lamp);
+    const spot = [{ c: lamp.c + 1, r: lamp.r }, { c: lamp.c - 1, r: lamp.r }, { c: lamp.c, r: lamp.r + 1 }].find((cell) => e.canBuild(cell.c, cell.r));
+    assert.ok(spot);
+    e.tapCell(spot.c, spot.r);
+    e.phase = "wave";
+    e.wave = e.map.waves.length;
+    e.spawnQ = [];
+    e.creeps = [];
+    const before = e.gold;
+    e.finishWaveIfClear();
+    assert.equal(e.phase, "shop");
+    assert.equal(e.gold - before, 70 + MAPS[0].profile.rule.reward);
   });
 
   it("horn oils the road", () => {

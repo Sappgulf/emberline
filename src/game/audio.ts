@@ -52,6 +52,10 @@ function beep(freq: number, dur: number, type: OscillatorType, gain: number, sli
 
 export const sfx = {
   place: () => beep(220, 0.08, "triangle", 0.05),
+  upgrade: () => {
+    beep(300, 0.08, "triangle", 0.045, 80);
+    setTimeout(() => beep(450, 0.1, "sine", 0.04, 100), 55);
+  },
   shootBow: () => shotBeep(520, 0.05, "square", 0.03, -180),
   shootMortar: () => shotBeep(90, 0.12, "sawtooth", 0.05, -40),
   shootFrost: () => shotBeep(640, 0.07, "sine", 0.035, 80),
@@ -73,8 +77,21 @@ export const sfx = {
     lastKill = now;
     beep(340, 0.1, "triangle", 0.05, 220);
   },
+  combo: () => beep(520, 0.12, "triangle", 0.045, 180),
+  boss: () => {
+    beep(78, 0.24, "sawtooth", 0.055, -12);
+    setTimeout(() => beep(116, 0.2, "triangle", 0.05, -18), 100);
+  },
   leak: () => beep(110, 0.22, "sawtooth", 0.07, -70),
   wave: () => beep(280, 0.16, "triangle", 0.05, 160),
+  waveClear: () => {
+    beep(330, 0.12, "triangle", 0.045, 90);
+    setTimeout(() => beep(495, 0.16, "triangle", 0.05, 120), 90);
+  },
+  objective: () => {
+    beep(440, 0.1, "triangle", 0.045, 80);
+    setTimeout(() => beep(660, 0.14, "sine", 0.05, 120), 85);
+  },
   win: () => {
     beep(392, 0.18, "triangle", 0.06);
     setTimeout(() => beep(523, 0.22, "triangle", 0.06), 140);

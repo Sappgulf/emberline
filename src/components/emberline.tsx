@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RotateCcw } from "lucide-react";
-import { COLS, CREEPS, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type TowerKind } from "@/game/config";
+import { COLS, CREEPS, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type TowerKind } from "@/game/config";
+import { relicUrl, routeMarkerUrl, spriteUrl } from "@/game/assets";
 import { BESTIARY, type RelicId } from "@/game/campaign";
 import { EmberEngine, type HudSnap } from "@/game/engine";
 import { drawWorld } from "@/game/render";
@@ -8,13 +9,22 @@ import { loadSprites } from "@/game/sprites";
 import { unlockAudio } from "@/game/audio";
 
 const engine = new EmberEngine();
-engine.readSave();
 const AIMS: Aim[] = ["first", "last", "close", "strong"];
 const AIM_LABEL: Record<Aim, string> = {
   first: "First",
   last: "Last",
   close: "Near",
   strong: "Tough",
+};
+const COUNTER_ORDER: TowerKind[] = ["bow", "frost", "spark", "mortar", "bramble", "ward"];
+const COUNTERS: Record<CreepKind, TowerKind[]> = {
+  grub: ["bow"],
+  runner: ["frost", "bramble"],
+  shell: ["mortar", "bramble", "spark"],
+  wisp: ["bow", "frost", "spark"],
+  shaman: ["spark", "mortar"],
+  hound: ["frost", "ward", "bramble"],
+  lord: ["mortar", "spark", "bow"],
 };
 
 function useHud(): HudSnap {
@@ -37,7 +47,35 @@ export function Emberline() {
   }, [hud.phase]);
 
   useEffect(() => {
+    type GameWindow = Window & {
+      render_game_to_text?: () => string;
+      advanceTime?: (ms: number) => void;
+    };
+    const host = window as GameWindow;
+    const previousRender = host.render_game_to_text;
+    const previousAdvance = host.advanceTime;
+    try {
+      host.render_game_to_text = () => engine.renderText();
+      host.advanceTime = (ms) => {
+        if (!Number.isFinite(ms) || ms < 0) return;
+        const steps = Math.max(1, Math.round((ms / 1000) * 60));
+        for (let i = 0; i < steps; i += 1) engine.tick(1 / 60);
+        engine.notify();
+      };
+    } catch {
+      return;
+    }
+    return () => {
+      if (host.render_game_to_text === previousRender) delete host.render_game_to_text;
+      else host.render_game_to_text = previousRender;
+      if (host.advanceTime === previousAdvance) delete host.advanceTime;
+      else host.advanceTime = previousAdvance;
+    };
+  }, []);
+
+  useEffect(() => {
     loadSprites();
+    engine.readSave();
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const apply = () => {
       engine.reducedMotion = mq.matches;
@@ -182,10 +220,16 @@ export function Emberline() {
         : hud.hornCost === 0
         ? "Use free horn"
         : `Use horn for ${hud.hornCost} gold`;
+  const hornValue = hud.phase !== "wave" ? "Wave only" : hud.hornCd > 0 ? `${Math.ceil(hud.hornCd)}s` : hud.hornCost === 0 ? "Free" : `${hud.hornCost}g`;
+  const stallHint = hud.wave < 1 ? "Stall opens after the first wave" : hud.phase !== "ready" ? "Stall opens between waves" : "Open roadside stall";
+  const stallValue = hud.wave < 1 ? "After wave 1" : hud.phase !== "ready" ? "Between waves" : "Open";
+  const mendHint = hud.lives >= hud.maxLives ? "The keep is already at full strength" : hud.gold < hud.mendCost ? `Mend costs ${hud.mendCost} gold` : `Mend the keep for ${hud.mendCost} gold`;
+  const mendValue = hud.lives >= hud.maxLives ? "Full" : `${hud.mendCost}g`;
   const waveProgressLabel = hud.phase === "wave" ? `Wave ${hud.wave}` : hud.wave > 0 ? `Wave ${hud.wave} held` : "First watch";
   const waveProgressStatus = hud.phase === "wave" ? `${hud.remaining} left` : hud.wave > 0 ? "Road clear" : "Ready";
   const menu =
     hud.codex ||
+    hud.campaign ||
     hud.phase === "title" ||
     hud.phase === "brief" ||
     hud.phase === "shop" ||
@@ -200,10 +244,13 @@ export function Emberline() {
       className="game-shell relative flex h-dvh flex-col overflow-hidden bg-[#10140c] text-parchment"
       data-phase={hud.phase}
     >
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {hud.bannerText ?? ""}
+      </p>
       <header className="watch-bar flex shrink-0 items-stretch">
         <div className="watch-title flex min-w-0 flex-1 flex-col justify-center px-4 py-2">
           <span className="watch-overline">Duskward watch</span>
-          <p className="truncate font-display text-xl leading-none text-copper">
+          <p className="watch-map-name font-display text-xl leading-none text-copper">
             {hud.phase === "title" ? "Emberline" : hud.mapName}
           </p>
           {hud.phase !== "title" && (
@@ -324,31 +371,111 @@ export function Emberline() {
               {hud.hero.who}: {hud.hero.line}
             </p>
           )}
+          {playing && hud.streak >= 4 && (
+            <div className="streak-chip" role="status" aria-live="polite">
+              <span className="streak-chip-kicker">Momentum</span>
+              <strong>{hud.streak} streak</strong>
+              <span>Every pair pays +3g</span>
+            </div>
+          )}
           {playing && (
             <div className="intel-stack" aria-label="Watch intelligence">
               <ThreatPanel hud={hud} />
-              {hud.selectedTower && <TowerIntel hud={hud} />}
+              {hud.selectedTower && !hud.lastResult && <TowerIntel hud={hud} />}
             </div>
           )}
           {hud.codex && (
             <Overlay wide kicker="Codex" title="Bestiary" onClose={() => engine.toggleCodex()} close="Close">
-              <div className="grid w-full grid-cols-1 gap-1.5 text-left sm:grid-cols-2">
-                {BESTIARY.map((b) => (
-                  <div key={b.kind} className="plaque p-3">
-                    <p className="font-semibold">{CREEPS[b.kind].name}</p>
-                    <p className="mt-1 text-xs text-dust">{b.weak}</p>
-                  </div>
-                ))}
+              <div className="bestiary-grid w-full text-left">
+                {BESTIARY.map((b) => {
+                  const creep = CREEPS[b.kind];
+                  return (
+                    <article key={b.kind} className="bestiary-card plaque">
+                      <div className="bestiary-art">
+                        <img src={spriteUrl(b.kind)} alt="" />
+                      </div>
+                      <div className="bestiary-copy">
+                        <div className="bestiary-heading">
+                          <div>
+                            <span className="intel-kicker">Field guide</span>
+                            <p className="font-display text-lg leading-none text-copper">{creep.name}</p>
+                          </div>
+                          <span className="bestiary-role">{creep.flying ? "Air" : creep.armor > 0 ? "Armored" : "Ground"}</span>
+                        </div>
+                        <p className="mt-2 text-[11px] leading-snug text-dust">{b.weak}</p>
+                        <div className="bestiary-counter-row">
+                          <span className="intel-kicker">Counter</span>
+                          <div className="counter-pills">
+                            {COUNTERS[b.kind].slice(0, 3).map((kind) => (
+                              <span key={kind} className={`counter-pill counter-${kind}`}>
+                                <img src={spriteUrl(kind)} alt="" />
+                                {TOWERS[kind].short}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </Overlay>
           )}
 
-          {hud.phase === "title" && !hud.codex && (
-            <Overlay kicker="Keep watch" title="Emberline">
+          {hud.campaign && (
+            <Overlay
+              wide
+              surface="campaign"
+              kicker="Campaign route"
+              title="The ember watch"
+              close="Close"
+              onClose={() => engine.toggleCampaign()}
+              action={`Begin ${hud.mapName}`}
+              onAction={() => engine.startSelectedMap()}
+            >
+              <div className="campaign-map-surface">
+                <p className="max-w-md text-sm leading-relaxed text-dust">
+                  {Math.min(hud.mapTotal, hud.unlocked + 1)} of {hud.mapTotal} routes available. Select a held route to choose where the next watch begins.
+                </p>
+                <div className="campaign-select" aria-label="Campaign route selection">
+                  {hud.route.map((node, index) => {
+                    const locked = node.state === "locked";
+                    const selected = index === hud.mapIndex;
+                    return (
+                      <button
+                        key={node.id}
+                        type="button"
+                        disabled={locked}
+                        data-selected={selected}
+                        data-state={node.state}
+                        className="campaign-card plaque pressable"
+                        aria-label={`${node.name}, ${node.state}${locked ? ", locked" : ""}`}
+                        onClick={() => engine.selectCampaignMap(index)}
+                      >
+                        <span className="campaign-card-marker" aria-hidden="true">
+                          <img src={routeMarkerUrl(node.id)} alt="" />
+                          <span>{index + 1}</span>
+                        </span>
+                        <span className="campaign-card-copy">
+                          <span className="campaign-card-state">{node.state === "current" ? "Selected" : node.state === "held" ? "Held" : "Locked"}</span>
+                          <strong>{node.name}</strong>
+                          <span>{node.place}</span>
+                          <small>{node.ruleLabel} · {node.objectiveTitle} · +{node.objectiveReward}g</small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </Overlay>
+          )}
+
+          {hud.phase === "title" && !hud.codex && !hud.campaign && (
+            <Overlay kicker="Keep watch" title="Emberline" emblem>
               <p className="max-w-sm text-sm leading-relaxed text-dust">
                 Plant on grass. Line two towers. Hold five maps until dawn. Space to begin.
               </p>
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="menu-actions">
                 <button
                   type="button"
                   className="pressable send-flag min-h-11 px-7 text-sm"
@@ -371,6 +498,9 @@ export function Emberline() {
                     Continue
                   </button>
                 )}
+                <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.toggleCampaign()}>
+                  Campaign
+                </button>
                 <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleCodex()}>
                   Bestiary
                 </button>
@@ -382,11 +512,13 @@ export function Emberline() {
             <Overlay
               kicker={hud.story.role}
               title={hud.story.speaker}
+              emblem
               action="Take the watch"
               onAction={() => engine.dismissBrief()}
               dimmer
             >
               <p className="max-w-md text-sm leading-relaxed text-parchment">{hud.story.line}</p>
+              <FieldNote field={hud.field} markerId={hud.route[hud.mapIndex]?.id} />
               <p className="text-[11px] text-dust">Space also takes the watch.</p>
             </Overlay>
           )}
@@ -437,8 +569,8 @@ export function Emberline() {
           }`}
         >
           {hud.selectedTower && hud.nextCosts ? (
-            <div className="flex flex-wrap items-start gap-3">
-              <div className="min-w-[12rem] flex-1">
+            <div className="selected-tower-bar flex flex-wrap items-start gap-3">
+              <div className="selected-tower-copy flex-1">
                 <p className="font-display text-lg leading-none text-copper">
                   {TOWERS[hud.selectedTower.kind].name}
                   <span className="ml-2 font-sans text-[11px] tracking-wide text-dust">
@@ -451,7 +583,7 @@ export function Emberline() {
                   {playing && hud.phase === "ready" && <span className="ml-2 text-copper">Next: {hud.nextWave}</span>}
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+              <div className="selected-tower-actions grid grid-cols-2 gap-1 sm:grid-cols-4">
                 <button
                   type="button"
                   className="pressable btn-wood min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
@@ -497,7 +629,7 @@ export function Emberline() {
               )}
             </div>
           ) : (
-              <p className="max-w-2xl bg-ink/60 px-2 py-1 text-[11px] text-parchment" aria-live="polite">
+              <p className="tray-hint max-w-2xl" aria-live="polite">
               {hud.selectedKind ? (
                 <>
                   {TOWERS[hud.selectedKind].blurb}
@@ -530,8 +662,9 @@ export function Emberline() {
                     className={`pressable packet ${hud.gold < def.cost ? "opacity-40" : ""}`}
                   >
                     <span className="key">{i + 1}</span>
-                    <TowerMark kind={kind} />
+                    <img className="packet-sprite" src={spriteUrl(kind)} alt="" />
                     <span className="mt-1 block text-[12px] font-semibold">{def.short}</span>
+                    <span className="packet-role">{def.hitsAir ? "Air" : "Ground"}</span>
                     <span className="block text-[10px] text-copper">{def.cost}g</span>
                   </button>
                 );
@@ -540,27 +673,29 @@ export function Emberline() {
             <div className="command-row flex flex-wrap items-center gap-1">
               <button
                 type="button"
-                className="pressable packet min-h-11 px-2 text-[11px] text-dust"
+                className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust"
                 aria-label={`Tower targeting: ${AIM_LABEL[hud.towerAim]}. Activate to cycle targeting mode.`}
                 title={`Targeting ${AIM_LABEL[hud.towerAim]}`}
                 disabled={!playing}
                 onClick={() => engine.setAim(AIMS[(AIMS.indexOf(hud.towerAim) + 1) % AIMS.length])}
               >
-                Aim {AIM_LABEL[hud.towerAim]}
+                <span className="command-label">Aim</span>
+                <span className="command-value">{AIM_LABEL[hud.towerAim]}</span>
               </button>
               <button
                 type="button"
-                className="pressable packet min-h-11 px-2 text-[11px] text-dust"
+                className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust"
                 aria-label={`Game speed ${hud.speed}x. Activate to cycle speed.`}
                 title={`Game speed ${hud.speed}x`}
                 disabled={!playing}
                 onClick={() => engine.cycleSpeed()}
               >
-                {hud.speed}×
+                <span className="command-label">Pace</span>
+                <span className="command-value">{hud.speed}×</span>
               </button>
               <button
                 type="button"
-                className="pressable packet min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
+                className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
                 aria-label={hornLabel}
                 title={hornLabel}
                 disabled={hud.phase !== "wave" || hud.hornCd > 0 || hud.gold < hud.hornCost}
@@ -569,33 +704,39 @@ export function Emberline() {
                   engine.blowHorn();
                 }}
               >
-                <img className="mx-auto mb-0.5 h-5 w-5 object-contain" src="/ui/icon-horn.png" alt="" />
-                {hud.phase !== "wave"
-                  ? "Wave only"
-                  : hud.hornCd > 0
-                    ? `${Math.ceil(hud.hornCd)}s`
-                    : hud.hornCost === 0
-                      ? "Horn"
-                      : `${hud.hornCost}g`}
-              </button>
-              <button type="button" className="pressable packet min-h-11 px-2 text-[11px] text-dust disabled:opacity-40" disabled={hud.phase !== "ready" || hud.wave < 1} onClick={() => engine.openStall()}>
-                Stall
+                <img className="command-icon" src="/ui/icon-horn.png" alt="" />
+                <span className="command-label">Horn</span>
+                <span className="command-value">{hornValue}</span>
               </button>
               <button
                 type="button"
-                className="pressable packet min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
+                className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
+                aria-label={stallHint}
+                title={stallHint}
+                disabled={hud.phase !== "ready" || hud.wave < 1}
+                onClick={() => engine.openStall()}
+              >
+                <span className="command-label">Stall</span>
+                <span className="command-value">{stallValue}</span>
+              </button>
+              <button
+                type="button"
+                className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
+                aria-label={mendHint}
+                title={mendHint}
                 disabled={!playing || hud.lives >= hud.maxLives || hud.gold < hud.mendCost}
                 onClick={() => {
                   unlockAudio();
                   engine.mendKeep();
                 }}
               >
-                Mend
+                <span className="command-label">Mend</span>
+                <span className="command-value">{mendValue}</span>
               </button>
               <button
                 type="button"
                 ref={readyActionRef}
-                className="pressable send-flag min-h-12 px-5 text-sm disabled:opacity-35"
+                className="pressable send-flag command-send min-h-12 px-5 text-sm disabled:opacity-35"
                 title={hud.nextWave}
                 disabled={hud.phase !== "ready" && !(hud.phase === "wave" && hud.remaining === 0)}
                 onClick={() => {
@@ -603,11 +744,12 @@ export function Emberline() {
                   engine.startWave();
                 }}
               >
-                {hud.phase === "wave"
-                  ? `${hud.remaining} left`
-                  : hud.nextAir && !hud.airCovered
-                    ? "Wisps — air tower"
-                    : "Send wave"}
+                <span className="command-label">
+                  {hud.phase === "wave" ? "Wave active" : hud.nextAir && !hud.airCovered ? "Air check" : "Send wave"}
+                </span>
+                <span className="command-value">
+                  {hud.phase === "wave" ? `${hud.remaining} left` : hud.nextAir && !hud.airCovered ? "Choose Bow" : `Wave ${hud.wave + 1}`}
+                </span>
               </button>
             </div>
           </div>
@@ -638,13 +780,6 @@ function formBlurb(kind: TowerKind, form: string) {
   return "Green timber. Upgrade damage or rate to change form.";
 }
 
-function TowerMark({ kind }: { kind: TowerKind }) {
-  const fill =
-    kind === "bow" ? "bg-leaf" : kind === "mortar" ? "bg-ember" : kind === "frost" ? "bg-frost" : kind === "spark" ? "bg-copper" : kind === "ward" ? "bg-copper" : "bg-leaf";
-  const shape = kind === "mortar" || kind === "spark" ? "rounded-full" : "rounded-[3px]";
-  return <span className={`mx-auto block h-1.5 w-7 ${fill} ${shape}`} aria-hidden="true" />;
-}
-
 const THREAT_LABEL: Record<HudSnap["threatTier"], string> = {
   light: "Light pressure",
   mixed: "Mixed pressure",
@@ -664,7 +799,7 @@ function CampaignRail({ route }: { route: HudSnap["route"] }) {
         {route.map((node, index) => (
           <li key={node.id} className="route-node" data-state={node.state} aria-current={node.state === "current" ? "step" : undefined}>
             <div className="route-marker" aria-hidden="true">
-              <img src="/assets/sprites/gate.png" alt="" />
+              <img src={routeMarkerUrl(node.id)} alt="" />
               <span>{index + 1}</span>
             </div>
             <div className="route-copy">
@@ -681,16 +816,24 @@ function CampaignRail({ route }: { route: HudSnap["route"] }) {
 
 function ThreatPanel({ hud }: { hud: HudSnap }) {
   const uncoveredAir = hud.nextAir && !hud.airCovered;
+  const counters = counterPlan(hud.wavePreview);
   return (
-    <section className="threat-panel" aria-label={`Wave ${hud.previewWave} threat forecast`} role="status">
+    <section
+      className={`threat-panel threat-panel-${hud.threatTier}`}
+      data-active={hud.phase === "wave"}
+      aria-label={`Wave ${hud.previewWave} threat forecast`}
+      role="status"
+    >
       <div className="intel-heading">
         <span className="intel-kicker">Next threat</span>
         <span className={`threat-tier threat-${hud.threatTier}`}>{THREAT_LABEL[hud.threatTier]}</span>
       </div>
       <div className="threat-title">
         <h2>Wave {hud.previewWave}</h2>
-        <span>{hud.phase === "wave" ? "In progress" : "Ready to send"}</span>
+        <span>{hud.phase === "wave" ? `${hud.remaining}/${hud.waveTotal} left` : "Ready to send"}</span>
       </div>
+      <FieldNote field={hud.field} compact markerId={hud.route[hud.mapIndex]?.id} />
+      <FieldObjective objective={hud.objective} />
       <div className="threat-meter" data-tier={hud.threatTier} aria-hidden="true">
         <span />
       </div>
@@ -699,7 +842,7 @@ function ThreatPanel({ hud }: { hud: HudSnap }) {
           const creep = CREEPS[item.kind];
           return (
             <div key={item.kind} className="threat-item" aria-label={`${item.count} ${creep.name}${creep.flying ? ", flying" : ""}`}>
-              <img src={`/assets/sprites/${item.kind}.png`} alt="" />
+              <img src={spriteUrl(item.kind)} alt="" />
               <span className="threat-count">{item.count}</span>
               <span className="threat-name">{creep.name}</span>
               {creep.flying && <span className="threat-tag">Air</span>}
@@ -708,10 +851,90 @@ function ThreatPanel({ hud }: { hud: HudSnap }) {
           );
         })}
       </div>
+      <div className="threat-tactics">
+        <span className="intel-kicker">Counter plan</span>
+        <div className="counter-pills">
+          {counters.map((kind) => (
+            <span key={kind} className={`counter-pill counter-${kind}`}>
+              <img src={spriteUrl(kind)} alt="" />
+              {TOWERS[kind].short}
+            </span>
+          ))}
+        </div>
+      </div>
       <p className={uncoveredAir ? "threat-note threat-note-alert" : "threat-note"}>
         {uncoveredAir ? "Air sightline needed — choose Bow or Frost." : THREAT_NOTE[hud.threatTier]}
       </p>
+      {hud.phase === "ready" && hud.lastResult && <WaveRecap result={hud.lastResult} />}
     </section>
+  );
+}
+
+function FieldNote({ field, compact = false, markerId }: { field: HudSnap["field"]; compact?: boolean; markerId?: string }) {
+  return (
+    <div className={`field-note ${compact ? "field-note-compact" : ""}`} aria-label={`Field note: ${field.label}`}>
+      <div className="field-note-art" aria-hidden="true">
+        <img src={routeMarkerUrl(markerId ?? "low-road")} alt="" />
+      </div>
+      <div className="field-note-copy">
+        <span className="intel-kicker">Field note</span>
+        <strong>{field.label}</strong>
+        <span>{field.detail}</span>
+        <span className="field-rule-copy">{field.rule.label} · {field.rule.detail}</span>
+      </div>
+    </div>
+  );
+}
+
+function FieldObjective({ objective }: { objective: HudSnap["objective"] }) {
+  const progress = Math.round((objective.current / Math.max(1, objective.target)) * 100);
+  return (
+    <div className="field-objective" data-complete={objective.complete} aria-label={`Field objective: ${objective.title}`}>
+      <div className="field-objective-heading">
+        <div>
+          <span className="intel-kicker">Field objective</span>
+          <strong>{objective.title}</strong>
+        </div>
+        <span className="field-objective-count">{objective.current}/{objective.target}</span>
+      </div>
+      <p>{objective.detail}</p>
+      <div className="objective-track" aria-hidden="true">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <span className="field-objective-reward">
+        {objective.complete ? "Objective secured" : `Reward +${objective.reward}g`}
+      </span>
+    </div>
+  );
+}
+
+function counterPlan(wave: HudSnap["wavePreview"]): TowerKind[] {
+  const needed = new Set<TowerKind>();
+  for (const item of wave) {
+    for (const kind of COUNTERS[item.kind]) needed.add(kind);
+  }
+  return COUNTER_ORDER.filter((kind) => needed.has(kind)).slice(0, 4);
+}
+
+function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
+  return (
+    <div className="wave-recap" aria-label={`Wave ${result.wave} result`}>
+      <div className="wave-recap-heading">
+        <span className="intel-kicker">Last hold</span>
+        <strong>Wave {result.wave} held</strong>
+      </div>
+      <div className="wave-recap-metrics">
+        <span>
+          <b>{result.kills}</b> cleared
+        </span>
+        <span className={result.leaks > 0 ? "recap-alert" : ""}>
+          <b>{result.leaks}</b> {result.leaks === 1 ? "breach" : "breaches"}
+        </span>
+        <span>
+          <b>+{result.earned}g</b> earned
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -725,9 +948,15 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
       (hud.relics.includes("whet") ? 1.12 : 1) *
       (hud.relics.includes("ember") && tower.kind === "mortar" ? 1.2 : 1) *
       (1 + (form - 1) * 0.06) *
-      hud.lineBonus,
+      hud.lineBonus *
+      (hud.fieldBoost?.damage ?? 1),
   );
-  const range = rangeAt(tower.kind, tower.dmgLvl) * (hud.relics.includes("glass") ? 1.12 : 1) * (tower.empowered ? 1.18 : 1);
+  const range =
+    rangeAt(tower.kind, tower.dmgLvl) *
+    (hud.relics.includes("glass") ? 1.12 : 1) *
+    (tower.empowered ? 1.18 : 1) *
+    (hud.fieldBoost?.range ?? 1);
+  const rate = rateAt(tower.kind, tower.rateLvl) * (hud.fieldBoost?.rate ?? 1);
   return (
     <section className="tower-intel" aria-label={`${def.name} selected tower details`}>
       <div className="tower-intel-heading">
@@ -739,7 +968,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
       </div>
       <div className="tower-intel-body">
         <div className="tower-intel-art">
-          <img src={`/assets/sprites/${tower.kind}.png`} alt="" />
+          <img src={spriteUrl(tower.kind)} alt="" />
         </div>
         <dl className="tower-stats">
           <div>
@@ -748,7 +977,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
           </div>
           <div>
             <dt>Rate</dt>
-            <dd>{rateAt(tower.kind, tower.rateLvl).toFixed(2)}×</dd>
+            <dd>{rate.toFixed(2)}×</dd>
           </div>
           <div>
             <dt>Reach</dt>
@@ -757,6 +986,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
         </dl>
       </div>
       <p className="tower-intel-copy">{def.blurb}</p>
+      <p className="tower-intel-path">Power {tower.dmgLvl} · Tempo {tower.rateLvl} · {hud.field.rule.label}</p>
       <p className="tower-intel-meta">
         Aim {AIM_LABEL[hud.towerAim]} <span aria-hidden="true">·</span> Line +{Math.round((hud.lineBonus - 1) * 100)}%
       </p>
@@ -774,6 +1004,8 @@ function Overlay({
   close,
   onClose,
   dimmer,
+  emblem,
+  surface,
 }: {
   children?: React.ReactNode;
   wide?: boolean;
@@ -784,6 +1016,8 @@ function Overlay({
   close?: string;
   onClose?: () => void;
   dimmer?: boolean;
+  emblem?: boolean;
+  surface?: "campaign";
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -829,20 +1063,20 @@ function Overlay({
       />
       <div
         ref={dialogRef}
-        className={`overlay-in dispatch relative flex w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[90dvh] flex-col items-center gap-3 overflow-y-auto px-8 py-8 text-center`}
+        className={`overlay-in dispatch ${surface === "campaign" ? "dispatch-campaign" : ""} relative flex w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[90dvh] flex-col items-center gap-3 overflow-y-auto px-8 py-8 text-center`}
       >
-        <img className="wax" src="/ui/wax.png" alt="" />
+        {close && onClose && (
+          <button type="button" className="pressable stamp overlay-close min-h-9 px-3 text-[10px] text-dust" onClick={onClose}>
+            {close}
+          </button>
+        )}
+        <img className={emblem ? "dispatch-crest" : "wax"} src={emblem ? "/ui/emberline-crest-v1.png" : "/ui/wax.png"} alt="" />
         {kicker && <p className="dispatch-kicker">{kicker}</p>}
         {title && <h2 className="font-display text-4xl leading-none text-copper sm:text-[2.75rem]">{title}</h2>}
         {children}
         {action && onAction && (
           <button type="button" className="pressable send-flag min-h-11 px-7 text-sm" onClick={onAction}>
             {action}
-          </button>
-        )}
-        {close && onClose && (
-          <button type="button" className="pressable stamp min-h-11 px-6 text-sm text-dust" onClick={onClose}>
-            {close}
           </button>
         )}
       </div>
@@ -869,10 +1103,15 @@ function ShopList({
             type="button"
             disabled={owned || gold < item.cost}
             onClick={() => engine.buyRelic(item.id)}
-            className={`pressable plaque px-3 py-2.5 text-left ${owned ? "opacity-45" : ""}`}
+            aria-label={`${item.name}, ${owned ? "held" : `${item.cost} gold`}. ${item.blurb}`}
+            className={`pressable plaque relic-card px-3 py-2.5 text-left ${owned ? "opacity-45" : ""}`}
+            data-held={owned}
           >
             <span className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold text-parchment">{item.name}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <img className="relic-mark" src={relicUrl(item.id)} alt="" aria-hidden="true" />
+                <span className="truncate text-sm font-semibold text-parchment">{item.name}</span>
+              </span>
               <span className="shrink-0 text-xs text-copper">{owned ? "Held" : `${item.cost}g`}</span>
             </span>
             <span className="mt-0.5 block text-[11px] leading-snug text-dust">{item.blurb}</span>
