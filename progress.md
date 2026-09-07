@@ -123,4 +123,5 @@ Original prompt: ok keep working. more upgrades across the game
 - Re-verified in the in-app browser at 641x814: title, Bestiary open/scroll/close, campaign ledger, Low Road briefing, ready board, valid placement, invalid tap persistence, Escape cancel, pause/resume, 3x combat, wave recap, stall purchase, and return-to-road.
 - Final live diagnostics: canvas `572x396` at `x=34.5`, `scrollWidth=641`, `scrollHeight=814`, fonts `loaded`, and no browser console logs.
 - Source gates before ship: 87 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
-- Commit/deployment proof will be appended after the final push and Vercel preview are complete.
+- Ship commit: `5724dc1` (`Polish Emberline overlays and placement flow`) pushed to `origin/main`.
+- Vercel preview: `https://emberline-8t9x0xep1-sappgulf-9169s-projects.vercel.app` (deployment `dpl_B6GpHXwJAMTJaytsrJ1Xe2tBWuaM`, ready). This record update is followed by the final provenance push and redeploy.
