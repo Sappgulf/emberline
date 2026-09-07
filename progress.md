@@ -113,4 +113,5 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: added an accessible Momentum streak chip driven by the existing combat streak, breathing wave progress, threat-tier motion/glow, campaign atlas texture, and reduced-motion gates for all new animation.
 - Verified in the live in-app browser at 641x814: title crest/menu, campaign ledger, Low Road briefing, ready HUD, active wave, accelerated 3x pace, and wave resolution all rendered without document overflow; fonts reported `loaded` and browser diagnostics were empty.
 - Source gates before ship: 86 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
-- Commit and Vercel preview URL are recorded below after the final push/deploy.
+- First ship commit: `fccce96` (`Polish Emberline UI motion and campaign atlas`) pushed to `origin/main`.
+- Vercel preview: `https://emberline-7x18ihi8n-sappgulf-9169s-projects.vercel.app` (deployment `dpl_rpKdG65PkzWkQkurVzPgVi2i4g1n`, ready). This record-only update is followed by the final provenance commit and redeploy.
