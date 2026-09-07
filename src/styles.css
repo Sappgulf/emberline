@@ -1198,12 +1198,13 @@
   z-index: 1;
 }
 .overlay-close {
-  position: absolute;
-  top: 0.9rem;
-  right: 0.95rem;
-  z-index: 2;
+  position: sticky;
+  top: 0.35rem;
+  z-index: 3;
+  align-self: flex-end;
   min-height: 2rem;
   padding-inline: 0.7rem;
+  margin: -2.25rem -1rem 0 0;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }

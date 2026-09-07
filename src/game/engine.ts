@@ -1078,6 +1078,7 @@ export class EmberEngine {
     };
     this.towers.push(tower);
     this.selectedId = tower.id;
+    this.selectedKind = null;
     this.lastPlaceId = tower.id;
     this.lastPlaceT = this.time;
     sfx.place();

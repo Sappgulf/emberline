@@ -115,3 +115,12 @@ Original prompt: ok keep working. more upgrades across the game
 - Source gates before ship: 86 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
 - First ship commit: `fccce96` (`Polish Emberline UI motion and campaign atlas`) pushed to `origin/main`.
 - Vercel preview: `https://emberline-7x18ihi8n-sappgulf-9169s-projects.vercel.app` (deployment `dpl_rpKdG65PkzWkQkurVzPgVi2i4g1n`, ready). This record-only update is followed by the final provenance commit and redeploy.
+
+## 2026-09-06 — overlay resilience and final ship audit
+
+- Fixed the placement intent lifecycle in the live build: rejected path taps keep the selected packet available, while a successful plant clears packet intent and leaves tower inspection active.
+- Hardened long overlays with a sticky close affordance so Bestiary content can scroll at compact widths without hiding the exit action; campaign and stall layouts remain contained without document overflow.
+- Re-verified in the in-app browser at 641x814: title, Bestiary open/scroll/close, campaign ledger, Low Road briefing, ready board, valid placement, invalid tap persistence, Escape cancel, pause/resume, 3x combat, wave recap, stall purchase, and return-to-road.
+- Final live diagnostics: canvas `572x396` at `x=34.5`, `scrollWidth=641`, `scrollHeight=814`, fonts `loaded`, and no browser console logs.
+- Source gates before ship: 87 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
+- Commit/deployment proof will be appended after the final push and Vercel preview are complete.

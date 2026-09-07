@@ -184,6 +184,19 @@ describe("EmberEngine", () => {
     e.tapCell(grass.c, grass.r);
     assert.equal(e.towers.length, 1);
     assert.equal(e.gold, START_GOLD - TOWERS.bow.cost);
+    assert.equal(e.selectedKind, null);
+    assert.equal(e.selectedId, e.towers[0].id);
+  });
+
+  it("keeps packet intent through rejected taps and clears it after a plant", () => {
+    const e = play();
+    e.chooseKind("mortar");
+    const path = e.path[0];
+    e.tapCell(path.c, path.r);
+    assert.equal(e.selectedKind, "mortar");
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    assert.equal(e.selectedKind, null);
   });
 
   it("refuses path, water, props, and occupied cells", () => {
@@ -354,6 +367,7 @@ describe("EmberEngine", () => {
     ];
     const n = neighbors.find((p) => e.canBuild(p.c, p.r));
     assert.ok(n);
+    e.chooseKind("bow");
     e.tapCell(n.c, n.r);
     e.relics.add("cord");
     assert.equal(e.lineBonus(e.towers[0]), 1.15);
@@ -390,6 +404,7 @@ describe("EmberEngine", () => {
     ];
     const n = neighbors.find((p) => e.canBuild(p.c, p.r));
     assert.ok(n);
+    e.chooseKind("bow");
     e.tapCell(n.c, n.r);
     assert.equal(e.lineBonus(e.towers[0]), 1.1);
   });
