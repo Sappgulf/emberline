@@ -852,6 +852,7 @@
   letter-spacing: 0.08em;
   line-height: 1;
   text-transform: uppercase;
+  pointer-events: auto;
 }
 .counter-pill[aria-pressed="true"] {
   border-color: var(--color-copper);
