@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { COLS, CREEPS, START_GOLD, START_LIVES, TOWERS, pathCells, blockedCells } from "./config.ts";
-import { MAPS, leakCost, pathCellsOf, planHasAir, shopFor } from "./campaign.ts";
+import { MAPS, leakCost, pathCellsOf, planHasAir, shopFor, watchOrderFor } from "./campaign.ts";
 import { EmberEngine } from "./engine.ts";
 
 function play(): EmberEngine {
@@ -74,6 +74,14 @@ describe("maps and shop", () => {
     assert.ok(late.cost >= 18);
     assert.ok(!shopFor(0, 0).some((s) => s.id === "ember"));
     assert.ok(shopFor(2, 0).some((s) => s.id === "ember"));
+  });
+
+  it("assigns a deterministic watch order from the strongest threat", () => {
+    assert.equal(watchOrderFor(MAPS[0].waves[0])?.id, "clean");
+    assert.equal(watchOrderFor(MAPS[1].waves[0])?.id, "sky");
+    assert.equal(watchOrderFor(MAPS[2].waves[2])?.id, "song");
+    assert.equal(watchOrderFor(MAPS[3].waves[4])?.id, "crown");
+    assert.equal(watchOrderFor(undefined), null);
   });
 
   it("legacy PATH helper still matches the first map", () => {
@@ -173,6 +181,40 @@ describe("EmberEngine", () => {
     assert.equal(e.hud().route[0].state, "held");
     assert.equal(e.hud().route[1].state, "current");
     assert.equal(e.hud().route[2].state, "available");
+  });
+
+  it("tracks and pays an optional watch order", () => {
+    const e = play();
+    assert.equal(e.hud().watchOrder?.id, "clean");
+
+    e.startWave();
+    assert.equal(e.hud().watchOrder?.id, "clean");
+    e.spawnQ = [];
+    e.creeps = [];
+    e.finishWaveIfClear();
+
+    assert.match(e.hud().bannerText ?? "", /Order \+22g/);
+    assert.equal(e.hud().lastResult?.earned, 98);
+    const text = JSON.parse(e.renderText()) as { watchOrder: { id: string } };
+    assert.equal(text.watchOrder.id, "clean");
+  });
+
+  it("shows targeted watch-order progress during an air wave", () => {
+    const e = play();
+    e.loadMap(1);
+    e.gold = 500;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.startWave();
+
+    assert.equal(e.hud().watchOrder?.id, "sky");
+    e.waveKillCounts.wisp = 2;
+    e.notify();
+    assert.equal(e.hud().watchOrder?.current, 2);
+    assert.equal(e.hud().watchOrder?.complete, false);
+    e.waveKillCounts.wisp = 3;
+    e.notify();
+    assert.equal(e.hud().watchOrder?.complete, true);
   });
 
   it("keeps the next unlocked route available while replaying a held map", () => {

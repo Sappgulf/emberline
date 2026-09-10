@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RotateCcw } from "lucide-react";
-import { COLS, CREEPS, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type TowerKind } from "@/game/config";
+import { COLS, CREEPS, FORM_NAME, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type TowerKind } from "@/game/config";
 import { relicUrl, routeMarkerUrl, spriteUrl } from "@/game/assets";
 import { BESTIARY, type RelicId } from "@/game/campaign";
 import { EmberEngine, type HudSnap } from "@/game/engine";
@@ -671,17 +671,23 @@ export function Emberline() {
                   type="button"
                   className="pressable btn-wood min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
                   disabled={!playing || hud.selectedTower.dmgLvl >= MAX_UPGRADE || hud.gold < hud.nextCosts.dmg}
+                  aria-label={upgradeAriaLabel(hud.selectedTower, "damage", hud.nextCosts.dmg)}
+                  title={upgradeAriaLabel(hud.selectedTower, "damage", hud.nextCosts.dmg)}
                   onClick={() => engine.upgradeDamage()}
                 >
-                  Damage {hud.selectedTower.dmgLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.dmg}g`}
+                  <span className="upgrade-main">Damage {hud.selectedTower.dmgLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.dmg}g`}</span>
+                  {hud.selectedTower.dmgLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud.selectedTower, "damage")}</span>}
                 </button>
                 <button
                   type="button"
                   className="pressable btn-wood min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
                   disabled={!playing || hud.selectedTower.rateLvl >= MAX_UPGRADE || hud.gold < hud.nextCosts.rate}
+                  aria-label={upgradeAriaLabel(hud.selectedTower, "rate", hud.nextCosts.rate)}
+                  title={upgradeAriaLabel(hud.selectedTower, "rate", hud.nextCosts.rate)}
                   onClick={() => engine.upgradeRate()}
                 >
-                  Rate {hud.selectedTower.rateLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.rate}g`}
+                  <span className="upgrade-main">Rate {hud.selectedTower.rateLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.rate}g`}</span>
+                  {hud.selectedTower.rateLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud.selectedTower, "rate")}</span>}
                 </button>
                 <button type="button" className="pressable packet min-h-10 px-3 text-xs text-dust" onClick={() => engine.sellSelected()}>
                   Sell {hud.sellRefund}g
@@ -863,6 +869,25 @@ function formBlurb(kind: TowerKind, form: string) {
   return "Green timber. Upgrade damage or rate to change form.";
 }
 
+type UpgradeBranch = "damage" | "rate";
+
+function upgradePreview(tower: NonNullable<HudSnap["selectedTower"]>, branch: UpgradeBranch) {
+  const nextDamage = branch === "damage" ? tower.dmgLvl + 1 : tower.dmgLvl;
+  const nextRate = branch === "rate" ? tower.rateLvl + 1 : tower.rateLvl;
+  const currentForm = towerForm(tower.dmgLvl, tower.rateLvl);
+  const nextForm = towerForm(nextDamage, nextRate);
+  return nextForm === currentForm ? (branch === "damage" ? "+power" : "+tempo") : `→ ${FORM_NAME[nextForm]}`;
+}
+
+function upgradeAriaLabel(tower: NonNullable<HudSnap["selectedTower"]>, branch: UpgradeBranch, cost: number) {
+  const level = branch === "damage" ? tower.dmgLvl : tower.rateLvl;
+  const label = branch === "damage" ? "Damage" : "Rate";
+  if (level >= MAX_UPGRADE) return `${label} upgrade maxed at ${FORM_NAME[towerForm(tower.dmgLvl, tower.rateLvl)]} form`;
+  const preview = upgradePreview(tower, branch);
+  const effect = preview.startsWith("→") ? `advances the tower to ${preview.slice(2)} form` : `raises ${branch === "damage" ? "power" : "fire rate"}`;
+  return `Upgrade ${label.toLowerCase()} for ${cost} gold; ${effect}`;
+}
+
 function WatchLedger({ hud }: { hud: HudSnap }) {
   const nextRoute = hud.route[hud.unlocked]?.name;
   const relicLabel = hud.relics.length === 1 ? "relic" : "relics";
@@ -984,6 +1009,7 @@ function ThreatPanel({ hud }: { hud: HudSnap }) {
       </div>
       <FieldNote field={hud.field} compact markerId={hud.route[hud.mapIndex]?.id} />
       <FieldObjective objective={hud.objective} />
+      <WatchOrder order={hud.watchOrder} />
       <div className="threat-meter" data-tier={hud.threatTier} aria-hidden="true">
         <span />
       </div>
@@ -1054,6 +1080,23 @@ function FieldObjective({ objective }: { objective: HudSnap["objective"] }) {
       <span className="field-objective-reward">
         {objective.complete ? "Objective secured" : `Reward +${objective.reward}g`}
       </span>
+    </div>
+  );
+}
+
+function WatchOrder({ order }: { order: HudSnap["watchOrder"] }) {
+  if (!order) return null;
+  const count = order.complete ? "Met" : order.id === "clean" ? "No breach" : `${order.current}/${order.target}`;
+  const status = order.complete ? "target met, paid on clear" : order.id === "clean" ? "no breaches yet" : `${order.current} of ${order.target} complete`;
+  return (
+    <div className="watch-order" data-complete={order.complete} aria-label={`Watch order: ${order.title}, ${status}`}>
+      <div className="watch-order-heading">
+        <span className="intel-kicker">Watch order</span>
+        <span className="watch-order-count">{count}</span>
+      </div>
+      <strong>{order.title}</strong>
+      <p>{order.detail}</p>
+      <span className="watch-order-reward">{order.complete ? `On clear +${order.reward}g` : `Bonus +${order.reward}g`}</span>
     </div>
   );
 }

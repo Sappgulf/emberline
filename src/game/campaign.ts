@@ -29,6 +29,17 @@ export interface FieldRule {
   reward: number;
 }
 
+export type WatchOrderId = "clean" | "sky" | "song" | "crown";
+
+export interface WatchOrder {
+  id: WatchOrderId;
+  title: string;
+  detail: string;
+  reward: number;
+  target: number;
+  targetKind?: CreepKind;
+}
+
 export interface MapProfile {
   label: string;
   detail: string;
@@ -98,6 +109,56 @@ export function shopFor(mapIndex: number, wave: number): ShopItem[] {
     ...s,
     cost: Math.max(18, s.cost - mapIndex * 16 - wave * 4),
   }));
+}
+
+export function watchOrderFor(plan: WaveSpawn[] | undefined): WatchOrder | null {
+  if (!plan) return null;
+  const countFor = (kind: CreepKind) => plan.find((entry) => entry.kind === kind)?.count ?? 0;
+  const lordCount = countFor("lord");
+  if (lordCount > 0) {
+    return {
+      id: "crown",
+      title: "Cut the crown",
+      detail: "Bring down the Emberlord before the gate.",
+      reward: 48,
+      target: 1,
+      targetKind: "lord",
+    };
+  }
+
+  const shamanCount = countFor("shaman");
+  if (shamanCount > 0) {
+    const target = Math.min(2, shamanCount);
+    return {
+      id: "song",
+      title: "Break the song",
+      detail: `Drop ${target} ${target === 1 ? "Shaman" : "Shamans"} before they heal the pack.`,
+      reward: 34,
+      target,
+      targetKind: "shaman",
+    };
+  }
+
+  const wispCount = countFor("wisp");
+  if (wispCount > 0) {
+    const target = Math.min(3, wispCount);
+    return {
+      id: "sky",
+      title: "Keep the sky",
+      detail: `Clear ${target} Wisps before the wave breaks.`,
+      reward: 28,
+      target,
+      targetKind: "wisp",
+    };
+  }
+
+  return {
+    id: "clean",
+    title: "Keep the line",
+    detail: "Clear the wave without a breach.",
+    reward: 22,
+    target: 1,
+  };
 }
 
 export const MAPS: MapDef[] = [

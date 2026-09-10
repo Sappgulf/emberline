@@ -22,7 +22,20 @@ import {
   type CreepKind,
   type TowerKind,
 } from "./config.ts";
-import { MAPS, RELIC_IDS, describePlan, leakCost, pathCellsOf, planHasAir, shopFor, type MapDef, type MapMarker, type RelicId } from "./campaign.ts";
+import {
+  MAPS,
+  RELIC_IDS,
+  describePlan,
+  leakCost,
+  pathCellsOf,
+  planHasAir,
+  shopFor,
+  type MapDef,
+  type MapMarker,
+  type RelicId,
+  type WatchOrder,
+  watchOrderFor,
+} from "./campaign.ts";
 import { sfx, setMuted } from "./audio.ts";
 
 const FIRST = MAPS[0];
@@ -64,6 +77,11 @@ export interface ObjectiveSnap {
   current: number;
   target: number;
   reward: number;
+  complete: boolean;
+}
+
+export interface WatchOrderSnap extends WatchOrder {
+  current: number;
   complete: boolean;
 }
 
@@ -230,6 +248,7 @@ export interface HudSnap {
   previewWave: number;
   wavePreview: WavePreviewSnap[];
   threatTier: ThreatTier;
+  watchOrder: WatchOrderSnap | null;
   campaign: boolean;
 }
 
@@ -301,6 +320,8 @@ export class EmberEngine {
   waveEarned = 0;
   lastResult: WaveResultSnap | null = null;
   killCounts: Partial<Record<CreepKind, number>> = {};
+  waveKillCounts: Partial<Record<CreepKind, number>> = {};
+  waveOrder: WatchOrder | null = null;
   campaignOpen = false;
 
   private acc = 0;
@@ -422,6 +443,7 @@ export class EmberEngine {
       banner: hud.bannerText,
       lastResult: hud.lastResult,
       objective: hud.objective,
+      watchOrder: hud.watchOrder,
       campaign: hud.campaign,
     });
   }
@@ -454,6 +476,26 @@ export class EmberEngine {
       reward: rule.reward,
       complete: progress.complete,
     };
+  }
+
+  watchOrderSnapshot(): WatchOrderSnap | null {
+    const index = this.phase === "wave" ? this.wave - 1 : this.wave;
+    const previewIndex = Math.min(index, Math.max(0, this.map.waves.length - 1));
+    const plan = this.map.waves[previewIndex];
+    const order = this.phase === "wave" && this.waveOrder ? this.waveOrder : watchOrderFor(plan);
+    if (!order) return null;
+    const current = order.targetKind ? Math.min(order.target, this.waveKillCounts[order.targetKind] ?? 0) : 0;
+    return {
+      ...order,
+      current,
+      complete: this.phase === "wave" && order.id !== "clean" && current >= order.target,
+    };
+  }
+
+  watchOrderComplete(order: WatchOrder | null) {
+    if (!order) return false;
+    if (order.targetKind) return (this.waveKillCounts[order.targetKind] ?? 0) >= order.target;
+    return this.waveLeaks === 0;
   }
 
   inLanternAura(tower: Tower) {
@@ -529,6 +571,7 @@ export class EmberEngine {
       lastResult: this.lastResult,
       field: map.profile,
       objective: this.objectiveSnapshot(),
+      watchOrder: this.watchOrderSnapshot(),
       fieldBoost: t
         ? {
             damage: this.fieldDamageMultiplier(t),
@@ -826,6 +869,8 @@ export class EmberEngine {
     this.waveEarned = 0;
     this.lastResult = null;
     this.killCounts = {};
+    this.waveKillCounts = {};
+    this.waveOrder = null;
   }
 
   reset() {
@@ -1173,8 +1218,10 @@ export class EmberEngine {
     this.waveLeaks = 0;
     this.waveEarned = 0;
     this.lastResult = null;
+    this.waveKillCounts = {};
     this.wave += 1;
     const plan = this.map.waves[this.wave - 1];
+    this.waveOrder = watchOrderFor(plan);
     this.spawnQ = [];
     for (const pack of plan) {
       for (let i = 0; i < pack.count; i++) {
@@ -1318,6 +1365,7 @@ export class EmberEngine {
         (this.wave % 4 === 0 ? 2 : 0);
       this.gold += gold;
       this.waveKills += 1;
+      this.waveKillCounts[creep.kind] = (this.waveKillCounts[creep.kind] ?? 0) + 1;
       this.waveEarned += gold;
       this.streakT = 3.2;
       this.streak += 1;
@@ -1769,6 +1817,13 @@ export class EmberEngine {
     this.shots = [];
     this.beams = [];
     const heldWave = this.wave;
+    const order = this.waveOrder;
+    const orderHeld = this.watchOrderComplete(order);
+    if (orderHeld && order) {
+      this.gold += order.reward;
+      this.waveEarned += order.reward;
+      this.float(COLS / 2, 0.35, `Order +${order.reward}`, "#e07838");
+    }
     if (this.wave >= this.map.waves.length) {
       const objective = this.objectiveSnapshot();
       if (objective.complete) {
@@ -1794,6 +1849,9 @@ export class EmberEngine {
         sfx.win();
       }
       this.trauma = 0.25;
+      if (orderHeld && order) {
+        this.banner = { text: `Watch order held · +${order.reward}g`, life: 2.2, max: 2.2 };
+      }
     } else {
       this.phase = "ready";
       const reward = 42 + this.wave * 7 + this.mapIndex * 8;
@@ -1805,7 +1863,11 @@ export class EmberEngine {
         this.waveEarned += interest;
         this.float(COLS / 2, 0.55, `Interest +${interest}`, "#d4a054");
       }
-      this.banner = { text: `Wave ${this.wave} held`, life: 1.6, max: 1.6 };
+      this.banner = {
+        text: orderHeld && order ? `Wave ${this.wave} held · Order +${order.reward}g` : `Wave ${this.wave} held`,
+        life: 1.6,
+        max: 1.6,
+      };
       this.float(COLS / 2, 0.45, "Road clear", "#d4a054");
       sfx.waveClear();
       const last = this.towers[this.towers.length - 1];

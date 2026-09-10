@@ -153,3 +153,11 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: applied the same return-focus contract to the Bestiary launcher so both title-screen overlays behave consistently.
 - Verified locally in Playwright at 390x844: Campaign and Bestiary open/close flows returned focus to their launchers and retained viewport bounds without overflow.
 - Source gates: 90 tests, typecheck, lint, production build, and `git diff --check` pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-10 — wave orders and upgrade-readability pass
+
+- Completed: added deterministic optional Watch orders that reward clean holds, Wisp clears, Shaman kills, or Emberlord kills from each wave plan; targeted orders track progress live and settle at wave clear.
+- Completed: surfaced Watch order status and bonus in the threat forecast, with compact-viewport fallback hiding secondary intel at 360x640 while preserving the board and command deck.
+- Completed: upgrade actions now preview the next form transition (`→ Bound`, `→ Tempered`, or `→ Crowned`) and announce their effect through accessible labels.
+- Verified locally in the in-app browser and Playwright at 390x844, 360x640, and 1440x900: order forecast, upgrade preview, responsive fallback, board bounds, and zero browser errors.
+- Source gates: 93 tests, typecheck, lint, production build, and `git diff --check` pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
