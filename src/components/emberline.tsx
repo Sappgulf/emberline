@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RotateCcw } from "lucide-react";
 import { COLS, CREEPS, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type TowerKind } from "@/game/config";
 import { relicUrl, routeMarkerUrl, spriteUrl } from "@/game/assets";
@@ -72,9 +72,23 @@ export function Emberline() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const readyActionRef = useRef<HTMLButtonElement>(null);
+  const campaignTriggerRef = useRef<HTMLButtonElement>(null);
+  const codexTriggerRef = useRef<HTMLButtonElement>(null);
   const hud = useHud();
   const [cell, setCell] = useState(40);
   const [hoverCell, setHoverCell] = useState<HoverCell | null>(null);
+
+  const restoreOverlayTrigger = useCallback((target: { current: HTMLButtonElement | null }) => {
+    window.requestAnimationFrame(() => target.current?.focus());
+  }, []);
+  const closeCampaign = useCallback(() => {
+    engine.toggleCampaign();
+    restoreOverlayTrigger(campaignTriggerRef);
+  }, [restoreOverlayTrigger]);
+  const closeCodex = useCallback(() => {
+    engine.toggleCodex();
+    restoreOverlayTrigger(codexTriggerRef);
+  }, [restoreOverlayTrigger]);
 
   useEffect(() => {
     if (hud.phase === "ready") readyActionRef.current?.focus();
@@ -128,13 +142,13 @@ export function Emberline() {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (engine.codex) {
-        if (e.key === "Escape") engine.toggleCodex();
+        if (e.key === "Escape") closeCodex();
         return;
       }
       if (engine.campaignOpen) {
         if (e.key === "Escape") {
           e.preventDefault();
-          engine.toggleCampaign();
+          closeCampaign();
         }
         return;
       }
@@ -176,7 +190,7 @@ export function Emberline() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [closeCampaign, closeCodex]);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -443,7 +457,7 @@ export function Emberline() {
             </div>
           )}
           {hud.codex && (
-            <Overlay wide kicker="Codex" title="Bestiary" onClose={() => engine.toggleCodex()} close="Close">
+            <Overlay wide kicker="Codex" title="Bestiary" onClose={closeCodex} close="Close">
               <div className="bestiary-grid w-full text-left">
                 {BESTIARY.map((b) => {
                   const creep = CREEPS[b.kind];
@@ -487,7 +501,7 @@ export function Emberline() {
               kicker="Campaign route"
               title="The ember watch"
               close="Close"
-              onClose={() => engine.toggleCampaign()}
+              onClose={closeCampaign}
               action={`Begin ${hud.mapName}`}
               onAction={() => engine.startSelectedMap()}
             >
@@ -559,10 +573,10 @@ export function Emberline() {
                     Continue
                   </button>
                 )}
-                <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.toggleCampaign()}>
+                <button ref={campaignTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.toggleCampaign()}>
                   Campaign
                 </button>
-                <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleCodex()}>
+                <button ref={codexTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleCodex()}>
                   Bestiary
                 </button>
               </div>

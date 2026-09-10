@@ -146,3 +146,9 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: let native focus traversal own Tab inside every modal phase and while footer buttons are focused, while keeping canvas tower inspection on Tab.
 - Completed: aligned compact HUD and campaign labels with stateful accessible names and singular relic grammar.
 - Verified locally in the in-app browser and Playwright at 390x844: saved campaign route selection, Campaign Space/Escape behavior, focus traversal, ready HUD labels, and no document overflow.
+
+## 2026-09-10 — modal return-focus pass
+
+- Completed: restored focus to the Campaign launcher after closing the route picker with Escape or Close.
+- Completed: applied the same return-focus contract to the Bestiary launcher so both title-screen overlays behave consistently.
+- Verified locally in Playwright at 390x844: Campaign and Bestiary open/close flows returned focus to their launchers and retained viewport bounds without overflow.
