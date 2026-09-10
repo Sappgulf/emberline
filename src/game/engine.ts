@@ -69,6 +69,10 @@ export interface WaveResultSnap {
   kills: number;
   leaks: number;
   earned: number;
+  hold: "clean" | "frayed" | "shaken";
+  orderHeld: boolean;
+  orderPayout: number;
+  orderChain: number;
 }
 
 export interface ObjectiveSnap {
@@ -83,6 +87,8 @@ export interface ObjectiveSnap {
 export interface WatchOrderSnap extends WatchOrder {
   current: number;
   complete: boolean;
+  payout: number;
+  chain: number;
 }
 
 function wavePreviewFor(plan: MapDef["waves"][number] | undefined): WavePreviewSnap[] {
@@ -322,6 +328,7 @@ export class EmberEngine {
   killCounts: Partial<Record<CreepKind, number>> = {};
   waveKillCounts: Partial<Record<CreepKind, number>> = {};
   waveOrder: WatchOrder | null = null;
+  watchChain = 0;
   campaignOpen = false;
 
   private acc = 0;
@@ -489,7 +496,14 @@ export class EmberEngine {
       ...order,
       current,
       complete: this.phase === "wave" && order.id !== "clean" && current >= order.target,
+      payout: this.watchOrderPayout(order),
+      chain: this.watchChain,
     };
+  }
+
+  watchOrderPayout(order: WatchOrder | null) {
+    if (!order) return 0;
+    return order.reward + Math.min(18, this.watchChain * 6);
   }
 
   watchOrderComplete(order: WatchOrder | null) {
@@ -871,6 +885,7 @@ export class EmberEngine {
     this.killCounts = {};
     this.waveKillCounts = {};
     this.waveOrder = null;
+    this.watchChain = 0;
   }
 
   reset() {
@@ -1819,11 +1834,14 @@ export class EmberEngine {
     const heldWave = this.wave;
     const order = this.waveOrder;
     const orderHeld = this.watchOrderComplete(order);
+    const orderPayout = orderHeld ? this.watchOrderPayout(order) : 0;
     if (orderHeld && order) {
-      this.gold += order.reward;
-      this.waveEarned += order.reward;
-      this.float(COLS / 2, 0.35, `Order +${order.reward}`, "#e07838");
+      this.gold += orderPayout;
+      this.waveEarned += orderPayout;
+      this.float(COLS / 2, 0.35, `Order +${orderPayout}`, "#e07838");
     }
+    this.watchChain = orderHeld ? Math.min(4, this.watchChain + 1) : 0;
+    const hold = this.waveLeaks === 0 ? "clean" : this.waveLeaks <= 2 ? "frayed" : "shaken";
     if (this.wave >= this.map.waves.length) {
       const objective = this.objectiveSnapshot();
       if (objective.complete) {
@@ -1850,7 +1868,7 @@ export class EmberEngine {
       }
       this.trauma = 0.25;
       if (orderHeld && order) {
-        this.banner = { text: `Watch order held · +${order.reward}g`, life: 2.2, max: 2.2 };
+        this.banner = { text: `Watch order held · +${orderPayout}g`, life: 2.2, max: 2.2 };
       }
     } else {
       this.phase = "ready";
@@ -1864,7 +1882,11 @@ export class EmberEngine {
         this.float(COLS / 2, 0.55, `Interest +${interest}`, "#d4a054");
       }
       this.banner = {
-        text: orderHeld && order ? `Wave ${this.wave} held · Order +${order.reward}g` : `Wave ${this.wave} held`,
+        text: orderHeld && order
+          ? `Wave ${this.wave} held · Order +${orderPayout}g`
+          : hold === "clean"
+            ? `Wave ${this.wave} held`
+            : `Wave ${this.wave} held · ${hold === "frayed" ? "line frayed" : "keep shaken"}`,
         life: 1.6,
         max: 1.6,
       };
@@ -1881,6 +1903,10 @@ export class EmberEngine {
       kills: this.waveKills,
       leaks: this.waveLeaks,
       earned: this.waveEarned,
+      hold,
+      orderHeld,
+      orderPayout,
+      orderChain: this.watchChain,
     };
     this.scoreGrade();
     this.notify();
@@ -1937,7 +1963,7 @@ export class EmberEngine {
   maybeNotify() {
     const heroKey = this.heroT > 0 ? this.hero?.kind ?? "active" : "none";
     const objective = this.objectiveProgress();
-    const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${heroKey}|${this.canUndo()}|${this.banner?.text ?? ""}|${this.lastResult?.wave ?? 0}|${this.waveKills}|${this.waveLeaks}|${this.waveEarned}|${objective.current}`;
+    const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${heroKey}|${this.canUndo()}|${this.banner?.text ?? ""}|${this.lastResult?.wave ?? 0}|${this.waveKills}|${this.waveLeaks}|${this.waveEarned}|${this.watchChain}|${objective.current}`;
     if (key !== this.hudKey) {
       this.hudKey = key;
       this.notify();

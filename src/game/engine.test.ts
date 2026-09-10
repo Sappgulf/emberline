@@ -195,8 +195,35 @@ describe("EmberEngine", () => {
 
     assert.match(e.hud().bannerText ?? "", /Order \+22g/);
     assert.equal(e.hud().lastResult?.earned, 98);
+    assert.equal(e.hud().lastResult?.hold, "clean");
+    assert.equal(e.hud().lastResult?.orderHeld, true);
+    assert.equal(e.hud().lastResult?.orderPayout, 22);
+    assert.equal(e.hud().lastResult?.orderChain, 1);
+    assert.equal(e.hud().watchOrder?.chain, 1);
+    assert.equal(e.hud().watchOrder?.payout, 28);
     const text = JSON.parse(e.renderText()) as { watchOrder: { id: string } };
     assert.equal(text.watchOrder.id, "clean");
+  });
+
+  it("shows line quality and breaks the watch chain after missed orders", () => {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [];
+    e.creeps = [];
+    e.finishWaveIfClear();
+
+    e.startWave();
+    e.waveLeaks = 1;
+    e.spawnQ = [];
+    e.creeps = [];
+    e.finishWaveIfClear();
+
+    assert.equal(e.hud().lastResult?.hold, "frayed");
+    assert.equal(e.hud().lastResult?.orderHeld, false);
+    assert.equal(e.hud().lastResult?.orderPayout, 0);
+    assert.equal(e.hud().lastResult?.orderChain, 0);
+    assert.equal(e.hud().watchOrder?.chain, 0);
+    assert.match(e.hud().bannerText ?? "", /line frayed/);
   });
 
   it("shows targeted watch-order progress during an air wave", () => {
@@ -366,7 +393,16 @@ describe("EmberEngine", () => {
     e.creeps = [];
     e.finishWaveIfClear();
 
-    assert.deepEqual(e.hud().lastResult, { wave: 1, kills: 0, leaks: 0, earned: e.hud().lastResult?.earned });
+    assert.deepEqual(e.hud().lastResult, {
+      wave: 1,
+      kills: 0,
+      leaks: 0,
+      earned: e.hud().lastResult?.earned,
+      hold: "clean",
+      orderHeld: true,
+      orderPayout: 22,
+      orderChain: 1,
+    });
     assert.ok((e.hud().lastResult?.earned ?? 0) > 0);
     const text = JSON.parse(e.renderText()) as { coordinateSystem: string; phase: string; wave: { progress: number } };
     assert.match(text.coordinateSystem, /origin top-left/);

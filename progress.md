@@ -161,3 +161,13 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: upgrade actions now preview the next form transition (`→ Bound`, `→ Tempered`, or `→ Crowned`) and announce their effect through accessible labels.
 - Verified locally in the in-app browser and Playwright at 390x844, 360x640, and 1440x900: order forecast, upgrade preview, responsive fallback, board bounds, and zero browser errors.
 - Source gates: 93 tests, typecheck, lint, production build, and `git diff --check` pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-10 — watch-chain and truthful recap pass
+
+- Completed: added a run-scoped Watch Chain that increases the next held order payout by +6g per consecutive success, capped at +18g, and resets when an order is missed or a field is cleared.
+- Completed: wave settlement now records clean, frayed, or shaken line quality; the progress rail and recap no longer call a wave “road clear” after breaches.
+- Completed: moved the wave recap above the forecast detail between waves, added order payout/chain confirmation, and reused the generated Emberline crest as the order seal without adding a new image dependency.
+- Verified in the live in-app browser: a clean first wave showed `ROAD CLEAR`, `ORDER HELD · +22G · CHAIN 1`, and the next preview showed `CHAIN 1 · +28G`; an unguarded second wave showed `KEEP SHAKEN` and `ORDER MISSED · CHAIN RESET`.
+- Verified with Playwright fallback because the IAB exposed no viewport override: 390x844 and 320x568 screenshots keep the board, packet row, and send action within exact document bounds; zero console errors or warnings.
+- Source gates: 94 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
+- Tooling note: live imagegen was not called because `OPENAI_API_KEY` is not set in this shell; the existing accepted crest asset remains the isolated fallback.

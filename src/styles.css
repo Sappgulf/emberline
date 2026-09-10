@@ -699,11 +699,41 @@
   border-color: rgba(224, 120, 56, 0.7);
   background: rgba(74, 48, 32, 0.38);
 }
+.watch-order[data-chain="true"] {
+  border-color: rgba(143, 196, 199, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(143, 196, 199, 0.08), 0 0 12px rgba(106, 168, 180, 0.08);
+}
+.watch-order[data-complete="true"][data-chain="true"] {
+  border-color: rgba(224, 120, 56, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 197, 0.06), 0 0 14px rgba(224, 120, 56, 0.12);
+}
 .watch-order-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.45rem;
+}
+.watch-order-identity {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.3rem;
+}
+.watch-order-seal {
+  display: grid;
+  flex: 0 0 1.35rem;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid rgba(212, 160, 84, 0.38);
+  border-radius: 999px;
+  background: rgba(8, 11, 10, 0.48);
+}
+.watch-order-seal img {
+  width: 1.16rem;
+  height: 1.16rem;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
 }
 .watch-order-heading .intel-kicker {
   color: #8fc4c7;
@@ -874,6 +904,24 @@
 .wave-recap-metrics .recap-alert b,
 .wave-recap-metrics .recap-alert {
   color: var(--color-blood);
+}
+.wave-recap[data-quality="frayed"] .wave-recap-heading strong,
+.wave-recap[data-quality="shaken"] .wave-recap-heading strong {
+  color: #e3947f;
+}
+.wave-recap-order {
+  margin-top: 0.42rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(212, 160, 84, 0.2);
+  color: var(--color-copper);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.wave-recap-order-missed {
+  color: #e3947f;
 }
 .tower-intel {
   padding: 0.75rem;

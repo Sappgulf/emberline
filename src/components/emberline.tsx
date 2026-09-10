@@ -284,7 +284,7 @@ export function Emberline() {
   const mendHint = hud.lives >= hud.maxLives ? "The keep is already at full strength" : hud.gold < hud.mendCost ? `Mend costs ${hud.mendCost} gold` : `Mend the keep for ${hud.mendCost} gold`;
   const mendValue = hud.lives >= hud.maxLives ? "Full" : `${hud.mendCost}g`;
   const waveProgressLabel = hud.phase === "wave" ? `Wave ${hud.wave}` : hud.wave > 0 ? `Wave ${hud.wave} held` : "First watch";
-  const waveProgressStatus = hud.phase === "wave" ? `${hud.remaining} left` : hud.wave > 0 ? "Road clear" : "Ready";
+  const waveProgressStatus = hud.phase === "wave" ? `${hud.remaining} left` : hud.wave > 0 ? holdLabel(hud.lastResult?.hold) : "Ready";
   const placementToneValue = placementTone(engine, hud, hoverCell);
   const placementMessageValue = placementMessage(engine, hud, hoverCell);
   const firstWatch = hud.mapIndex === 0 && hud.wave === 0 && hud.relics.length === 0;
@@ -1007,6 +1007,7 @@ function ThreatPanel({ hud }: { hud: HudSnap }) {
         <h2>Wave {hud.previewWave}</h2>
         <span>{hud.phase === "wave" ? `${hud.remaining}/${hud.waveTotal} left` : "Ready to send"}</span>
       </div>
+      {hud.phase === "ready" && hud.lastResult && <WaveRecap result={hud.lastResult} />}
       <FieldNote field={hud.field} compact markerId={hud.route[hud.mapIndex]?.id} />
       <FieldObjective objective={hud.objective} />
       <WatchOrder order={hud.watchOrder} />
@@ -1041,7 +1042,6 @@ function ThreatPanel({ hud }: { hud: HudSnap }) {
       <p className={uncoveredAir ? "threat-note threat-note-alert" : "threat-note"}>
         {uncoveredAir ? "Air sightline needed — choose Bow or Frost." : THREAT_NOTE[hud.threatTier]}
       </p>
-      {hud.phase === "ready" && hud.lastResult && <WaveRecap result={hud.lastResult} />}
     </section>
   );
 }
@@ -1087,16 +1087,33 @@ function FieldObjective({ objective }: { objective: HudSnap["objective"] }) {
 function WatchOrder({ order }: { order: HudSnap["watchOrder"] }) {
   if (!order) return null;
   const count = order.complete ? "Met" : order.id === "clean" ? "No breach" : `${order.current}/${order.target}`;
-  const status = order.complete ? "target met, paid on clear" : order.id === "clean" ? "no breaches yet" : `${order.current} of ${order.target} complete`;
+  const payout = order.payout;
+  const status = order.complete
+    ? `target met, paid ${payout} gold on clear`
+    : order.id === "clean"
+      ? `no breaches yet, payout ${payout} gold`
+      : `${order.current} of ${order.target} complete, payout ${payout} gold`;
   return (
-    <div className="watch-order" data-complete={order.complete} aria-label={`Watch order: ${order.title}, ${status}`}>
+    <div
+      className="watch-order"
+      data-complete={order.complete}
+      data-chain={order.chain > 0}
+      aria-label={`Watch order: ${order.title}, ${status}`}
+    >
       <div className="watch-order-heading">
-        <span className="intel-kicker">Watch order</span>
+        <span className="watch-order-identity">
+          <span className="watch-order-seal" aria-hidden="true">
+            <img src="/ui/emberline-crest-v1.png" alt="" />
+          </span>
+          <span className="intel-kicker">Watch order</span>
+        </span>
         <span className="watch-order-count">{count}</span>
       </div>
       <strong>{order.title}</strong>
       <p>{order.detail}</p>
-      <span className="watch-order-reward">{order.complete ? `On clear +${order.reward}g` : `Bonus +${order.reward}g`}</span>
+      <span className="watch-order-reward">
+        {order.complete ? `On clear +${payout}g` : order.chain > 0 ? `Chain ${order.chain} · +${payout}g` : `Bonus +${payout}g`}
+      </span>
     </div>
   );
 }
@@ -1110,11 +1127,12 @@ function counterPlan(wave: HudSnap["wavePreview"]): TowerKind[] {
 }
 
 function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
+  const quality = holdLabel(result.hold);
   return (
-    <div className="wave-recap" aria-label={`Wave ${result.wave} result`}>
+    <div className="wave-recap" data-quality={result.hold} aria-label={`Wave ${result.wave} result: ${quality}`}>
       <div className="wave-recap-heading">
         <span className="intel-kicker">Last hold</span>
-        <strong>Wave {result.wave} held</strong>
+        <strong>{quality}</strong>
       </div>
       <div className="wave-recap-metrics">
         <span>
@@ -1127,8 +1145,19 @@ function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
           <b>+{result.earned}g</b> earned
         </span>
       </div>
+      <div className={`wave-recap-order ${result.orderHeld ? "" : "wave-recap-order-missed"}`}>
+        {result.orderHeld
+          ? `Order held · +${result.orderPayout}g · chain ${result.orderChain}`
+          : "Order missed · chain reset"}
+      </div>
     </div>
   );
+}
+
+function holdLabel(hold: string | undefined) {
+  if (hold === "frayed") return "Line frayed";
+  if (hold === "shaken") return "Keep shaken";
+  return "Road clear";
 }
 
 function TowerIntel({ hud }: { hud: HudSnap }) {
