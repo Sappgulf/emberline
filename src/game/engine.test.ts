@@ -129,6 +129,16 @@ describe("EmberEngine", () => {
     assert.equal(e.selectedKind, null);
   });
 
+  it("keeps a counter armed when the recommended packet is already selected", () => {
+    const e = play();
+    e.chooseCounter("bow");
+    assert.equal(e.selectedKind, "bow");
+    e.chooseCounter("bow");
+    assert.equal(e.selectedKind, "bow");
+    e.chooseCounter("mortar");
+    assert.equal(e.selectedKind, "mortar");
+  });
+
   it("hydrates saved progress into the initial HUD snapshot", () => {
     const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
     const stored = JSON.stringify({ relics: ["purse"], unlocked: 3, muted: false });

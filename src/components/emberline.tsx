@@ -457,7 +457,7 @@ export function Emberline() {
                 hud={hud}
                 onSelectCounter={(kind) => {
                   unlockAudio();
-                  engine.chooseKind(kind);
+                  engine.chooseCounter(kind);
                 }}
               />
               {hud.selectedTower && !hud.lastResult && <TowerIntel hud={hud} />}
@@ -1000,65 +1000,118 @@ function CampaignRail({ route }: { route: HudSnap["route"] }) {
 function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: (kind: TowerKind) => void }) {
   const uncoveredAir = hud.nextAir && !hud.airCovered;
   const counters = counterPlan(hud.wavePreview);
+  const [intelOpen, setIntelOpen] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 640px)");
+    const sync = () => {
+      if (media.matches) setIntelOpen(false);
+    };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (hud.phase === "wave" && window.matchMedia("(max-width: 640px)").matches) {
+      setIntelOpen(false);
+    }
+  }, [hud.phase]);
+
+  const intelDetailsId = `wave-intel-details-${hud.previewWave}`;
   return (
     <section
       className={`threat-panel threat-panel-${hud.threatTier}`}
       data-active={hud.phase === "wave"}
+      data-expanded={intelOpen}
       aria-label={`Wave ${hud.previewWave} threat forecast`}
       role="region"
     >
       <div className="intel-heading">
         <span className="intel-kicker">Next threat</span>
         <span className={`threat-tier threat-${hud.threatTier}`}>{THREAT_LABEL[hud.threatTier]}</span>
+        <button
+          type="button"
+          className="pressable intel-toggle"
+          aria-controls={intelDetailsId}
+          aria-expanded={intelOpen}
+          onClick={() => setIntelOpen((open) => !open)}
+        >
+          {intelOpen ? "Hide details" : "Show details"}
+        </button>
       </div>
       <div className="threat-title" aria-live="polite">
         <h2>Wave {hud.previewWave}</h2>
         <span>{hud.phase === "wave" ? `${hud.remaining}/${hud.waveTotal} left` : "Ready to send"}</span>
       </div>
-      {hud.phase === "ready" && hud.lastResult && <WaveRecap result={hud.lastResult} />}
-      <FieldNote field={hud.field} compact markerId={hud.route[hud.mapIndex]?.id} />
-      <FieldObjective objective={hud.objective} />
-      <WatchOrder order={hud.watchOrder} />
-      <div className="threat-meter" data-tier={hud.threatTier} aria-hidden="true">
-        <span />
-      </div>
-      <div className="threat-items">
-        {hud.wavePreview.map((item) => {
-          const creep = CREEPS[item.kind];
-          return (
-            <div key={item.kind} className="threat-item" aria-label={`${item.count} ${creep.name}${creep.flying ? ", flying" : ""}`}>
-              <img src={spriteUrl(item.kind)} alt="" />
-              <span className="threat-count">{item.count}</span>
-              <span className="threat-name">{creep.name}</span>
-              {creep.flying && <span className="threat-tag">Air</span>}
-              {!creep.flying && creep.armor > 0 && <span className="threat-tag">Armor</span>}
-            </div>
-          );
-        })}
-      </div>
-      <div className="threat-tactics">
-        <span className="intel-kicker">Counter plan</span>
-        <div className="counter-pills">
-          {counters.map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              className={`pressable counter-pill counter-${kind}`}
-              aria-pressed={hud.selectedKind === kind}
-              aria-label={`Choose ${TOWERS[kind].name} as the counter for this wave`}
-              title={`Choose ${TOWERS[kind].short} counter`}
-              onClick={() => onSelectCounter(kind)}
-            >
-              <img src={spriteUrl(kind)} alt="" />
-              {TOWERS[kind].short}
-            </button>
-          ))}
+      {!intelOpen && (
+        <div className="intel-quick-actions" aria-label="Quick counter plan">
+          <span className="intel-kicker">Counter</span>
+          <CounterPills counters={counters} selectedKind={hud.selectedKind} onSelect={onSelectCounter} compact />
         </div>
+      )}
+      <div id={intelDetailsId} className="intel-details" hidden={!intelOpen}>
+        {hud.phase === "ready" && hud.lastResult && <WaveRecap result={hud.lastResult} />}
+        <FieldNote field={hud.field} compact markerId={hud.route[hud.mapIndex]?.id} />
+        <FieldObjective objective={hud.objective} />
+        <WatchOrder order={hud.watchOrder} />
+        <div className="threat-meter" data-tier={hud.threatTier} aria-hidden="true">
+          <span />
+        </div>
+        <div className="threat-items">
+          {hud.wavePreview.map((item) => {
+            const creep = CREEPS[item.kind];
+            return (
+              <div key={item.kind} className="threat-item" aria-label={`${item.count} ${creep.name}${creep.flying ? ", flying" : ""}`}>
+                <img src={spriteUrl(item.kind)} alt="" />
+                <span className="threat-count">{item.count}</span>
+                <span className="threat-name">{creep.name}</span>
+                {creep.flying && <span className="threat-tag">Air</span>}
+                {!creep.flying && creep.armor > 0 && <span className="threat-tag">Armor</span>}
+              </div>
+            );
+          })}
+        </div>
+        <div className="threat-tactics">
+          <span className="intel-kicker">Counter plan</span>
+          <CounterPills counters={counters} selectedKind={hud.selectedKind} onSelect={onSelectCounter} />
+        </div>
+        <p className={uncoveredAir ? "threat-note threat-note-alert" : "threat-note"}>
+          {uncoveredAir ? "Air sightline needed — choose Bow or Frost." : THREAT_NOTE[hud.threatTier]}
+        </p>
       </div>
-      <p className={uncoveredAir ? "threat-note threat-note-alert" : "threat-note"}>
-        {uncoveredAir ? "Air sightline needed — choose Bow or Frost." : THREAT_NOTE[hud.threatTier]}
-      </p>
     </section>
+  );
+}
+
+function CounterPills({
+  counters,
+  selectedKind,
+  onSelect,
+  compact = false,
+}: {
+  counters: TowerKind[];
+  selectedKind: TowerKind | null;
+  onSelect: (kind: TowerKind) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`counter-pills ${compact ? "counter-pills-quick" : ""}`}>
+      {counters.map((kind) => (
+        <button
+          key={kind}
+          type="button"
+          className={`pressable counter-pill counter-${kind}`}
+          aria-pressed={selectedKind === kind}
+          aria-label={`Choose ${TOWERS[kind].name} as the counter for this wave`}
+          title={`Choose ${TOWERS[kind].short} counter`}
+          onClick={() => onSelect(kind)}
+        >
+          <img src={spriteUrl(kind)} alt="" />
+          {TOWERS[kind].short}
+        </button>
+      ))}
+    </div>
   );
 }
 

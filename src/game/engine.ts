@@ -1031,6 +1031,15 @@ export class EmberEngine {
     this.notify();
   }
 
+  chooseCounter(kind: TowerKind) {
+    if (this.selectedKind === kind) {
+      this.movingId = null;
+      this.notify();
+      return;
+    }
+    this.chooseKind(kind);
+  }
+
   moveCost() {
     return this.relics.has("oil") ? 10 : 15;
   }

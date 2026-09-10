@@ -482,6 +482,16 @@
   justify-content: space-between;
   gap: 0.6rem;
 }
+.intel-toggle {
+  display: none;
+  pointer-events: auto;
+}
+.intel-details[hidden] {
+  display: none;
+}
+.intel-quick-actions {
+  display: none;
+}
 .intel-kicker {
   color: var(--color-dust);
   font-size: 8px;
@@ -2132,6 +2142,63 @@
 
   .threat-panel {
     padding: 0.45rem 0.5rem;
+  }
+
+  .intel-heading {
+    align-items: center;
+  }
+
+  .intel-heading > .intel-kicker {
+    flex: 1 1 auto;
+  }
+
+  .intel-toggle {
+    display: inline-flex;
+    min-height: 1.35rem;
+    padding: 0.14rem 0.34rem;
+    border: 1px solid rgba(212, 160, 84, 0.38);
+    border-radius: 999px;
+    background: rgba(8, 11, 10, 0.54);
+    color: var(--color-copper);
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .intel-quick-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    margin-top: 0.35rem;
+    padding-top: 0.3rem;
+    border-top: 1px solid rgba(232, 220, 196, 0.12);
+  }
+
+  .intel-quick-actions > .intel-kicker {
+    flex: 0 0 auto;
+    color: var(--color-copper);
+    font-size: 7px;
+  }
+
+  .counter-pills-quick {
+    flex-wrap: nowrap;
+    min-width: 0;
+    margin-top: 0;
+    overflow: hidden;
+  }
+
+  .counter-pills-quick .counter-pill {
+    min-height: 1.45rem;
+    padding: 0.1rem 0.26rem 0.1rem 0.16rem;
+    font-size: 6px;
+  }
+
+  .counter-pills-quick .counter-pill img {
+    width: 0.72rem;
+    height: 0.72rem;
   }
 
   .field-note-compact {
