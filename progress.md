@@ -179,3 +179,11 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: added a `dispatch-dawn` surface used only by the completed-campaign `won` overlay, keeping all normal play, briefing, campaign, and shop surfaces unchanged while giving the five-map finish a distinct dawn payoff.
 - Verified locally in the in-app browser after restarting the documented Vite server: title → briefing → ready, exact board/tray geometry at 1280×720, and no Browser diagnostics. Verified with Playwright fallback because the IAB exposes no viewport override: 390×844, 320×568, and 1440×900 screenshots show no document overflow or clipping; mobile console has 0 errors and 0 warnings.
 - Asset delivery check: both `/ui/dawn-watch-v1.webp` and `/ui/dawn-watch-v1.png` return HTTP 200 with the expected image MIME types. Source gates: 94 tests, typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-10 — counter-plan action pass
+
+- Completed: made the threat forecast's Counter plan actionable; each recommendation now selects the matching packet through the existing `chooseKind` engine path and exposes pressed state to assistive tech.
+- Completed: synced the packet tray to the same `wavePreview`-derived counter list with a restrained `COUNTER` marker and accessible recommendation wording, keeping the selected packet glow as the stronger state.
+- Completed: changed the forecast container from a status live region to a labeled region with a polite live wave title so interactive counter controls remain visible in the accessibility tree.
+- Verified locally in the in-app browser: fresh title → brief → ready, forecast counter button exposure, keyboard activation selecting Bow, packet selection handoff, marker rendering, and zero local error/warn diagnostics.
+- Verified with Playwright fallback because the IAB exposes no viewport override: 320×568, 390×844, and 1440×900 screenshots show no document overflow or clipping; the desktop snapshot exposes the counter as a real button. Source gates: 94 tests, typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.

@@ -853,6 +853,12 @@
   line-height: 1;
   text-transform: uppercase;
 }
+.counter-pill[aria-pressed="true"] {
+  border-color: var(--color-copper);
+  background: rgba(212, 160, 84, 0.18);
+  box-shadow: 0 0 0 1px rgba(212, 160, 84, 0.2);
+  color: var(--color-parchment);
+}
 .counter-pill img {
   width: 1rem;
   height: 1rem;
@@ -1145,6 +1151,24 @@
   background:
     linear-gradient(180deg, rgba(212, 160, 84, 0.22), rgba(12, 16, 13, 0.58) 78%),
     rgba(18, 22, 15, 0.74);
+}
+.packet[data-counter="true"]:not([data-on="true"]) {
+  border-color: rgba(212, 160, 84, 0.72);
+  box-shadow:
+    0 0 0 1px rgba(212, 160, 84, 0.2),
+    0 0 12px rgba(212, 160, 84, 0.1);
+}
+.packet[data-counter="true"]:not([data-on="true"])::after {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.28rem;
+  color: var(--color-copper);
+  content: "Counter";
+  font-size: 6px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 .packet .key {
   position: absolute;

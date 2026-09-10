@@ -299,6 +299,7 @@ export function Emberline() {
     hud.phase === "lost";
 
   const packets = Object.keys(TOWERS) as TowerKind[];
+  const recommendedCounters = counterPlan(hud.wavePreview);
 
   return (
     <div
@@ -452,7 +453,13 @@ export function Emberline() {
           )}
           {playing && (
             <div className="intel-stack" aria-label="Watch intelligence">
-              <ThreatPanel hud={hud} />
+              <ThreatPanel
+                hud={hud}
+                onSelectCounter={(kind) => {
+                  unlockAudio();
+                  engine.chooseKind(kind);
+                }}
+              />
               {hud.selectedTower && !hud.lastResult && <TowerIntel hud={hud} />}
             </div>
           )}
@@ -742,8 +749,9 @@ export function Emberline() {
                     type="button"
                     disabled={!playing}
                     data-on={hud.selectedKind === kind}
+                    data-counter={recommendedCounters.includes(kind)}
                     aria-pressed={hud.selectedKind === kind}
-                    aria-label={`${def.name} tower, costs ${def.cost} gold${hud.selectedKind === kind ? ", selected" : ""}`}
+                    aria-label={`${def.name} tower, costs ${def.cost} gold${recommendedCounters.includes(kind) ? ", recommended counter" : ""}${hud.selectedKind === kind ? ", selected" : ""}`}
                     onClick={() => {
                       unlockAudio();
                       engine.chooseKind(kind);
@@ -989,7 +997,7 @@ function CampaignRail({ route }: { route: HudSnap["route"] }) {
   );
 }
 
-function ThreatPanel({ hud }: { hud: HudSnap }) {
+function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: (kind: TowerKind) => void }) {
   const uncoveredAir = hud.nextAir && !hud.airCovered;
   const counters = counterPlan(hud.wavePreview);
   return (
@@ -997,13 +1005,13 @@ function ThreatPanel({ hud }: { hud: HudSnap }) {
       className={`threat-panel threat-panel-${hud.threatTier}`}
       data-active={hud.phase === "wave"}
       aria-label={`Wave ${hud.previewWave} threat forecast`}
-      role="status"
+      role="region"
     >
       <div className="intel-heading">
         <span className="intel-kicker">Next threat</span>
         <span className={`threat-tier threat-${hud.threatTier}`}>{THREAT_LABEL[hud.threatTier]}</span>
       </div>
-      <div className="threat-title">
+      <div className="threat-title" aria-live="polite">
         <h2>Wave {hud.previewWave}</h2>
         <span>{hud.phase === "wave" ? `${hud.remaining}/${hud.waveTotal} left` : "Ready to send"}</span>
       </div>
@@ -1032,10 +1040,18 @@ function ThreatPanel({ hud }: { hud: HudSnap }) {
         <span className="intel-kicker">Counter plan</span>
         <div className="counter-pills">
           {counters.map((kind) => (
-            <span key={kind} className={`counter-pill counter-${kind}`}>
+            <button
+              key={kind}
+              type="button"
+              className={`pressable counter-pill counter-${kind}`}
+              aria-pressed={hud.selectedKind === kind}
+              aria-label={`Choose ${TOWERS[kind].name} as the counter for this wave`}
+              title={`Choose ${TOWERS[kind].short} counter`}
+              onClick={() => onSelectCounter(kind)}
+            >
               <img src={spriteUrl(kind)} alt="" />
               {TOWERS[kind].short}
-            </span>
+            </button>
           ))}
         </div>
       </div>
