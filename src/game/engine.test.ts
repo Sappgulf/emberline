@@ -172,7 +172,23 @@ describe("EmberEngine", () => {
     e.notify();
     assert.equal(e.hud().route[0].state, "held");
     assert.equal(e.hud().route[1].state, "current");
-    assert.equal(e.hud().route[2].state, "locked");
+    assert.equal(e.hud().route[2].state, "available");
+  });
+
+  it("keeps the next unlocked route available while replaying a held map", () => {
+    const e = play();
+    e.unlocked = 4;
+    e.loadMap(0);
+    e.notify();
+
+    assert.equal(e.hud().route[0].state, "current");
+    assert.equal(e.hud().route[3].state, "held");
+    assert.equal(e.hud().route[4].state, "available");
+
+    e.phase = "title";
+    e.selectCampaignMap(4);
+    assert.equal(e.mapIndex, 4);
+    assert.equal(e.hud().route[4].state, "current");
   });
 
   it("starts a watch with gold, lives, and a buildable field", () => {

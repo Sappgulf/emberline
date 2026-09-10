@@ -478,7 +478,7 @@ export function Emberline() {
             >
               <div className="campaign-map-surface">
                 <p className="max-w-md text-sm leading-relaxed text-dust">
-                  {Math.min(hud.mapTotal, hud.unlocked + 1)} of {hud.mapTotal} routes available. Select a held route to choose where the next watch begins.
+                  {Math.min(hud.mapTotal, hud.unlocked + 1)} of {hud.mapTotal} routes available. Select an open route to choose where the next watch begins.
                 </p>
                 <div className="campaign-select" aria-label="Campaign route selection">
                   {hud.route.map((node, index) => {
@@ -500,7 +500,9 @@ export function Emberline() {
                           <span>{index + 1}</span>
                         </span>
                         <span className="campaign-card-copy">
-                          <span className="campaign-card-state">{node.state === "current" ? "Selected" : node.state === "held" ? "Held" : "Locked"}</span>
+                          <span className="campaign-card-state">
+                            {node.state === "current" ? "Selected" : node.state === "held" ? "Held" : node.state === "available" ? "Available" : "Locked"}
+                          </span>
                           <strong>{node.name}</strong>
                           <span>{node.place}</span>
                           <small>{node.ruleLabel} · {node.objectiveTitle} · +{node.objectiveReward}g</small>
@@ -921,7 +923,7 @@ function CampaignRail({ route }: { route: HudSnap["route"] }) {
               <span>{index + 1}</span>
             </div>
             <div className="route-copy">
-              <span className="route-state">{node.state === "current" ? "Current" : node.state === "held" ? "Held" : "Ahead"}</span>
+              <span className="route-state">{node.state === "current" ? "Current" : node.state === "held" ? "Held" : node.state === "available" ? "Next" : "Ahead"}</span>
               <span className="route-name">{node.name}</span>
               <span className="route-place">{node.place}</span>
             </div>

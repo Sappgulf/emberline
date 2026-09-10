@@ -133,3 +133,9 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: added a compact title ledger, first-watch three-step briefing, active-wave live cue, stronger mobile command state, and a dawn summary without competing with the board.
 - Verified in the live in-app browser and Playwright at 1280px, 390x844, and 320x568: title → brief → ready, invalid placement copy, Pine Cut air check, successful Bow placement, active wave, no document overflow, and no console errors.
 - Source gates: 89 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-10 — campaign state and smallest-phone finish
+
+- Completed: tightened the 320px returning-player menu so Continue, Campaign, and Bestiary remain fully legible without shrinking the primary Hold the line action.
+- Completed: added an explicit available campaign state for the next unlocked route, keeping route rail, campaign cards, and engine selection behavior consistent while replaying a held map.
+- Verified locally in the in-app browser and Playwright at 320x568: returning-player title, campaign copy, available Ember Copse selection, and transition to `Begin Ember Copse` all work without document overflow.

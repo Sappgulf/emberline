@@ -40,7 +40,7 @@ export interface RouteNodeSnap {
   name: string;
   place: string;
   marker: MapMarker;
-  state: "held" | "current" | "locked";
+  state: "held" | "current" | "available" | "locked";
   ruleLabel: string;
   objectiveTitle: string;
   objectiveReward: number;
@@ -573,7 +573,8 @@ export class EmberEngine {
       sellRefund: t ? this.refundFor(t) : 0,
       muted: this.muted,
       route: MAPS.map((entry, index) => {
-        const state: RouteNodeSnap["state"] = index === this.mapIndex ? "current" : index < this.unlocked ? "held" : "locked";
+        const state: RouteNodeSnap["state"] =
+          index === this.mapIndex ? "current" : index < this.unlocked ? "held" : index === this.unlocked ? "available" : "locked";
         return {
           id: entry.id,
           name: entry.name,
