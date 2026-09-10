@@ -152,3 +152,4 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: restored focus to the Campaign launcher after closing the route picker with Escape or Close.
 - Completed: applied the same return-focus contract to the Bestiary launcher so both title-screen overlays behave consistently.
 - Verified locally in Playwright at 390x844: Campaign and Bestiary open/close flows returned focus to their launchers and retained viewport bounds without overflow.
+- Source gates: 90 tests, typecheck, lint, production build, and `git diff --check` pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
