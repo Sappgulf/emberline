@@ -131,6 +131,16 @@ export function Emberline() {
         if (e.key === "Escape") engine.toggleCodex();
         return;
       }
+      if (engine.campaignOpen) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          engine.toggleCampaign();
+        }
+        return;
+      }
+      if (engine.phase === "brief" || engine.phase === "shop" || engine.phase === "stall" || engine.phase === "won" || engine.phase === "lost") {
+        return;
+      }
       if (e.key === "1") engine.chooseKind("bow");
       if (e.key === "2") engine.chooseKind("mortar");
       if (e.key === "3") engine.chooseKind("frost");
@@ -144,6 +154,7 @@ export function Emberline() {
       if (e.key === "x" || e.key === "X") engine.sellSelected();
       if (e.key === "z" || e.key === "Z") engine.undoLast();
       if (e.key === "Tab") {
+        if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLSelectElement) return;
         e.preventDefault();
         engine.inspectLast();
       }
@@ -156,9 +167,6 @@ export function Emberline() {
       if (e.key === " " || e.code === "Space") {
         e.preventDefault();
         if (engine.phase === "title") engine.startFromTitle();
-        else if (engine.phase === "brief") engine.dismissBrief();
-        else if (engine.phase === "shop") engine.leaveShop();
-        else if (engine.phase === "stall") engine.closeStall();
         else engine.startWave();
       }
       if (e.key === "p" || e.key === "P") engine.togglePause();
@@ -345,12 +353,19 @@ export function Emberline() {
             type="button"
             className="pressable packet px-2 py-1 text-[10px] text-dust"
             aria-pressed={hud.muted}
+            aria-label={hud.muted ? "Turn sound on" : "Mute sound"}
             onClick={() => engine.toggleMute()}
           >
             {hud.muted ? "Muted" : "Sound"}
           </button>
           {playing && (
-            <button type="button" className="pressable packet px-2 py-1 text-[10px] text-dust" onClick={() => engine.togglePause()}>
+            <button
+              type="button"
+              className="pressable packet px-2 py-1 text-[10px] text-dust"
+              aria-pressed={hud.paused}
+              aria-label={hud.paused ? "Resume watch" : "Pause watch"}
+              onClick={() => engine.togglePause()}
+            >
               {hud.paused ? "Resume" : "Pause"}
             </button>
           )}
@@ -492,7 +507,7 @@ export function Emberline() {
                         data-selected={selected}
                         data-state={node.state}
                         className="campaign-card plaque pressable"
-                        aria-label={`${node.name}, ${node.state}${locked ? ", locked" : ""}`}
+                        aria-label={`${node.name}, ${node.state === "current" ? "selected" : node.state}`}
                         onClick={() => engine.selectCampaignMap(index)}
                       >
                         <span className="campaign-card-marker" aria-hidden="true">
@@ -836,8 +851,9 @@ function formBlurb(kind: TowerKind, form: string) {
 
 function WatchLedger({ hud }: { hud: HudSnap }) {
   const nextRoute = hud.route[hud.unlocked]?.name;
+  const relicLabel = hud.relics.length === 1 ? "relic" : "relics";
   return (
-    <div className="watch-ledger" aria-label={`${hud.unlocked} of ${hud.mapTotal} routes held and ${hud.relics.length} relics carried`}>
+    <div className="watch-ledger" aria-label={`${hud.unlocked} of ${hud.mapTotal} routes held and ${hud.relics.length} ${relicLabel} carried`}>
       <div className="watch-ledger-stats">
         <span>
           <strong>{hud.unlocked}/{hud.mapTotal}</strong>

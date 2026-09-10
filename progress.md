@@ -139,3 +139,10 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: tightened the 320px returning-player menu so Continue, Campaign, and Bestiary remain fully legible without shrinking the primary Hold the line action.
 - Completed: added an explicit available campaign state for the next unlocked route, keeping route rail, campaign cards, and engine selection behavior consistent while replaying a held map.
 - Verified locally in the in-app browser and Playwright at 320x568: returning-player title, campaign copy, available Ember Copse selection, and transition to `Begin Ember Copse` all work without document overflow.
+
+## 2026-09-10 — cross-app keyboard and accessibility pass
+
+- Completed: made Campaign a true modal keyboard boundary so Space cannot restart a saved watch and Escape closes the route picker.
+- Completed: let native focus traversal own Tab inside every modal phase and while footer buttons are focused, while keeping canvas tower inspection on Tab.
+- Completed: aligned compact HUD and campaign labels with stateful accessible names and singular relic grammar.
+- Verified locally in the in-app browser and Playwright at 390x844: saved campaign route selection, Campaign Space/Escape behavior, focus traversal, ready HUD labels, and no document overflow.
