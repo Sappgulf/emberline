@@ -530,6 +530,32 @@ describe("EmberEngine", () => {
     assert.equal(e.lineBonus(e.towers[0]), 1.1);
   });
 
+  it("turns complementary neighbors into a combat bond", () => {
+    const e = play();
+    e.gold = 500;
+    const first = emptyGrass(e);
+    e.tapCell(first.c, first.r);
+    const neighbors = [
+      { c: first.c + 1, r: first.r },
+      { c: first.c - 1, r: first.r },
+      { c: first.c, r: first.r + 1 },
+      { c: first.c, r: first.r - 1 },
+    ];
+    const neighbor = neighbors.find((p) => e.canBuild(p.c, p.r));
+    assert.ok(neighbor);
+    e.chooseKind("frost");
+    e.tapCell(neighbor.c, neighbor.r);
+
+    const bow = e.towers[0];
+    const frost = e.towers[1];
+    assert.equal(e.bondBetween(bow, frost)?.id, "windcut");
+    assert.equal(e.bondFor(bow)?.partner, "frost");
+    assert.equal(e.bondFor(frost)?.partner, "bow");
+    assert.equal(e.bondMultiplier(bow), 1.08);
+    assert.equal(e.hud().bond?.label, "Windcut");
+    assert.equal(JSON.parse(e.renderText()).selectedTower.bond.id, "windcut");
+  });
+
   it("horn spends gold, slows the road, and respects cooldown", () => {
     const e = play();
     e.startWave();

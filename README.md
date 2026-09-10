@@ -15,6 +15,7 @@ Open `http://localhost:8080`. `npm test` covers the watch engine (build, waves, 
 ## Watch
 
 - **Towers:** Longbow, Mortar, Frost, Spark, Bramble, Ash Ward
+- **Lines:** Pair adjacent Bow + Frost (Windcut), Mortar + Ward (Ashring), or Spark + Bramble (Stormroot) towers for +8% damage to both.
 - **Forms:** Timber → Bound → Tempered → Crowned → Emberlit
 - **Tools:** Horn (burn the road + slow), Mend (lives + drag), Move, Sell. Pause is pause. 1× / 2× / 3× is speed.
 - **Relics** persist between maps (including Watch cord and Gate flint). Stall prices drop each wave.

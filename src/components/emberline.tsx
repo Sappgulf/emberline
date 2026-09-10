@@ -668,6 +668,11 @@ export function Emberline() {
                   ) : (
                     <>
                       {formBlurb(hud.selectedTower.kind, hud.formName)}
+                      {hud.bond && (
+                        <span className="ml-2 text-frost">
+                          Bond: {hud.bond.label} +{Math.round(hud.bond.bonus * 100)}%
+                        </span>
+                      )}
                       {playing && hud.phase === "ready" && <span className="ml-2 text-copper">Next: {hud.nextWave}</span>}
                     </>
                   )}
@@ -1256,6 +1261,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
       (hud.relics.includes("ember") && tower.kind === "mortar" ? 1.2 : 1) *
       (1 + (form - 1) * 0.06) *
       hud.lineBonus *
+      (1 + (hud.bond?.bonus ?? 0)) *
       (hud.fieldBoost?.damage ?? 1),
   );
   const range =
@@ -1264,6 +1270,9 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
     (tower.empowered ? 1.18 : 1) *
     (hud.fieldBoost?.range ?? 1);
   const rate = rateAt(tower.kind, tower.rateLvl) * (hud.fieldBoost?.rate ?? 1);
+  const bondText = hud.bond
+    ? `Bonded with ${TOWERS[hud.bond.partner].short} · ${hud.bond.label} +${Math.round(hud.bond.bonus * 100)}% power`
+    : "No bond active · pair complementary towers for +8% power";
   return (
     <section className="tower-intel" aria-label={`${def.name} selected tower details`}>
       <div className="tower-intel-heading">
@@ -1292,6 +1301,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
           </div>
         </dl>
       </div>
+      <p className="tower-intel-bond" data-active={Boolean(hud.bond)}>{bondText}</p>
       <p className="tower-intel-copy">{def.blurb}</p>
       <p className="tower-intel-path">Power {tower.dmgLvl} · Tempo {tower.rateLvl} · {hud.field.rule.label}</p>
       <p className="tower-intel-meta">

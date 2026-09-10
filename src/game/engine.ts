@@ -91,6 +91,28 @@ export interface WatchOrderSnap extends WatchOrder {
   chain: number;
 }
 
+export type TowerBondId = "windcut" | "ashring" | "stormroot";
+
+export interface TowerBondSnap {
+  id: TowerBondId;
+  label: string;
+  partner: TowerKind;
+  bonus: number;
+}
+
+type TowerBondDefinition = Omit<TowerBondSnap, "bonus">;
+
+const TOWER_BOND_BONUS = 0.08;
+
+const TOWER_BONDS: Record<TowerKind, TowerBondDefinition> = {
+  bow: { id: "windcut", label: "Windcut", partner: "frost" },
+  frost: { id: "windcut", label: "Windcut", partner: "bow" },
+  mortar: { id: "ashring", label: "Ashring", partner: "ward" },
+  ward: { id: "ashring", label: "Ashring", partner: "mortar" },
+  spark: { id: "stormroot", label: "Stormroot", partner: "bramble" },
+  bramble: { id: "stormroot", label: "Stormroot", partner: "spark" },
+};
+
 function wavePreviewFor(plan: MapDef["waves"][number] | undefined): WavePreviewSnap[] {
   return plan?.map(({ kind, count }) => ({ kind, count })) ?? [];
 }
@@ -240,6 +262,7 @@ export interface HudSnap {
   maxLives: number;
   towerCount: number;
   lineBonus: number;
+  bond: TowerBondSnap | null;
   unlocked: number;
   hero: { who: string; line: string; kind: "horn" | "mend" | "gold" } | null;
   grade: string | null;
@@ -393,6 +416,26 @@ export class EmberEngine {
     return 1 + n * (this.relics.has("cord") ? 0.15 : 0.1);
   }
 
+  bondBetween(a: Tower, b: Tower): TowerBondSnap | null {
+    if (Math.abs(a.c - b.c) + Math.abs(a.r - b.r) !== 1) return null;
+    const definition = TOWER_BONDS[a.kind];
+    if (definition.partner !== b.kind) return null;
+    return { ...definition, bonus: TOWER_BOND_BONUS };
+  }
+
+  bondFor(tower: Tower): TowerBondSnap | null {
+    for (const other of this.towers) {
+      if (other.id === tower.id) continue;
+      const bond = this.bondBetween(tower, other);
+      if (bond) return bond;
+    }
+    return null;
+  }
+
+  bondMultiplier(tower: Tower) {
+    return 1 + (this.bondFor(tower) ? TOWER_BOND_BONUS : 0);
+  }
+
   hud(): HudSnap {
     return this.snap;
   }
@@ -423,6 +466,9 @@ export class EmberEngine {
             rateLevel: hud.selectedTower.rateLvl,
             aim: hud.selectedTower.aim,
             empowered: hud.selectedTower.empowered,
+            bond: hud.bond
+              ? { id: hud.bond.id, partner: hud.bond.partner, bonus: hud.bond.bonus }
+              : null,
           }
         : null,
       towers: this.towers.map((tower) => ({
@@ -619,6 +665,7 @@ export class EmberEngine {
       maxLives: this.maxLives(),
       towerCount: this.towers.length,
       lineBonus: t ? this.lineBonus(t) : 1,
+      bond: t ? this.bondFor(t) : null,
       unlocked: this.unlocked,
       hero: this.heroT > 0 ? this.hero : null,
       grade: this.grade,
@@ -1126,7 +1173,8 @@ export class EmberEngine {
       this.selectedId = mover.id;
       this.banner = null;
       this.burst(c + 0.5, r + 0.5, "#d4a054", 10, "spark");
-      this.float(c + 0.5, r + 0.1, "Moved", "#d4a054");
+      const bond = this.bondFor(mover);
+      this.float(c + 0.5, r + 0.1, bond ? `${bond.label} link` : "Moved", bond ? "#6aa8b4" : "#d4a054");
       sfx.place();
       this.notify();
       return;
@@ -1175,7 +1223,9 @@ export class EmberEngine {
     this.lastPlaceT = this.time;
     sfx.place();
     this.burst(c + 0.5, r + 0.5, "#d4a054", 4, "spark");
-    if (this.lineBonus(tower) > 1) this.float(c + 0.5, r + 0.15, "Lined", "#d4a054");
+    const bond = this.bondFor(tower);
+    if (bond) this.float(c + 0.5, r + 0.15, `${bond.label} +8%`, "#6aa8b4");
+    else if (this.lineBonus(tower) > 1) this.float(c + 0.5, r + 0.15, "Lined", "#d4a054");
     this.notify();
   }
 
@@ -1444,6 +1494,7 @@ export class EmberEngine {
       (this.relics.has("ember") && tower.kind === "mortar" ? 1.2 : 1) *
       (1 + (form - 1) * 0.06) *
       this.lineBonus(tower) *
+      this.bondMultiplier(tower) *
       this.fieldDamageMultiplier(tower) *
       (this.focusId === target.id ? 1.1 : 1);
     if (tower.kind === "mortar" && target.kind === "shell") dmg *= 1.28;

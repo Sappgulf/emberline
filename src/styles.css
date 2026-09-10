@@ -1060,6 +1060,23 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+.tower-intel-bond {
+  margin: 0.44rem 0 0;
+  padding: 0.34rem 0.42rem;
+  border-left: 2px solid rgba(212, 160, 84, 0.28);
+  background: rgba(28, 31, 24, 0.48);
+  color: var(--color-dust);
+  font-size: 8px;
+  line-height: 1.25;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.tower-intel-bond[data-active="true"] {
+  border-left-color: rgba(106, 168, 180, 0.88);
+  background: rgba(28, 54, 56, 0.3);
+  color: #8fc4c7;
+  font-weight: 700;
+}
 .tower-intel-meta {
   margin: 0.5rem 0 0;
   color: var(--color-copper);

@@ -400,20 +400,40 @@ function drawPath(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngi
 function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
   if (engine.towers.length < 2) return;
   ctx.save();
-  ctx.strokeStyle = "rgba(212,160,84,0.35)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 6]);
   for (let i = 0; i < engine.towers.length; i++) {
     const a = engine.towers[i];
     for (let j = i + 1; j < engine.towers.length; j++) {
       const b = engine.towers[j];
       if (Math.abs(a.c - b.c) + Math.abs(a.r - b.r) !== 1) continue;
+      const bond = engine.bondBetween(a, b);
+      const bondColor =
+        bond?.id === "windcut"
+          ? FROST
+          : bond?.id === "ashring"
+            ? EMBER
+            : bond?.id === "stormroot"
+              ? COPPER
+              : "rgba(212,160,84,0.35)";
+      ctx.strokeStyle = bond ? bondColor : "rgba(212,160,84,0.35)";
+      ctx.globalAlpha = bond ? 0.82 : 1;
+      ctx.lineWidth = bond ? Math.max(2.2, cell * 0.05) : Math.max(1.4, cell * 0.028);
+      ctx.setLineDash(bond ? [cell * 0.15, cell * 0.07] : [5, 6]);
+      ctx.lineDashOffset = bond ? -engine.time * 18 : 0;
       ctx.beginPath();
       ctx.moveTo((a.c + 0.5) * cell, (a.r + 0.5) * cell);
       ctx.lineTo((b.c + 0.5) * cell, (b.r + 0.5) * cell);
       ctx.stroke();
+      if (bond) {
+        ctx.setLineDash([]);
+        ctx.fillStyle = bondColor;
+        ctx.globalAlpha = 0.72 + Math.sin(engine.time * 5 + a.id + b.id) * 0.12;
+        ctx.beginPath();
+        ctx.arc(((a.c + b.c + 1) / 2) * cell, ((a.r + b.r + 1) / 2) * cell, Math.max(2.5, cell * 0.07), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
+  ctx.setLineDash([]);
   ctx.restore();
   for (const t of engine.towers) {
     if (t.kind !== "ward") continue;
