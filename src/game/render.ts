@@ -583,7 +583,7 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   ctx.fillStyle = ok ? "rgba(212,160,84,0.22)" : "rgba(196,92,74,0.2)";
   ctx.fillRect(engine.hoverC * cell, engine.hoverR * cell, cell, cell);
   if (ok && engine.selectedKind) {
-    const range = rangeAt(engine.selectedKind, 1) * glass;
+    const range = engine.placementRange(engine.selectedKind);
     ctx.strokeStyle = "rgba(232,220,196,0.35)";
     ctx.beginPath();
     ctx.arc((engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell, range * cell, 0, Math.PI * 2);

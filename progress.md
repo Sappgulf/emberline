@@ -125,3 +125,11 @@ Original prompt: ok keep working. more upgrades across the game
 - Source gates before ship: 87 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
 - Ship commit: `5724dc1` (`Polish Emberline overlays and placement flow`) pushed to `origin/main`.
 - Vercel preview: `https://emberline-8t9x0xep1-sappgulf-9169s-projects.vercel.app` (deployment `dpl_B6GpHXwJAMTJaytsrJ1Xe2tBWuaM`, ready). This record update is followed by the final provenance push and redeploy.
+
+## 2026-09-10 — mobile clarity and first-watch guidance pass
+
+- Completed: added player-facing placement feedback for invalid grass, road, sealed, occupied, and unaffordable placements while preserving packet intent after rejected taps.
+- Completed: synchronized placement range previews with the Pine Fog field modifier and Scout Glass relic bonus; air-required waves now hold until an air-capable tower is planted.
+- Completed: added a compact title ledger, first-watch three-step briefing, active-wave live cue, stronger mobile command state, and a dawn summary without competing with the board.
+- Verified in the live in-app browser and Playwright at 1280px, 390x844, and 320x568: title → brief → ready, invalid placement copy, Pine Cut air check, successful Bow placement, active wave, no document overflow, and no console errors.
+- Source gates: 89 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.

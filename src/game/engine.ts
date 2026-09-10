@@ -940,12 +940,28 @@ export class EmberEngine {
     return this.blockedSet.has(this.cellKey(c, r));
   }
 
+  buildReason(c: number, r: number) {
+    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return "Outside the field";
+    if (this.pathSet.has(this.cellKey(c, r))) return "Road tile — choose open grass";
+    if (this.blocked(c, r)) return "Sealed ground — choose open grass";
+    if (this.occupied(c, r)) return "Tower already stands here";
+    return null;
+  }
+
   canBuild(c: number, r: number) {
-    if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return false;
-    if (this.pathSet.has(this.cellKey(c, r))) return false;
-    if (this.blocked(c, r)) return false;
-    if (this.occupied(c, r)) return false;
-    return true;
+    return this.buildReason(c, r) === null;
+  }
+
+  placementRange(kind: TowerKind) {
+    const glass = this.relics.has("glass") ? 1.12 : 1;
+    const field = this.map.profile.rule.id === "pine-fog" ? (kind === "spark" ? 1.12 : 0.9) : 1;
+    return rangeAt(kind, 1) * glass * field;
+  }
+
+  rejectAction(text: string) {
+    sfx.deny();
+    this.banner = { text, life: 0.9, max: 0.9 };
+    this.notify();
   }
 
   chooseKind(kind: TowerKind | null) {
@@ -1022,13 +1038,14 @@ export class EmberEngine {
         this.notify();
         return;
       }
-      if (!this.canBuild(c, r)) {
-        sfx.deny();
+      const reason = this.buildReason(c, r);
+      if (reason) {
+        this.rejectAction(reason);
         return;
       }
       const cost = this.moveCost();
       if (this.gold < cost) {
-        sfx.deny();
+        this.rejectAction(`Need ${cost}g to move`);
         return;
       }
       this.gold -= cost;
@@ -1049,13 +1066,14 @@ export class EmberEngine {
       return;
     }
     if (!this.selectedKind) return;
-    if (!this.canBuild(c, r)) {
-      sfx.deny();
+    const reason = this.buildReason(c, r);
+    if (reason) {
+      this.rejectAction(reason);
       return;
     }
     const def = TOWERS[this.selectedKind];
     if (this.gold < def.cost) {
-      sfx.deny();
+      this.rejectAction(`Need ${def.cost}g for ${def.short}`);
       return;
     }
     this.gold -= def.cost;
@@ -1146,6 +1164,10 @@ export class EmberEngine {
     this.finishWaveIfClear();
     if (this.phase !== "ready") return;
     if (this.wave >= this.map.waves.length) return;
+    if (planHasAir(this.map.waves, this.wave) && !this.towers.some((tower) => TOWERS[tower.kind].hitsAir)) {
+      this.rejectAction("Air sightline needed — choose Bow, Frost, Spark, or Ward");
+      return;
+    }
     this.waveKills = 0;
     this.waveLeaks = 0;
     this.waveEarned = 0;

@@ -27,6 +27,8 @@ const COUNTERS: Record<CreepKind, TowerKind[]> = {
   lord: ["mortar", "spark", "bow"],
 };
 
+type HoverCell = { c: number; r: number };
+
 function useHud(): HudSnap {
   return useSyncExternalStore(
     (cb) => engine.subscribe(cb),
@@ -35,12 +37,44 @@ function useHud(): HudSnap {
   );
 }
 
+function placementMessage(engine: EmberEngine, hud: HudSnap, hover: HoverCell | null) {
+  const playing = hud.phase === "ready" || hud.phase === "wave";
+  if (!playing) return "";
+
+  if (hud.moving) {
+    const reason = hover ? engine.buildReason(hover.c, hover.r) : null;
+    if (reason) return reason;
+    if (hud.gold < hud.moveCost) return `Need ${hud.moveCost}g to move`;
+    return hover ? `Move here · ${hud.moveCost}g` : "Move armed · tap a highlighted grass tile";
+  }
+
+  if (hud.selectedKind) {
+    const def = TOWERS[hud.selectedKind];
+    const reason = hover ? engine.buildReason(hover.c, hover.r) : null;
+    if (reason) return reason;
+    if (hud.gold < def.cost) return `Need ${def.cost}g for ${def.short}`;
+    return hover ? `${def.short} · place here · ${def.cost}g` : `${def.short} ready · tap a highlighted grass tile`;
+  }
+
+  return hud.selectedTower ? "Tower selected · tap a tower to inspect or choose a packet" : "Pick a packet · highlighted grass shows safe tiles";
+}
+
+function placementTone(engine: EmberEngine, hud: HudSnap, hover: HoverCell | null) {
+  if (hud.phase !== "ready" && hud.phase !== "wave") return "idle";
+  if (!hud.selectedKind && !hud.moving) return "idle";
+  const reason = hover ? engine.buildReason(hover.c, hover.r) : null;
+  const cost = hud.moving ? hud.moveCost : hud.selectedKind ? TOWERS[hud.selectedKind].cost : 0;
+  if (reason || hud.gold < cost) return "invalid";
+  return hover ? "valid" : "armed";
+}
+
 export function Emberline() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const readyActionRef = useRef<HTMLButtonElement>(null);
   const hud = useHud();
   const [cell, setCell] = useState(40);
+  const [hoverCell, setHoverCell] = useState<HoverCell | null>(null);
 
   useEffect(() => {
     if (hud.phase === "ready") readyActionRef.current?.focus();
@@ -199,10 +233,12 @@ export function Emberline() {
     if (!pos) {
       engine.hoverC = -1;
       engine.hoverR = -1;
+      setHoverCell((current) => (current ? null : current));
       return;
     }
     engine.hoverC = pos.c;
     engine.hoverR = pos.r;
+    setHoverCell((current) => (current?.c === pos.c && current?.r === pos.r ? current : pos));
   };
 
   const onTap = (e: React.PointerEvent) => {
@@ -227,6 +263,9 @@ export function Emberline() {
   const mendValue = hud.lives >= hud.maxLives ? "Full" : `${hud.mendCost}g`;
   const waveProgressLabel = hud.phase === "wave" ? `Wave ${hud.wave}` : hud.wave > 0 ? `Wave ${hud.wave} held` : "First watch";
   const waveProgressStatus = hud.phase === "wave" ? `${hud.remaining} left` : hud.wave > 0 ? "Road clear" : "Ready";
+  const placementToneValue = placementTone(engine, hud, hoverCell);
+  const placementMessageValue = placementMessage(engine, hud, hoverCell);
+  const firstWatch = hud.mapIndex === 0 && hud.wave === 0 && hud.relics.length === 0;
   const menu =
     hud.codex ||
     hud.campaign ||
@@ -263,10 +302,13 @@ export function Emberline() {
         </div>
         {hud.phase !== "title" && (
           <>
-            <div className="watch-progress" aria-label={`${waveProgressLabel} progress`}>
+            <div className="watch-progress" data-live={hud.phase === "wave"} aria-label={`${waveProgressLabel} progress`}>
               <div className="watch-progress-label">
                 <span>{waveProgressLabel}</span>
-                <span>{waveProgressStatus}</span>
+                <span className="watch-progress-state">
+                  {hud.phase === "wave" && <span className="watch-live-dot" aria-hidden="true" />}
+                  {waveProgressStatus}
+                </span>
               </div>
               <div
                 className="watch-progress-track"
@@ -350,6 +392,7 @@ export function Emberline() {
             onPointerLeave={() => {
               engine.hoverC = -1;
               engine.hoverR = -1;
+              setHoverCell(null);
             }}
           />
 
@@ -475,6 +518,7 @@ export function Emberline() {
               <p className="max-w-sm text-sm leading-relaxed text-dust">
                 Plant on grass. Line two towers. Hold five maps until dawn. Space to begin.
               </p>
+              <WatchLedger hud={hud} />
               <div className="menu-actions">
                 <button
                   type="button"
@@ -519,6 +563,7 @@ export function Emberline() {
             >
               <p className="max-w-md text-sm leading-relaxed text-parchment">{hud.story.line}</p>
               <FieldNote field={hud.field} markerId={hud.route[hud.mapIndex]?.id} />
+              {firstWatch && <BriefingSteps />}
               <p className="text-[11px] text-dust">Space also takes the watch.</p>
             </Overlay>
           )}
@@ -553,6 +598,7 @@ export function Emberline() {
             <Overlay kicker="Dawn" title="The line held">
               {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
               <p className="text-sm text-dust">Five maps. Emberford still stands.</p>
+              <WatchSummary hud={hud} />
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.keepRelics()}>
                   March again with relics
@@ -569,7 +615,7 @@ export function Emberline() {
           }`}
         >
           {hud.selectedTower && hud.nextCosts ? (
-            <div className="selected-tower-bar flex flex-wrap items-start gap-3">
+            <div className="selected-tower-bar flex flex-wrap items-start gap-3" data-placement={hud.moving ? placementToneValue : "idle"}>
               <div className="selected-tower-copy flex-1">
                 <p className="font-display text-lg leading-none text-copper">
                   {TOWERS[hud.selectedTower.kind].name}
@@ -579,8 +625,14 @@ export function Emberline() {
                   </span>
                 </p>
                 <p className="mt-1 max-w-lg text-[11px] text-dust">
-                  {formBlurb(hud.selectedTower.kind, hud.formName)}
-                  {playing && hud.phase === "ready" && <span className="ml-2 text-copper">Next: {hud.nextWave}</span>}
+                  {hud.moving ? (
+                    placementMessageValue
+                  ) : (
+                    <>
+                      {formBlurb(hud.selectedTower.kind, hud.formName)}
+                      {playing && hud.phase === "ready" && <span className="ml-2 text-copper">Next: {hud.nextWave}</span>}
+                    </>
+                  )}
                 </p>
               </div>
               <div className="selected-tower-actions grid grid-cols-2 gap-1 sm:grid-cols-4">
@@ -629,10 +681,10 @@ export function Emberline() {
               )}
             </div>
           ) : (
-              <p className="tray-hint max-w-2xl" aria-live="polite">
+              <p className="tray-hint max-w-2xl" data-placement={placementToneValue} aria-live="polite">
               {hud.selectedKind ? (
                 <>
-                  {TOWERS[hud.selectedKind].blurb}
+                  <strong className="tray-hint-status">{placementMessageValue}</strong>
                   {playing && hud.phase === "ready" && <span className="ml-2 text-copper">Next: {hud.nextWave}</span>}
                 </>
               ) : playing && hud.phase === "ready" ? (
@@ -736,7 +788,7 @@ export function Emberline() {
               <button
                 type="button"
                 ref={readyActionRef}
-                className="pressable send-flag command-send min-h-12 px-5 text-sm disabled:opacity-35"
+                className={`pressable send-flag command-send min-h-12 px-5 text-sm disabled:opacity-35 ${hud.phase === "wave" ? "command-send-live" : ""}`}
                 title={hud.nextWave}
                 disabled={hud.phase !== "ready" && !(hud.phase === "wave" && hud.remaining === 0)}
                 onClick={() => {
@@ -778,6 +830,72 @@ function formBlurb(kind: TowerKind, form: string) {
     return "Long root.";
   }
   return "Green timber. Upgrade damage or rate to change form.";
+}
+
+function WatchLedger({ hud }: { hud: HudSnap }) {
+  const nextRoute = hud.route[hud.unlocked]?.name;
+  return (
+    <div className="watch-ledger" aria-label={`${hud.unlocked} of ${hud.mapTotal} routes held and ${hud.relics.length} relics carried`}>
+      <div className="watch-ledger-stats">
+        <span>
+          <strong>{hud.unlocked}/{hud.mapTotal}</strong>
+          <small>Routes held</small>
+        </span>
+        <span>
+          <strong>{hud.relics.length}</strong>
+          <small>Relics carried</small>
+        </span>
+      </div>
+      <p>
+        <span className="intel-kicker">Next road</span>
+        {nextRoute ?? "All roads held"}
+      </p>
+    </div>
+  );
+}
+
+function BriefingSteps() {
+  return (
+    <div className="briefing-steps" aria-label="First watch steps">
+      <div className="briefing-steps-heading">
+        <span className="intel-kicker">First watch</span>
+        <span>Three moves</span>
+      </div>
+      <ol>
+        <li>
+          <b>1</b>
+          <span><strong>Choose a packet</strong><small>Bow starts ready for this road.</small></span>
+        </li>
+        <li>
+          <b>2</b>
+          <span><strong>Tap open grass</strong><small>Highlighted tiles are safe to plant.</small></span>
+        </li>
+        <li>
+          <b>3</b>
+          <span><strong>Send the wave</strong><small>Read the count and hold the keep.</small></span>
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+function WatchSummary({ hud }: { hud: HudSnap }) {
+  return (
+    <div className="watch-summary" aria-label="Dawn watch summary">
+      <div>
+        <span>Routes held</span>
+        <strong>{hud.mapTotal}/{hud.mapTotal}</strong>
+      </div>
+      <div>
+        <span>Relics carried</span>
+        <strong>{hud.relics.length}</strong>
+      </div>
+      <div>
+        <span>Final grade</span>
+        <strong>{hud.grade?.split(" · ")[0] ?? "Dawn"}</strong>
+      </div>
+    </div>
+  );
 }
 
 const THREAT_LABEL: Record<HudSnap["threatTier"], string> = {

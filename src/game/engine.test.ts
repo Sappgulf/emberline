@@ -212,6 +212,22 @@ describe("EmberEngine", () => {
     assert.equal(e.canBuild(grass.c, grass.r), false);
   });
 
+  it("explains why a placement tile is unavailable", () => {
+    const e = play();
+    const path = e.path[0];
+    const water = e.map.water[0];
+    const prop = e.map.props[0];
+
+    assert.equal(e.buildReason(path.c, path.r), "Road tile — choose open grass");
+    assert.equal(e.buildReason(water[0], water[1]), "Sealed ground — choose open grass");
+    assert.equal(e.buildReason(prop.c, prop.r), "Sealed ground — choose open grass");
+    assert.equal(e.buildReason(-1, 0), "Outside the field");
+
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    assert.equal(e.buildReason(grass.c, grass.r), "Tower already stands here");
+  });
+
   it("refunds a fraction of spent gold on sell", () => {
     const e = play();
     const grass = emptyGrass(e);
@@ -453,6 +469,22 @@ describe("EmberEngine", () => {
   it("flags air on pine cut's opening wave", () => {
     assert.equal(planHasAir(MAPS[1].waves, 0), true);
     assert.equal(planHasAir(MAPS[0].waves, 0), false);
+  });
+
+  it("holds an air wave until an air-capable tower is ready", () => {
+    const e = play();
+    e.loadMap(1);
+    e.clearField();
+    e.gold = 500;
+    e.startWave();
+    assert.equal(e.phase, "ready");
+    assert.match(e.hud().bannerText ?? "", /Air sightline needed/);
+
+    const grass = emptyGrass(e);
+    e.selectedKind = "bow";
+    e.tapCell(grass.c, grass.r);
+    e.startWave();
+    assert.equal(e.phase, "wave");
   });
 
   it("applies the lantern aura to towers near a lamp", () => {
