@@ -197,3 +197,14 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: changed the forecast container from a status live region to a labeled region with a polite live wave title so interactive counter controls remain visible in the accessibility tree.
 - Verified locally in the in-app browser: fresh title → brief → ready, forecast counter button exposure, keyboard activation selecting Bow, packet selection handoff, marker rendering, and zero local error/warn diagnostics.
 - Verified with Playwright fallback because the IAB exposes no viewport override: 320×568, 390×844, and 1440×900 screenshots show no document overflow or clipping; the desktop snapshot exposes the counter as a real button. Source gates: 94 tests, typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-10 — complementary tower bond pass
+
+- Completed: added three positional combat bonds to the existing Line system: Bow + Frost (`Windcut`), Mortar + Ward (`Ashring`), and Spark + Bramble (`Stormroot`). Each active bond adds 8% damage to both adjacent towers.
+- Completed: made bond state derive from live tower positions, so planting, moving, selling, and undoing stay synchronized without new persistent state. Placement/move feedback, the Canvas link, selected-tower intel, the mobile footer, and `render_game_to_text()` all read the same engine result.
+- Verified with the required `web_game_playwright_client.js` choreography against local Vite: completed successfully with canvas screenshots and no error artifacts.
+- Verified with Playwright fallback because the Browser plugin is not available in this environment and the IAB exposes no viewport override: exact 320×568, 390×844, and 1440×900 runs placed a real Bow/Frost adjacent pair, asserted `selectedTower.bond.id === "windcut"` and `bonus === 0.08`, confirmed the mobile footer and desktop intel row, and found zero document overflow plus zero console errors/warnings.
+- Verified in the live in-app browser: title → briefing → ready, real Bow/Frost placement, `BONDED WITH BOW · WINDCUT +8% POWER`, `Bond: Windcut +8%`, and empty error/warn diagnostics. Production smoke at the same exact widths passed against `https://emberline-xi.vercel.app`.
+- Source gates: 96 tests, typecheck, lint, auth invariant, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+- Released commit `853b8b6` (`Add complementary tower bonds`) to `origin/main`; Vercel deployment `dpl_EsiuekAohdnSsMJM7x77dEeoib6b` is READY and aliased to `https://emberline-xi.vercel.app`.
+- Remaining QA: exact viewport checks use the regular Playwright fallback because the Browser plugin is unavailable; the in-app browser has no viewport override, and real iOS Safari/device performance remains unverified.
