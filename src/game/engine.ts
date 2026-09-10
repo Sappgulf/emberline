@@ -1105,6 +1105,7 @@ export class EmberEngine {
       }
       if (existing && existing.id === mover.id) {
         this.movingId = null;
+        this.banner = null;
         this.notify();
         return;
       }
@@ -1123,6 +1124,7 @@ export class EmberEngine {
       mover.r = r;
       this.movingId = null;
       this.selectedId = mover.id;
+      this.banner = null;
       this.burst(c + 0.5, r + 0.5, "#d4a054", 10, "spark");
       this.float(c + 0.5, r + 0.1, "Moved", "#d4a054");
       sfx.place();
@@ -1132,6 +1134,7 @@ export class EmberEngine {
     if (existing) {
       this.selectedId = existing.id;
       this.selectedKind = null;
+      this.banner = null;
       this.notify();
       return;
     }
@@ -1147,6 +1150,7 @@ export class EmberEngine {
       return;
     }
     this.gold -= def.cost;
+    this.banner = null;
     const tower: Tower = {
       id: this.nextId++,
       kind: this.selectedKind,

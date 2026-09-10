@@ -292,6 +292,7 @@ describe("EmberEngine", () => {
     const grass = emptyGrass(e);
     e.tapCell(grass.c, grass.r);
     assert.equal(e.selectedKind, null);
+    assert.equal(e.hud().bannerText, null);
   });
 
   it("refuses path, water, props, and occupied cells", () => {

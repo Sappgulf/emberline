@@ -978,6 +978,9 @@
 }
 .tower-intel {
   padding: 0.75rem;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 160, 84, 0.6) rgba(8, 11, 10, 0.42);
 }
 .tower-intel-heading {
   align-items: flex-start;

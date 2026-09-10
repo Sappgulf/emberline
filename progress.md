@@ -184,6 +184,8 @@ Original prompt: ok keep working. more upgrades across the game
 
 - Completed: added a compact post-wave hold strip to the collapsed mobile threat forecast so hold quality, cleared count, breaches, and order outcome remain visible before the next send decision.
 - Completed: made the forecast breakpoint handoff explicit; compact mobile intel re-expands when the viewport crosses into desktop so a hidden toggle can never strand the detailed forecast.
+- Completed: clear transient placement rejection banners after a successful plant, move, tower inspection, or move-cancel so the board and live announcement never describe the previous invalid tap.
+- Completed: made the desktop selected-tower intel card an interactive contained scroll surface, keeping its lower path and line details reachable without changing the compact mobile tray.
 - Verified with the project Playwright fallback at exact 390×844, 320×568, and 1440×900 viewports: a real wave clear produced `KEEP SHAKEN · 2 cleared · 6 breaches · Order missed`, the full recap reopened from `Show details`, and both mobile sizes remained overflow-free with zero console errors or warnings.
 - Verified responsive resize behavior from 390px to 1440px and back, preserving expanded desktop intel and compact mobile intel. The required game-playtest client also completed its action choreography with canvas screenshots and no error artifacts after pointing its missing Chromium revision at the installed local headless binary.
 - Source gates: 95 tests, typecheck, lint, auth invariant, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
