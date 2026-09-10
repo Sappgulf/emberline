@@ -171,3 +171,11 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified with Playwright fallback because the IAB exposed no viewport override: 390x844 and 320x568 screenshots keep the board, packet row, and send action within exact document bounds; zero console errors or warnings.
 - Source gates: 94 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skipped the optional database migration because `DATABASE_URL` is unset.
 - Tooling note: live imagegen was not called because `OPENAI_API_KEY` is not set in this shell; the existing accepted crest asset remains the isolated fallback.
+
+## 2026-09-10 — dawn completion-state art pass
+
+- Generated with the built-in imagegen skill: a text-free dawn watchtower overlook with a winding ember road, distant keep, dark pines, and restrained charcoal/umber/copper color treatment. The existing `menu-backdrop-v3.png` served as the style reference; its composition was preserved.
+- Saved project assets: `public/ui/dawn-watch-v1.png` and compressed `public/ui/dawn-watch-v1.webp`. The generated scene is versioned and does not overwrite the accepted backdrop.
+- Completed: added a `dispatch-dawn` surface used only by the completed-campaign `won` overlay, keeping all normal play, briefing, campaign, and shop surfaces unchanged while giving the five-map finish a distinct dawn payoff.
+- Verified locally in the in-app browser after restarting the documented Vite server: title → briefing → ready, exact board/tray geometry at 1280×720, and no Browser diagnostics. Verified with Playwright fallback because the IAB exposes no viewport override: 390×844, 320×568, and 1440×900 screenshots show no document overflow or clipping; mobile console has 0 errors and 0 warnings.
+- Asset delivery check: both `/ui/dawn-watch-v1.webp` and `/ui/dawn-watch-v1.png` return HTTP 200 with the expected image MIME types. Source gates: 94 tests, typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.

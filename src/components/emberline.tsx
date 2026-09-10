@@ -626,7 +626,7 @@ export function Emberline() {
           )}
 
           {hud.phase === "won" && (
-            <Overlay kicker="Dawn" title="The line held">
+            <Overlay kicker="Dawn" title="The line held" surface="dawn">
               {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
               <p className="text-sm text-dust">Five maps. Emberford still stands.</p>
               <WatchSummary hud={hud} />
@@ -1239,7 +1239,7 @@ function Overlay({
   onClose?: () => void;
   dimmer?: boolean;
   emblem?: boolean;
-  surface?: "campaign";
+  surface?: "campaign" | "dawn";
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -1285,7 +1285,7 @@ function Overlay({
       />
       <div
         ref={dialogRef}
-        className={`overlay-in dispatch ${surface === "campaign" ? "dispatch-campaign" : ""} relative flex w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[90dvh] flex-col items-center gap-3 overflow-y-auto px-8 py-8 text-center`}
+        className={`overlay-in dispatch ${surface === "campaign" ? "dispatch-campaign" : surface === "dawn" ? "dispatch-dawn" : ""} relative flex w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[90dvh] flex-col items-center gap-3 overflow-y-auto px-8 py-8 text-center`}
       >
         {close && onClose && (
           <button type="button" className="pressable stamp overlay-close min-h-9 px-3 text-[10px] text-dust" onClick={onClose}>

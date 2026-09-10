@@ -1304,6 +1304,15 @@
       url("/ui/campaign-atlas-v1.png") type("image/png")
     ) center / cover no-repeat;
 }
+.dispatch-dawn {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(239, 187, 101, 0.16), transparent 44%),
+    linear-gradient(180deg, rgba(18, 22, 15, 0.55), rgba(8, 11, 10, 0.82)),
+    image-set(
+      url("/ui/dawn-watch-v1.webp") type("image/webp"),
+      url("/ui/dawn-watch-v1.png") type("image/png")
+    ) center / cover no-repeat;
+}
 .campaign-map-surface {
   width: 100%;
   padding: 0.65rem;
