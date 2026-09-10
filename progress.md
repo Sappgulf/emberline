@@ -180,6 +180,14 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified locally in the in-app browser after restarting the documented Vite server: title → briefing → ready, exact board/tray geometry at 1280×720, and no Browser diagnostics. Verified with Playwright fallback because the IAB exposes no viewport override: 390×844, 320×568, and 1440×900 screenshots show no document overflow or clipping; mobile console has 0 errors and 0 warnings.
 - Asset delivery check: both `/ui/dawn-watch-v1.webp` and `/ui/dawn-watch-v1.png` return HTTP 200 with the expected image MIME types. Source gates: 94 tests, typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
 
+## 2026-09-10 — compact wave recap and responsive intel handoff
+
+- Completed: added a compact post-wave hold strip to the collapsed mobile threat forecast so hold quality, cleared count, breaches, and order outcome remain visible before the next send decision.
+- Completed: made the forecast breakpoint handoff explicit; compact mobile intel re-expands when the viewport crosses into desktop so a hidden toggle can never strand the detailed forecast.
+- Verified with the project Playwright fallback at exact 390×844, 320×568, and 1440×900 viewports: a real wave clear produced `KEEP SHAKEN · 2 cleared · 6 breaches · Order missed`, the full recap reopened from `Show details`, and both mobile sizes remained overflow-free with zero console errors or warnings.
+- Verified responsive resize behavior from 390px to 1440px and back, preserving expanded desktop intel and compact mobile intel. The required game-playtest client also completed its action choreography with canvas screenshots and no error artifacts after pointing its missing Chromium revision at the installed local headless binary.
+- Source gates: 95 tests, typecheck, lint, auth invariant, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+
 ## 2026-09-10 — counter-plan action pass
 
 - Completed: made the threat forecast's Counter plan actionable; each recommendation now selects the matching packet through the existing `chooseKind` engine path and exposes pressed state to assistive tech.

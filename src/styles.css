@@ -940,6 +940,42 @@
 .wave-recap-order-missed {
   color: #e3947f;
 }
+.wave-recap-compact {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.36rem;
+  min-width: 0;
+  margin-top: 0.32rem;
+  padding: 0.28rem 0.36rem;
+  border-top: 1px solid rgba(212, 160, 84, 0.2);
+  border-bottom: 1px solid rgba(232, 220, 196, 0.1);
+  background: rgba(8, 11, 10, 0.32);
+}
+.wave-recap-compact .intel-kicker {
+  color: var(--color-dust);
+  font-size: 7px;
+  letter-spacing: 0.11em;
+}
+.wave-recap-compact strong {
+  color: var(--color-copper);
+  font-size: 8px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.wave-recap-compact > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-dust);
+  font-size: 7px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wave-recap-compact[data-quality="frayed"] strong,
+.wave-recap-compact[data-quality="shaken"] strong {
+  color: #e3947f;
+}
 .tower-intel {
   padding: 0.75rem;
 }

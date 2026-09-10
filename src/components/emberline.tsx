@@ -1004,9 +1004,7 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 640px)");
-    const sync = () => {
-      if (media.matches) setIntelOpen(false);
-    };
+    const sync = () => setIntelOpen(!media.matches);
     sync();
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
@@ -1044,6 +1042,7 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
         <h2>Wave {hud.previewWave}</h2>
         <span>{hud.phase === "wave" ? `${hud.remaining}/${hud.waveTotal} left` : "Ready to send"}</span>
       </div>
+      {!intelOpen && hud.phase === "ready" && hud.lastResult && <CompactWaveRecap result={hud.lastResult} />}
       {!intelOpen && (
         <div className="intel-quick-actions" aria-label="Quick counter plan">
           <span className="intel-kicker">Counter</span>
@@ -1219,6 +1218,23 @@ function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
           ? `Order held · +${result.orderPayout}g · chain ${result.orderChain}`
           : "Order missed · chain reset"}
       </div>
+    </div>
+  );
+}
+
+function CompactWaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
+  const quality = holdLabel(result.hold);
+  const breachLabel = result.leaks === 1 ? "breach" : "breaches";
+  const orderLabel = result.orderHeld ? `Order +${result.orderPayout}g` : "Order missed";
+  return (
+    <div
+      className="wave-recap-compact"
+      data-quality={result.hold}
+      aria-label={`Last hold: ${quality}. ${result.kills} cleared, ${result.leaks} ${breachLabel}. ${orderLabel}.`}
+    >
+      <span className="intel-kicker">Last hold</span>
+      <strong>{quality}</strong>
+      <span>{result.kills} cleared · {result.leaks} {breachLabel} · {orderLabel}</span>
     </div>
   );
 }
