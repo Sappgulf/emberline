@@ -995,6 +995,39 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+.tower-form[data-form="bound"] {
+  color: var(--color-parchment);
+}
+.tower-form[data-form="crowned"],
+.tower-form[data-form="emberlit"] {
+  color: var(--color-ember);
+}
+.tower-intel-tags {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+.tower-intel-upgrade {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1rem;
+  border: 1px solid rgba(224, 120, 56, 0.5);
+  border-radius: 999px;
+  padding: 0.12rem 0.28rem;
+  color: var(--color-ember);
+  font-size: 6px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tower-intel-upgrade[data-branch="rate"] {
+  border-color: rgba(212, 160, 84, 0.56);
+  color: var(--color-copper);
+}
 .tower-intel-body {
   display: grid;
   grid-template-columns: 4.2rem minmax(0, 1fr);
@@ -1172,6 +1205,105 @@
 
 .selected-tower-copy {
   min-width: min(12rem, 100%);
+}
+
+.selected-tower-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.selected-tower-heading > p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-tower-tags {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.28rem;
+}
+
+.tower-form-chip,
+.tower-ascension-chip,
+.tower-upgrade-result {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.15rem;
+  border: 1px solid rgba(212, 160, 84, 0.3);
+  border-radius: 999px;
+  padding: 0.15rem 0.38rem;
+  color: var(--color-dust);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tower-form-chip[data-form="bound"] {
+  border-color: rgba(183, 171, 144, 0.52);
+  color: var(--color-parchment);
+}
+
+.tower-form-chip[data-form="tempered"] {
+  border-color: rgba(212, 160, 84, 0.72);
+  color: var(--color-copper);
+}
+
+.tower-form-chip[data-form="crowned"],
+.tower-form-chip[data-form="emberlit"],
+.tower-ascension-chip {
+  border-color: rgba(224, 120, 56, 0.75);
+  background: rgba(224, 120, 56, 0.12);
+  color: #efbb65;
+}
+
+.tower-upgrade-result {
+  border-color: rgba(224, 120, 56, 0.5);
+  color: var(--color-ember);
+}
+
+.tower-upgrade-result[data-branch="rate"] {
+  border-color: rgba(212, 160, 84, 0.56);
+  color: var(--color-copper);
+}
+
+.tower-upgrade-result[data-branch="emberlit"] {
+  box-shadow: 0 0 10px rgba(224, 120, 56, 0.18);
+}
+
+.selected-tower-bar[data-form="bound"] {
+  border-color: rgba(183, 171, 144, 0.32);
+}
+
+.selected-tower-bar[data-form="tempered"] {
+  border-color: rgba(212, 160, 84, 0.42);
+  background: linear-gradient(90deg, rgba(212, 160, 84, 0.06), rgba(8, 11, 10, 0.42));
+}
+
+.selected-tower-bar[data-form="crowned"],
+.selected-tower-bar[data-form="emberlit"] {
+  border-color: rgba(224, 120, 56, 0.48);
+  background: linear-gradient(90deg, rgba(224, 120, 56, 0.1), rgba(8, 11, 10, 0.42));
+}
+
+.selected-tower-bar[data-upgrade="damage"] .upgrade-action-damage {
+  border-color: rgba(224, 120, 56, 0.78);
+  box-shadow: 0 0 0 1px rgba(224, 120, 56, 0.14), 0 0 14px rgba(224, 120, 56, 0.14);
+}
+
+.selected-tower-bar[data-upgrade="rate"] .upgrade-action-rate {
+  border-color: rgba(212, 160, 84, 0.78);
+  box-shadow: 0 0 0 1px rgba(212, 160, 84, 0.14), 0 0 14px rgba(212, 160, 84, 0.12);
 }
 
 .selected-tower-actions {
@@ -1366,6 +1498,14 @@
   letter-spacing: 0.08em;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.upgrade-action[data-branch="damage"] .upgrade-preview {
+  color: var(--color-ember);
+}
+
+.upgrade-action[data-branch="rate"] .upgrade-preview {
+  color: var(--color-copper);
 }
 
 .dispatch {
@@ -2575,11 +2715,25 @@
     min-width: 0;
   }
 
-  .selected-tower-copy > p:first-child {
-    overflow: hidden;
+  .selected-tower-heading {
+    align-items: flex-start;
+  }
+
+  .selected-tower-heading > p {
     font-size: 0.9rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  }
+
+  .selected-tower-tags {
+    flex: 0 0 auto;
+    gap: 0.18rem;
+  }
+
+  .tower-form-chip,
+  .tower-ascension-chip,
+  .tower-upgrade-result {
+    min-height: 1rem;
+    padding: 0.13rem 0.28rem;
+    font-size: 6px;
   }
 
   .selected-tower-copy > p:nth-child(2) {

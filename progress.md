@@ -208,3 +208,14 @@ Original prompt: ok keep working. more upgrades across the game
 - Source gates: 96 tests, typecheck, lint, auth invariant, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
 - Released commit `853b8b6` (`Add complementary tower bonds`) to `origin/main`; Vercel deployment `dpl_EsiuekAohdnSsMJM7x77dEeoib6b` is READY and aliased to `https://emberline-xi.vercel.app`.
 - Remaining QA: exact viewport checks use the regular Playwright fallback because the Browser plugin is unavailable; the in-app browser has no viewport override, and real iOS Safari/device performance remains unverified.
+
+## 2026-09-10 — upgrade forge and form-legibility pass
+
+- Completed: added typed per-tower upgrade feedback for Power, Tempo, and Emberlit investments; the transient branch state pauses with the watch and expires independently while the last result remains inspectable.
+- Completed: added branch-specific Canvas forge rings, tier auras, nodes, and Emberlit crest geometry using the existing cell-scaled renderer, making Timber → Bound → Tempered → Crowned progression visible on every weapon.
+- Completed: upgraded the selected-tower HUD with form/result chips, form-themed container treatments, branch-highlighted upgrade controls, and matching desktop intel tags without increasing the bounded intel card height.
+- Verified in the live in-app browser: fresh title → briefing → ready, centered Bow placement, Power upgrade to Bound, visible forge ring, `BOUND` + `POWER TUNED` state, and live transition to `WAVE 1` with `8 LEFT`; browser error/warn diagnostics were empty.
+- Verified with regular Playwright fallback because the Browser plugin is not available and the IAB exposes no viewport override: exact 320×568, 390×844, and 1440×900 flows all placed and upgraded a real tower, asserted `form === "Bound"`, `upgrade.branch === "damage"`, `lastUpgrade === "damage"`, result chip presence, `data-form="bound"`, `data-upgrade="damage"`, no horizontal overflow, and zero console errors. Screenshots show the centered forge read and fully contained desktop intel tags.
+- Verified with the required `web_game_playwright_client.js` choreography against local Vite after installing its skill-local Chromium revision: canvas capture and `render_game_to_text()` completed with no error artifact.
+- Source gates: 97 tests, typecheck, lint, auth invariant, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+- Remaining QA: exact viewport checks use regular Playwright fallback and real iOS Safari/device performance remains unverified.

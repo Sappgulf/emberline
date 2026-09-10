@@ -3,7 +3,7 @@ import { RotateCcw } from "lucide-react";
 import { COLS, CREEPS, FORM_NAME, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type TowerKind } from "@/game/config";
 import { relicUrl, routeMarkerUrl, spriteUrl } from "@/game/assets";
 import { BESTIARY, type RelicId } from "@/game/campaign";
-import { EmberEngine, type HudSnap } from "@/game/engine";
+import { EmberEngine, type HudSnap, type TowerUpgradeBranch } from "@/game/engine";
 import { drawWorld } from "@/game/render";
 import { loadSprites } from "@/game/sprites";
 import { unlockAudio } from "@/game/audio";
@@ -653,15 +653,25 @@ export function Emberline() {
           }`}
         >
           {hud.selectedTower && hud.nextCosts ? (
-            <div className="selected-tower-bar flex flex-wrap items-start gap-3" data-placement={hud.moving ? placementToneValue : "idle"}>
+            <div
+              className="selected-tower-bar flex flex-wrap items-start gap-3"
+              data-form={formKey(hud.selectedTower, hud.formName)}
+              data-placement={hud.moving ? placementToneValue : "idle"}
+              data-upgrade={hud.selectedTower.lastUpgrade ?? "none"}
+            >
               <div className="selected-tower-copy flex-1">
-                <p className="font-display text-lg leading-none text-copper">
-                  {TOWERS[hud.selectedTower.kind].name}
-                  <span className="ml-2 font-sans text-[11px] tracking-wide text-dust">
-                    · {hud.formName}
-                    {hud.selectedTower.empowered ? " · Emberlit" : ""}
-                  </span>
-                </p>
+                <div className="selected-tower-heading">
+                  <p className="font-display text-lg leading-none text-copper">{TOWERS[hud.selectedTower.kind].name}</p>
+                  <div className="selected-tower-tags" aria-label={`${hud.formName} form${hud.selectedTower.empowered ? ", Emberlit awakened" : ""}`}>
+                    <span className="tower-form-chip" data-form={formKey(hud.selectedTower, hud.formName)}>{hud.formName}</span>
+                    {hud.selectedTower.empowered && <span className="tower-ascension-chip">Emberlit</span>}
+                    {hud.selectedTower.lastUpgrade && (
+                      <span className="tower-upgrade-result" data-branch={hud.selectedTower.lastUpgrade} role="status" aria-live="polite">
+                        {upgradeResultLabel(hud.selectedTower.lastUpgrade)}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <p className="mt-1 max-w-lg text-[11px] text-dust">
                   {hud.moving ? (
                     placementMessageValue
@@ -681,7 +691,8 @@ export function Emberline() {
               <div className="selected-tower-actions grid grid-cols-2 gap-1 sm:grid-cols-4">
                 <button
                   type="button"
-                  className="pressable btn-wood min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
+                  className="pressable btn-wood upgrade-action upgrade-action-damage min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
+                  data-branch="damage"
                   disabled={!playing || hud.selectedTower.dmgLvl >= MAX_UPGRADE || hud.gold < hud.nextCosts.dmg}
                   aria-label={upgradeAriaLabel(hud.selectedTower, "damage", hud.nextCosts.dmg)}
                   title={upgradeAriaLabel(hud.selectedTower, "damage", hud.nextCosts.dmg)}
@@ -692,7 +703,8 @@ export function Emberline() {
                 </button>
                 <button
                   type="button"
-                  className="pressable btn-wood min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
+                  className="pressable btn-wood upgrade-action upgrade-action-rate min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
+                  data-branch="rate"
                   disabled={!playing || hud.selectedTower.rateLvl >= MAX_UPGRADE || hud.gold < hud.nextCosts.rate}
                   aria-label={upgradeAriaLabel(hud.selectedTower, "rate", hud.nextCosts.rate)}
                   title={upgradeAriaLabel(hud.selectedTower, "rate", hud.nextCosts.rate)}
@@ -716,7 +728,8 @@ export function Emberline() {
               {hud.formName === "Crowned" && !hud.selectedTower.empowered && (
                 <button
                   type="button"
-                  className="pressable send-flag min-h-10 px-4 text-xs font-semibold disabled:opacity-40"
+                  className="pressable send-flag upgrade-action upgrade-action-emberlit min-h-10 px-4 text-xs font-semibold disabled:opacity-40"
+                  data-branch="emberlit"
                   disabled={!playing || hud.gold < 70}
                   onClick={() => engine.empowerSelected()}
                 >
@@ -880,6 +893,15 @@ function formBlurb(kind: TowerKind, form: string) {
     return "Long root.";
   }
   return "Green timber. Upgrade damage or rate to change form.";
+}
+
+function formKey(tower: NonNullable<HudSnap["selectedTower"]>, form: string) {
+  return tower.empowered ? "emberlit" : form.toLowerCase();
+}
+
+function upgradeResultLabel(branch: TowerUpgradeBranch) {
+  if (branch === "emberlit") return "Emberlit awakened";
+  return branch === "damage" ? "Power tuned" : "Tempo tuned";
 }
 
 type UpgradeBranch = "damage" | "rate";
@@ -1280,7 +1302,10 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
           <span className="intel-kicker">Selected tower</span>
           <h2>{def.name}</h2>
         </div>
-        <span className="tower-form">{hud.formName}</span>
+        <div className="tower-intel-tags">
+          <span className="tower-form" data-form={formKey(tower, hud.formName)}>{hud.formName}</span>
+          {tower.lastUpgrade && <span className="tower-intel-upgrade" data-branch={tower.lastUpgrade}>{upgradeResultLabel(tower.lastUpgrade)}</span>}
+        </div>
       </div>
       <div className="tower-intel-body">
         <div className="tower-intel-art">

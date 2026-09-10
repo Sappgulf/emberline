@@ -283,6 +283,43 @@ describe("EmberEngine", () => {
     assert.equal(e.selectedId, e.towers[0].id);
   });
 
+  it("records the upgrade branch while the forge effect is active", () => {
+    const e = play();
+    e.gold = 500;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+
+    e.upgradeDamage();
+
+    assert.equal(tower.dmgLvl, 2);
+    assert.equal(tower.upgradeBranch, "damage");
+    assert.equal(tower.lastUpgrade, "damage");
+    assert.ok(tower.upgradeT > 0);
+    assert.equal(e.hud().formName, "Bound");
+    const text = JSON.parse(e.renderText()) as {
+      selectedTower: {
+        form: string;
+        upgrade: { branch: string; active: boolean };
+        lastUpgrade: string;
+      };
+    };
+    assert.equal(text.selectedTower.form, "Bound");
+    assert.deepEqual(text.selectedTower.upgrade, { branch: "damage", active: true });
+    assert.equal(text.selectedTower.lastUpgrade, "damage");
+
+    e.stepFx(2);
+    assert.equal(tower.upgradeBranch, null);
+    assert.equal(tower.lastUpgrade, "damage");
+
+    e.upgradeRate();
+    assert.equal(tower.rateLvl, 2);
+    assert.equal(tower.upgradeBranch, "rate");
+    assert.equal(tower.lastUpgrade, "rate");
+    assert.ok(tower.upgradeT > 0);
+    assert.equal(e.hud().formName, "Bound");
+  });
+
   it("keeps packet intent through rejected taps and clears it after a plant", () => {
     const e = play();
     e.chooseKind("mortar");

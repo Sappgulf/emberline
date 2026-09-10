@@ -104,6 +104,14 @@ type TowerBondDefinition = Omit<TowerBondSnap, "bonus">;
 
 const TOWER_BOND_BONUS = 0.08;
 
+export type TowerUpgradeBranch = "damage" | "rate" | "emberlit";
+
+const UPGRADE_FX_DURATION: Record<TowerUpgradeBranch, number> = {
+  damage: 1.15,
+  rate: 1.15,
+  emberlit: 1.45,
+};
+
 const TOWER_BONDS: Record<TowerKind, TowerBondDefinition> = {
   bow: { id: "windcut", label: "Windcut", partner: "frost" },
   frost: { id: "windcut", label: "Windcut", partner: "bow" },
@@ -144,6 +152,9 @@ export interface Tower {
   visAngle: number;
   recoil: number;
   build: number;
+  upgradeT: number;
+  upgradeBranch: TowerUpgradeBranch | null;
+  lastUpgrade: TowerUpgradeBranch | null;
   spent: number;
   aim: Aim;
   empowered: boolean;
@@ -464,8 +475,13 @@ export class EmberEngine {
             cell: { c: hud.selectedTower.c, r: hud.selectedTower.r },
             damageLevel: hud.selectedTower.dmgLvl,
             rateLevel: hud.selectedTower.rateLvl,
+            form: hud.formName,
             aim: hud.selectedTower.aim,
             empowered: hud.selectedTower.empowered,
+            upgrade: hud.selectedTower.upgradeBranch
+              ? { branch: hud.selectedTower.upgradeBranch, active: hud.selectedTower.upgradeT > 0 }
+              : null,
+            lastUpgrade: hud.selectedTower.lastUpgrade,
             bond: hud.bond
               ? { id: hud.bond.id, partner: hud.bond.partner, bonus: hud.bond.bonus }
               : null,
@@ -1110,6 +1126,9 @@ export class EmberEngine {
     t.empowered = true;
     t.spent += 70;
     t.build = 0.5;
+    t.upgradeT = UPGRADE_FX_DURATION.emberlit;
+    t.upgradeBranch = "emberlit";
+    t.lastUpgrade = "emberlit";
     this.burst(t.c + 0.5, t.r + 0.3, "#e07838", 16, "ember");
     this.float(t.c + 0.5, t.r - 0.2, "Emberlit", "#e07838");
     sfx.upgrade();
@@ -1211,6 +1230,9 @@ export class EmberEngine {
       visAngle: -Math.PI / 2,
       recoil: 0,
       build: 1,
+      upgradeT: 0,
+      upgradeBranch: null,
+      lastUpgrade: null,
       spent: def.cost,
       aim: this.aim,
       empowered: false,
@@ -1238,13 +1260,23 @@ export class EmberEngine {
       sfx.deny();
       return;
     }
+    const previousForm = towerForm(t.dmgLvl, t.rateLvl);
     this.gold -= cost;
     this.lastPlaceId = -1;
     t.dmgLvl += 1;
     t.spent += cost;
     t.build = 0.55;
+    t.upgradeT = UPGRADE_FX_DURATION.damage;
+    t.upgradeBranch = "damage";
+    t.lastUpgrade = "damage";
     this.burst(t.c + 0.5, t.r + 0.35, "#e07838", 10, "spark");
-    if (towerForm(t.dmgLvl, t.rateLvl) >= 4) this.float(t.c + 0.5, t.r - 0.2, "Crowned", "#e07838");
+    const nextForm = towerForm(t.dmgLvl, t.rateLvl);
+    this.float(
+      t.c + 0.5,
+      t.r - 0.2,
+      nextForm > previousForm ? `${FORM_NAME[nextForm]} form` : "Power tuned",
+      nextForm >= 4 ? "#e07838" : "#d4a054",
+    );
     sfx.upgrade();
     this.notify();
   }
@@ -1258,13 +1290,23 @@ export class EmberEngine {
       sfx.deny();
       return;
     }
+    const previousForm = towerForm(t.dmgLvl, t.rateLvl);
     this.gold -= cost;
     this.lastPlaceId = -1;
     t.rateLvl += 1;
     t.spent += cost;
     t.build = 0.55;
+    t.upgradeT = UPGRADE_FX_DURATION.rate;
+    t.upgradeBranch = "rate";
+    t.lastUpgrade = "rate";
     this.burst(t.c + 0.5, t.r + 0.35, "#d4a054", 10, "spark");
-    if (towerForm(t.dmgLvl, t.rateLvl) >= 4) this.float(t.c + 0.5, t.r - 0.2, "Crowned", "#e07838");
+    const nextForm = towerForm(t.dmgLvl, t.rateLvl);
+    this.float(
+      t.c + 0.5,
+      t.r - 0.2,
+      nextForm > previousForm ? `${FORM_NAME[nextForm]} form` : "Tempo tuned",
+      nextForm >= 4 ? "#e07838" : "#d4a054",
+    );
     sfx.upgrade();
     this.notify();
   }
@@ -1984,6 +2026,13 @@ export class EmberEngine {
   }
 
   stepFx(dt: number) {
+    if (!this.paused) {
+      for (const tower of this.towers) {
+        if (tower.upgradeT <= 0) continue;
+        tower.upgradeT = Math.max(0, tower.upgradeT - dt);
+        if (tower.upgradeT === 0) tower.upgradeBranch = null;
+      }
+    }
     this.moteAcc += dt;
     if (!this.reducedMotion && !this.paused && this.moteAcc > 0.18 && this.particles.length < 140) {
       this.moteAcc = 0;

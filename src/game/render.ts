@@ -626,6 +626,97 @@ function kindInk(kind: Tower["kind"]) {
   return "#6d8a4a";
 }
 
+function formInk(tower: Tower, form: number) {
+  if (tower.empowered) return EMBER;
+  if (form >= 4) return EMBER;
+  if (form >= 3) return COPPER;
+  if (form >= 2) return PARCHMENT;
+  return kindInk(tower.kind);
+}
+
+function drawFormAura(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, form: number, time: number) {
+  if (form < 2 && !tower.empowered) return;
+  const color = formInk(tower, form);
+  const radius = cell * (0.34 + form * 0.035 + (tower.empowered ? 0.04 : 0));
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = form >= 4 || tower.empowered ? 2.2 : form >= 3 ? 1.8 : 1.35;
+  ctx.globalAlpha = form >= 4 || tower.empowered ? 0.68 : form >= 3 ? 0.55 : 0.36;
+  ctx.setLineDash(
+    tower.empowered
+      ? [cell * 0.06, cell * 0.04]
+      : form >= 4
+        ? [cell * 0.12, cell * 0.045]
+        : form >= 3
+          ? [cell * 0.16, cell * 0.06]
+          : [cell * 0.08, cell * 0.1],
+  );
+  ctx.lineDashOffset = -time * cell * (tower.empowered ? 0.28 : 0.16);
+  ctx.beginPath();
+  ctx.arc(0, -cell * 0.08, radius, -Math.PI * 0.88, Math.PI * 0.88);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  if (form >= 3) {
+    const nodes = form >= 4 || tower.empowered ? 4 : 3;
+    for (let i = 0; i < nodes; i++) {
+      const a = -Math.PI * 0.72 + (i / Math.max(1, nodes - 1)) * Math.PI * 1.44;
+      const x = Math.cos(a) * radius;
+      const y = -cell * 0.08 + Math.sin(a) * radius * 0.78;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, cell * (tower.empowered ? 0.035 : 0.026), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawUpgradeForge(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, time: number) {
+  const branch = tower.upgradeBranch;
+  if (!branch || tower.upgradeT <= 0) return;
+  const duration = branch === "emberlit" ? 1.45 : 1.15;
+  const remaining = Math.min(1, tower.upgradeT / duration);
+  const progress = 1 - remaining;
+  const fade = Math.min(1, tower.upgradeT / 0.18) * (0.62 + remaining * 0.38);
+  const color = branch === "rate" ? COPPER : EMBER;
+  const radius = cell * (0.48 + progress * 0.45);
+  const spokes = branch === "emberlit" ? 5 : branch === "rate" ? 4 : 3;
+
+  ctx.save();
+  ctx.globalAlpha = 0.94 * fade;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = branch === "emberlit" ? 3 : 2.2;
+  ctx.setLineDash(branch === "rate" ? [cell * 0.045, cell * 0.1] : [cell * 0.12, cell * 0.05]);
+  ctx.lineDashOffset = branch === "rate" ? time * cell * 0.46 : -time * cell * 0.36;
+  ctx.beginPath();
+  ctx.arc(0, -cell * 0.06, radius, -Math.PI * 0.9, Math.PI * 0.9);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (let i = 0; i < spokes; i++) {
+    const a = time * (branch === "rate" ? 1.5 : 0.8) + (i / spokes) * Math.PI * 2;
+    const inner = radius * 0.82;
+    const outer = radius + cell * (0.1 + progress * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * inner, -cell * 0.06 + Math.sin(a) * inner);
+    ctx.lineTo(Math.cos(a) * outer, -cell * 0.06 + Math.sin(a) * outer);
+    ctx.stroke();
+  }
+
+  if (branch === "emberlit") {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, -cell * 0.52 - progress * cell * 0.08);
+    ctx.lineTo(cell * 0.07, -cell * 0.39 - progress * cell * 0.08);
+    ctx.lineTo(0, -cell * 0.32 - progress * cell * 0.08);
+    ctx.lineTo(-cell * 0.07, -cell * 0.39 - progress * cell * 0.08);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawFormKit(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, form: number, time: number) {
   const ink = kindInk(tower.kind);
   ctx.strokeStyle = ink;
@@ -715,6 +806,7 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
     ctx.roundRect(-cell * 0.4, -cell * 0.48, cell * 0.8, cell * 0.8, 6);
     ctx.stroke();
   }
+  drawFormAura(ctx, tower, cell, form, time);
   const size = cell * (0.82 + form * 0.08 + (tower.empowered ? 0.06 : 0));
   if (form >= 2) {
     ctx.strokeStyle = form >= 4 ? EMBER : form === 3 ? COPPER : "rgba(212,160,84,0.55)";
@@ -733,6 +825,7 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
   }
   drawSprite(ctx, tower.kind, 0, cell * 0.12, size);
   drawFormKit(ctx, tower, cell, form, time);
+  drawUpgradeForge(ctx, tower, cell, time);
   for (let i = 0; i < MAX_UPGRADE; i++) {
     ctx.fillStyle = i < tower.dmgLvl ? EMBER : "rgba(58,68,50,0.9)";
     ctx.fillRect(-cell * 0.18 + i * cell * 0.1, cell * 0.22, cell * 0.08, cell * 0.045);
