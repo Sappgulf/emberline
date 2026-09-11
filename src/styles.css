@@ -1558,6 +1558,23 @@
 .campaign-map-surface > p {
   margin-inline: auto;
 }
+.campaign-next-intel {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.38rem;
+  margin-top: 0.5rem;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid rgba(212, 160, 84, 0.16);
+  border-radius: 0.35rem;
+  background: rgba(8, 11, 10, 0.34);
+  color: var(--color-copper);
+  font-size: 10px;
+  line-height: 1.25;
+}
+.campaign-next-intel .intel-kicker {
+  flex: 0 0 auto;
+}
 .dispatch::before {
   position: absolute;
   inset: 0.55rem;
@@ -1770,6 +1787,18 @@
   color: var(--color-copper);
   font-size: 7px;
   letter-spacing: 0.05em;
+}
+.campaign-card-intel {
+  overflow: hidden;
+  color: var(--color-parchment);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.campaign-card[data-state="locked"] .campaign-card-intel {
+  color: var(--color-dust);
 }
 
 .bestiary-grid {

@@ -195,6 +195,10 @@ describe("EmberEngine", () => {
     assert.equal(initial.route.length, MAPS.length);
     assert.equal(initial.route[0].state, "current");
     assert.equal(initial.route[1].state, "locked");
+    assert.equal(initial.route[1].unlockHint, "Hold The Low Road to open");
+    assert.equal(initial.route[0].waveCount, MAPS[0].waves.length);
+    assert.equal(initial.route[0].threatTier, "light");
+    assert.equal(initial.route[0].hasAir, false);
     assert.equal(initial.previewWave, 1);
     assert.deepEqual(initial.wavePreview, [{ kind: "grub", count: 8 }]);
     assert.equal(initial.threatTier, "light");
@@ -214,6 +218,7 @@ describe("EmberEngine", () => {
     assert.equal(e.hud().route[0].state, "held");
     assert.equal(e.hud().route[1].state, "current");
     assert.equal(e.hud().route[2].state, "available");
+    assert.equal(e.hud().route[3].unlockHint, "Hold Keep Stair to open");
   });
 
   it("tracks and pays an optional watch order", () => {

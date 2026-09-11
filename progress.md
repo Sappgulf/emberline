@@ -236,3 +236,13 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified with regular Playwright fallback because the Browser plugin is not available and the IAB exposes no viewport override: exact 320×568, 390×844, and 1440×900 flows placed and upgraded a Bow, matched compact preview values to desktop Power, preserved the full accessible upgrade explanation, stayed within document bounds, and produced zero console errors or warnings.
 - Source gates: 97 tests, typecheck, lint, auth invariant, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
 - Remaining QA: exact viewport checks use regular Playwright fallback and real iOS Safari/device performance remains unverified.
+
+## 2026-09-10 — campaign route intelligence pass
+
+- Completed: campaign cards now explain the exact prerequisite for every locked route, and the campaign header names the next road revealed by the current hold.
+- Completed: open route cards now surface their wave count, opening pressure tier, and opening air threat when present; accessible card labels carry the same tactical preview.
+- Completed: kept the new intelligence compact and scroll-safe at phone widths while preserving the existing route-card art, objective reward, and selection behavior.
+- Verified in the live in-app browser: title → Campaign shows `Hold The Low Road to reveal Pine Cut`, locked cards expose their sequential requirements, and the Low Road card reports `5 waves · Light pressure`.
+- Verified with the required web-game Playwright client: local Vite ready-state canvas screenshot and deterministic text state completed without an error artifact.
+- Verified with regular Playwright fallback at exact 320×900, 390×900, and 1440×900 viewports: no horizontal overflow, no page errors, and the unlock/locked copy is accessible at every width.
+- Source gates: 98 tests, typecheck, lint, auth invariant, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.

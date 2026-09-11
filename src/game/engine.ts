@@ -57,6 +57,10 @@ export interface RouteNodeSnap {
   ruleLabel: string;
   objectiveTitle: string;
   objectiveReward: number;
+  waveCount: number;
+  threatTier: ThreatTier;
+  hasAir: boolean;
+  unlockHint: string | null;
 }
 
 export interface WavePreviewSnap {
@@ -717,6 +721,10 @@ export class EmberEngine {
           ruleLabel: entry.profile.rule.label,
           objectiveTitle: entry.profile.rule.objectiveTitle,
           objectiveReward: entry.profile.rule.reward,
+          waveCount: entry.waves.length,
+          threatTier: threatTierFor(entry.waves[0]),
+          hasAir: planHasAir(entry.waves, 0),
+          unlockHint: index > this.unlocked ? `Hold ${MAPS[index - 1].name} to open` : null,
         };
       }),
       previewWave: previewIndex + 1,

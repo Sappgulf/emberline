@@ -516,10 +516,20 @@ export function Emberline() {
                 <p className="max-w-md text-sm leading-relaxed text-dust">
                   {Math.min(hud.mapTotal, hud.unlocked + 1)} of {hud.mapTotal} routes available. Select an open route to choose where the next watch begins.
                 </p>
+                <p className="campaign-next-intel" aria-live="polite">
+                  <span className="intel-kicker">Next road</span>
+                  {hud.route[hud.unlocked + 1]
+                    ? `Hold ${hud.route[hud.unlocked]?.name ?? "the current route"} to reveal ${hud.route[hud.unlocked + 1].name}.`
+                    : "All six roads are open. Replay a held route to chase a cleaner watch."}
+                </p>
                 <div className="campaign-select" aria-label="Campaign route selection">
                   {hud.route.map((node, index) => {
                     const locked = node.state === "locked";
                     const selected = index === hud.mapIndex;
+                    const pressure = node.threatTier === "severe" ? "Severe pressure" : node.threatTier === "mixed" ? "Mixed pressure" : "Light pressure";
+                    const routeIntel = locked
+                      ? node.unlockHint
+                      : `${node.waveCount} waves · ${pressure}${node.hasAir ? " · air threat" : ""}`;
                     return (
                       <button
                         key={node.id}
@@ -528,7 +538,7 @@ export function Emberline() {
                         data-selected={selected}
                         data-state={node.state}
                         className="campaign-card plaque pressable"
-                        aria-label={`${node.name}, ${node.state === "current" ? "selected" : node.state}`}
+                        aria-label={`${node.name}, ${node.state === "current" ? "selected" : node.state}. ${routeIntel}`}
                         onClick={() => engine.selectCampaignMap(index)}
                       >
                         <span className="campaign-card-marker" aria-hidden="true">
@@ -542,6 +552,7 @@ export function Emberline() {
                           <strong>{node.name}</strong>
                           <span>{node.place}</span>
                           <small>{node.ruleLabel} · {node.objectiveTitle} · +{node.objectiveReward}g</small>
+                          <span className="campaign-card-intel">{routeIntel}</span>
                         </span>
                       </button>
                     );
