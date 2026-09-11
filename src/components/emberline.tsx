@@ -694,24 +694,24 @@ export function Emberline() {
                   className="pressable btn-wood upgrade-action upgrade-action-damage min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
                   data-branch="damage"
                   disabled={!playing || hud.selectedTower.dmgLvl >= MAX_UPGRADE || hud.gold < hud.nextCosts.dmg}
-                  aria-label={upgradeAriaLabel(hud.selectedTower, "damage", hud.nextCosts.dmg)}
-                  title={upgradeAriaLabel(hud.selectedTower, "damage", hud.nextCosts.dmg)}
+                  aria-label={upgradeAriaLabel(hud, "damage", hud.nextCosts.dmg)}
+                  title={upgradeAriaLabel(hud, "damage", hud.nextCosts.dmg)}
                   onClick={() => engine.upgradeDamage()}
                 >
                   <span className="upgrade-main">Damage {hud.selectedTower.dmgLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.dmg}g`}</span>
-                  {hud.selectedTower.dmgLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud.selectedTower, "damage")}</span>}
+                  {hud.selectedTower.dmgLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud, "damage")}</span>}
                 </button>
                 <button
                   type="button"
                   className="pressable btn-wood upgrade-action upgrade-action-rate min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
                   data-branch="rate"
                   disabled={!playing || hud.selectedTower.rateLvl >= MAX_UPGRADE || hud.gold < hud.nextCosts.rate}
-                  aria-label={upgradeAriaLabel(hud.selectedTower, "rate", hud.nextCosts.rate)}
-                  title={upgradeAriaLabel(hud.selectedTower, "rate", hud.nextCosts.rate)}
+                  aria-label={upgradeAriaLabel(hud, "rate", hud.nextCosts.rate)}
+                  title={upgradeAriaLabel(hud, "rate", hud.nextCosts.rate)}
                   onClick={() => engine.upgradeRate()}
                 >
                   <span className="upgrade-main">Rate {hud.selectedTower.rateLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.rate}g`}</span>
-                  {hud.selectedTower.rateLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud.selectedTower, "rate")}</span>}
+                  {hud.selectedTower.rateLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud, "rate")}</span>}
                 </button>
                 <button type="button" className="pressable packet min-h-10 px-3 text-xs text-dust" onClick={() => engine.sellSelected()}>
                   Sell {hud.sellRefund}g
@@ -906,20 +906,52 @@ function upgradeResultLabel(branch: TowerUpgradeBranch) {
 
 type UpgradeBranch = "damage" | "rate";
 
-function upgradePreview(tower: NonNullable<HudSnap["selectedTower"]>, branch: UpgradeBranch) {
+function towerPower(hud: HudSnap, tower: NonNullable<HudSnap["selectedTower"]>, damageLevel = tower.dmgLvl, rateLevel = tower.rateLvl) {
+  const form = towerForm(damageLevel, rateLevel);
+  return Math.round(
+    damageAt(tower.kind, damageLevel) *
+      (hud.relics.includes("whet") ? 1.12 : 1) *
+      (hud.relics.includes("ember") && tower.kind === "mortar" ? 1.2 : 1) *
+      (1 + (form - 1) * 0.06) *
+      hud.lineBonus *
+      (1 + (hud.bond?.bonus ?? 0)) *
+      (hud.fieldBoost?.damage ?? 1),
+  );
+}
+
+function towerRate(hud: HudSnap, tower: NonNullable<HudSnap["selectedTower"]>, rateLevel = tower.rateLvl) {
+  return rateAt(tower.kind, rateLevel) * (hud.fieldBoost?.rate ?? 1);
+}
+
+function upgradePreview(hud: HudSnap, branch: UpgradeBranch) {
+  const tower = hud.selectedTower;
+  if (!tower) return "";
   const nextDamage = branch === "damage" ? tower.dmgLvl + 1 : tower.dmgLvl;
   const nextRate = branch === "rate" ? tower.rateLvl + 1 : tower.rateLvl;
   const currentForm = towerForm(tower.dmgLvl, tower.rateLvl);
   const nextForm = towerForm(nextDamage, nextRate);
-  return nextForm === currentForm ? (branch === "damage" ? "+power" : "+tempo") : `→ ${FORM_NAME[nextForm]}`;
+  const stat =
+    branch === "damage"
+      ? `P ${towerPower(hud, tower)}→${towerPower(hud, tower, nextDamage, nextRate)}`
+      : `R ${towerRate(hud, tower).toFixed(1)}→${towerRate(hud, tower, nextRate).toFixed(1)}×`;
+  return nextForm === currentForm ? stat : `→ ${FORM_NAME[nextForm]} · ${stat}`;
 }
 
-function upgradeAriaLabel(tower: NonNullable<HudSnap["selectedTower"]>, branch: UpgradeBranch, cost: number) {
+function upgradeAriaLabel(hud: HudSnap, branch: UpgradeBranch, cost: number) {
+  const tower = hud.selectedTower;
+  if (!tower) return "Tower upgrade unavailable";
   const level = branch === "damage" ? tower.dmgLvl : tower.rateLvl;
   const label = branch === "damage" ? "Damage" : "Rate";
   if (level >= MAX_UPGRADE) return `${label} upgrade maxed at ${FORM_NAME[towerForm(tower.dmgLvl, tower.rateLvl)]} form`;
-  const preview = upgradePreview(tower, branch);
-  const effect = preview.startsWith("→") ? `advances the tower to ${preview.slice(2)} form` : `raises ${branch === "damage" ? "power" : "fire rate"}`;
+  const current = branch === "damage" ? towerPower(hud, tower) : towerRate(hud, tower).toFixed(2);
+  const next = branch === "damage" ? towerPower(hud, tower, tower.dmgLvl + 1, tower.rateLvl) : towerRate(hud, tower, tower.rateLvl + 1).toFixed(2);
+  const currentForm = towerForm(tower.dmgLvl, tower.rateLvl);
+  const nextForm = towerForm(
+    branch === "damage" ? tower.dmgLvl + 1 : tower.dmgLvl,
+    branch === "rate" ? tower.rateLvl + 1 : tower.rateLvl,
+  );
+  const formEffect = nextForm !== currentForm ? ` and advances the tower to ${FORM_NAME[nextForm]} form` : "";
+  const effect = `changes ${branch === "damage" ? "power" : "fire rate"} from ${current} to ${next}${formEffect}`;
   return `Upgrade ${label.toLowerCase()} for ${cost} gold; ${effect}`;
 }
 
@@ -1276,22 +1308,13 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
   const tower = hud.selectedTower;
   if (!tower) return null;
   const def = TOWERS[tower.kind];
-  const form = towerForm(tower.dmgLvl, tower.rateLvl);
-  const power = Math.round(
-    damageAt(tower.kind, tower.dmgLvl) *
-      (hud.relics.includes("whet") ? 1.12 : 1) *
-      (hud.relics.includes("ember") && tower.kind === "mortar" ? 1.2 : 1) *
-      (1 + (form - 1) * 0.06) *
-      hud.lineBonus *
-      (1 + (hud.bond?.bonus ?? 0)) *
-      (hud.fieldBoost?.damage ?? 1),
-  );
+  const power = towerPower(hud, tower);
   const range =
     rangeAt(tower.kind, tower.dmgLvl) *
-    (hud.relics.includes("glass") ? 1.12 : 1) *
-    (tower.empowered ? 1.18 : 1) *
-    (hud.fieldBoost?.range ?? 1);
-  const rate = rateAt(tower.kind, tower.rateLvl) * (hud.fieldBoost?.rate ?? 1);
+      (hud.relics.includes("glass") ? 1.12 : 1) *
+      (tower.empowered ? 1.18 : 1) *
+      (hud.fieldBoost?.range ?? 1);
+  const rate = towerRate(hud, tower);
   const bondText = hud.bond
     ? `Bonded with ${TOWERS[hud.bond.partner].short} · ${hud.bond.label} +${Math.round(hud.bond.bonus * 100)}% power`
     : "No bond active · pair complementary towers for +8% power";

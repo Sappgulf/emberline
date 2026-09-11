@@ -1491,13 +1491,16 @@
   display: block;
 }
 .upgrade-preview {
+  overflow: hidden;
   margin-top: 0.1rem;
   color: var(--color-copper);
   font-size: 7px;
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .upgrade-action[data-branch="damage"] .upgrade-preview {

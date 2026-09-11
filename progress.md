@@ -219,3 +219,13 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified with the required `web_game_playwright_client.js` choreography against local Vite after installing its skill-local Chromium revision: canvas capture and `render_game_to_text()` completed with no error artifact.
 - Source gates: 97 tests, typecheck, lint, auth invariant, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
 - Remaining QA: exact viewport checks use regular Playwright fallback and real iOS Safari/device performance remains unverified.
+
+## 2026-09-10 — effective upgrade preview pass
+
+- Completed: upgrade buttons now preview the effective Power or Rate before and after the investment (`P 14→20`, `R 1.7→2.1×`) while retaining the next form transition.
+- Completed: extracted the contextual Power/Rate calculation shared by the compact selected-tower bar and desktop Tower Intel, keeping relic, line, bond, and field modifiers truthful in both surfaces.
+- Found and fixed during visual QA: raw base Power diverged from desktop effective Power after form upgrades; the preview now agrees with the selected-tower intel card.
+- Verified with the required `web_game_playwright_client.js` choreography against local Vite: canvas screenshot and `render_game_to_text()` completed with no error artifact.
+- Verified with regular Playwright fallback because the Browser plugin is not available and the IAB exposes no viewport override: exact 320×568, 390×844, and 1440×900 flows placed and upgraded a Bow, matched compact preview values to desktop Power, preserved the full accessible upgrade explanation, stayed within document bounds, and produced zero console errors or warnings.
+- Source gates: 97 tests, typecheck, lint, auth invariant, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+- Remaining QA: exact viewport checks use regular Playwright fallback and real iOS Safari/device performance remains unverified.
