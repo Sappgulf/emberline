@@ -38,6 +38,89 @@ export type PropKind = "pine" | "oak" | "rock" | "stump" | "reed" | "lamp" | "sh
 export type AffixId = "shielded" | "frenzied" | "warded" | "hollow";
 export type EmberlitBranch = "a" | "b";
 export type PerkId = "purse" | "wall" | "whet" | "rest";
+export type OmenId = "bitter-wind" | "blood-tide" | "hollow-moon" | "ash-fall";
+
+export interface OmenDef {
+  id: OmenId;
+  name: string;
+  detail: string;
+  color: string;
+  rgb: string;
+  creepHp: number;
+  creepSpeed: number;
+  gold: number;
+  towerDamage: number;
+  towerRate: number;
+  towerRange: number;
+  burnLife: number;
+}
+
+export const OMENS: Record<OmenId, OmenDef> = {
+  "bitter-wind": {
+    id: "bitter-wind",
+    name: "Bitter wind",
+    detail: "The pack runs 8% slower and towers fire 6% slower.",
+    color: "#6aa8b4",
+    rgb: "106,168,180",
+    creepHp: 1,
+    creepSpeed: 0.92,
+    gold: 1,
+    towerDamage: 1,
+    towerRate: 0.94,
+    towerRange: 1,
+    burnLife: 1,
+  },
+  "blood-tide": {
+    id: "blood-tide",
+    name: "Blood tide",
+    detail: "Bounties pay 15% more and prey arrive 10% tougher.",
+    color: "#c45c4a",
+    rgb: "196,92,74",
+    creepHp: 1.1,
+    creepSpeed: 1,
+    gold: 1.15,
+    towerDamage: 1,
+    towerRate: 1,
+    towerRange: 1,
+    burnLife: 1,
+  },
+  "hollow-moon": {
+    id: "hollow-moon",
+    name: "Hollow moon",
+    detail: "Towers hit 10% harder and prey arrive 8% tougher.",
+    color: "#b78ad4",
+    rgb: "183,138,212",
+    creepHp: 1.08,
+    creepSpeed: 1,
+    gold: 1.02,
+    towerDamage: 1.1,
+    towerRate: 1,
+    towerRange: 1,
+    burnLife: 1,
+  },
+  "ash-fall": {
+    id: "ash-fall",
+    name: "Ash fall",
+    detail: "Burns last longer and pay a little more; towers see 6% less far.",
+    color: "#b7ab90",
+    rgb: "183,171,144",
+    creepHp: 1,
+    creepSpeed: 1,
+    gold: 1.05,
+    towerDamage: 1,
+    towerRate: 1,
+    towerRange: 0.94,
+    burnLife: 1.35,
+  },
+};
+
+const OMEN_ORDER: OmenId[] = ["bitter-wind", "blood-tide", "hollow-moon", "ash-fall"];
+
+export function omenFor(mapIndex: number, wave: number, endless = false): OmenDef | null {
+  if (!endless && mapIndex < 2) return null;
+  const index = Math.abs(mapIndex * 5 + wave * 3) % OMEN_ORDER.length;
+  return OMENS[OMEN_ORDER[index]];
+}
 
 export const PERKS: ReadonlyArray<{ id: PerkId; name: string; detail: string; max: number; costs: number[] }> = [
   { id: "purse", name: "Keep purse", detail: "+20 starting gold per mark spent.", max: 3, costs: [2, 4, 6] },

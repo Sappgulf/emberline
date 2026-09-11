@@ -325,6 +325,41 @@ export const CHRONICLE: ChronicleEntry[] = [
     body: "A braided cord that ties neighboring towers into one line. Every watch keeps its own knot.",
     unlock: { type: "relic", id: "cord" },
   },
+  {
+    id: "omens",
+    kicker: "Weather",
+    title: "Night omens",
+    body: "From the third road on, some waves carry an omen — bitter wind, blood tide, hollow moon, or ash fall. Read the forecast and send accordingly.",
+    unlock: { type: "road", index: 2 },
+  },
+  {
+    id: "elite-prey",
+    kicker: "Prey",
+    title: "Elite prey",
+    body: "Shielded, frenzied, warded, hollow. One in a handful of bodies is born wrong and pays better for it.",
+    unlock: { type: "road", index: 1 },
+  },
+  {
+    id: "mirefather",
+    kicker: "Boss",
+    title: "Mirefather",
+    body: "The ford's drowned warden. At half strength it calls the pack up out of the water.",
+    unlock: { type: "road", index: 3 },
+  },
+  {
+    id: "cinderhide",
+    kicker: "Boss",
+    title: "Cinderhide",
+    body: "The last blaze given legs. Its second wind spills coals along the whole road.",
+    unlock: { type: "road", index: 4 },
+  },
+  {
+    id: "wicker-crown",
+    kicker: "Boss",
+    title: "The Wicker Crown",
+    body: "Emberlord ascendant, walking the last arch. It sets the draft alight and the pack sprints.",
+    unlock: { type: "road", index: 7 },
+  },
 ];
 
 export function shopFor(mapIndex: number, wave: number): ShopItem[] {

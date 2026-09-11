@@ -30,10 +30,12 @@ import {
   AFFIXES,
   EMBERLIT,
   PERKS,
+  omenFor,
   type AffixId,
   type Aim,
   type CreepKind,
   type EmberlitBranch,
+  type OmenDef,
   type PerkId,
   type TowerKind,
 } from "./config.ts";
@@ -102,6 +104,7 @@ export interface WaveResultSnap {
   orderHeld: boolean;
   orderPayout: number;
   orderChain: number;
+  omen: string | null;
 }
 
 export interface ObjectiveSnap {
@@ -147,6 +150,7 @@ export interface SetSnap {
   id: string;
   name: string;
   detail: string;
+  relics: RelicId[];
   active: boolean;
 }
 
@@ -434,6 +438,7 @@ export interface HudSnap {
   setBonus: { damage: number; rate: number };
   ability: AbilitySnap | null;
   emberlitOptions: EmberlitSnap | null;
+  omen: { id: string; name: string; detail: string; color: string } | null;
   marks: number;
   perkOptions: PerkSnap[];
   bestEndless: number;
@@ -663,18 +668,19 @@ export class EmberEngine {
       (this.relics.has("glass") ? 1.12 : 1) *
       (tower.empowered ? 1.18 : 1) *
       (tower.emberlit === "b" && tower.kind === "ward" ? 1.12 : 1) *
+      (this.omenNow()?.towerRange ?? 1) *
       this.fieldRangeMultiplier(tower)
     );
   }
 
   hpMult() {
     const endless = this.endless ? 1 + Math.max(0, this.wave - 1) * 0.14 : 1;
-    return (this.hard ? HARD_HP : 1) * endless;
+    return (this.hard ? HARD_HP : 1) * endless * (this.omenNow()?.creepHp ?? 1);
   }
 
   goldMult() {
     const endless = this.endless ? 1 + Math.max(0, this.wave - 1) * 0.02 : 1;
-    return (this.hard ? HARD_GOLD : 1) * endless;
+    return (this.hard ? HARD_GOLD : 1) * endless * (this.omenNow()?.gold ?? 1);
   }
 
   markedCreep(): Creep | null {
@@ -760,6 +766,7 @@ export class EmberEngine {
       boss: hud.boss,
       camp: this.campChoice ?? this.campLabel,
       sets: hud.sets.filter((set) => set.active).map((set) => set.id),
+      omen: hud.omen?.id ?? null,
       marks: this.marks,
       perks: this.perks,
       endless: this.endless,
@@ -908,6 +915,11 @@ export class EmberEngine {
   wavesLeft() {
     if (this.endless) return false;
     return this.wave >= this.map.waves.length;
+  }
+
+  omenNow(): OmenDef | null {
+    const waveNumber = this.phase === "wave" ? this.wave : this.wave + 1;
+    return omenFor(this.mapIndex, waveNumber, this.endless);
   }
 
   buildHud(): HudSnap {
@@ -1069,6 +1081,7 @@ export class EmberEngine {
         id: set.id,
         name: set.name,
         detail: set.detail,
+        relics: set.relics,
         active: set.relics.every((id) => this.relics.has(id)),
       })),
       setBonus: { damage: this.setAmount("damage") + this.perks.whet * 0.04, rate: this.setAmount("rate") },
@@ -1077,7 +1090,7 @@ export class EmberEngine {
             name: ABILITIES[t.kind].name,
             detail: ABILITIES[t.kind].detail,
             cd: Math.ceil(t.abilityCd),
-            ready: t.abilityCd <= 0 && this.playing(),
+            ready: t.abilityCd <= 0 && this.playing() && !t.volt && !t.siege && !t.storm && !t.brace,
           }
         : null,
       emberlitOptions:
@@ -1096,6 +1109,10 @@ export class EmberEngine {
           canBuy: !maxed && this.marks >= perk.costs[tier],
         };
       }),
+      omen: (() => {
+        const omen = this.omenNow();
+        return omen ? { id: omen.id, name: omen.name, detail: omen.detail, color: omen.color } : null;
+      })(),
       bestEndless: this.bestEndless,
       endless: this.endless,
       eliteCount: this.creeps.filter((c) => c.alive && c.elite).length,
@@ -1666,10 +1683,19 @@ export class EmberEngine {
       sfx.deny();
       return;
     }
+    const before = new Set(this.activeSets().map((set) => set.id));
     this.gold -= item.cost;
     this.relics.add(id);
+    const completed = this.activeSets().filter((set) => !before.has(set.id));
+    if (completed.length > 0) {
+      this.banner = { text: `Set complete — ${completed[0].name}`, life: 2.4, max: 2.4 };
+      this.float(COLS / 2, 0.55, completed[0].name, "#6aa8b4");
+      this.ring(COLS / 2, 0.6, "#6aa8b4");
+      sfx.objective();
+    } else {
+      sfx.place();
+    }
     this.persist();
-    sfx.place();
     this.notify();
   }
 
@@ -2554,6 +2580,7 @@ export class EmberEngine {
     let dmg =
       damageAt(tower.kind, tower.dmgLvl) *
       this.damageMultiplier() *
+      (this.omenNow()?.towerDamage ?? 1) *
       (this.relics.has("whet") ? 1.12 : 1) *
       (this.relics.has("ember") && tower.kind === "mortar" ? 1.2 : 1) *
       (1 + (form - 1) * 0.06) *
@@ -2586,7 +2613,12 @@ export class EmberEngine {
       tower.volley = false;
     }
     this.focusId = target.id;
-    const rate = rateAt(tower.kind, tower.rateLvl) * this.fieldRateMultiplier(tower) * this.kindredRate(tower) * (1 + this.setAmount("rate"));
+    const rate =
+      rateAt(tower.kind, tower.rateLvl) *
+      this.fieldRateMultiplier(tower) *
+      this.kindredRate(tower) *
+      (1 + this.setAmount("rate")) *
+      (this.omenNow()?.towerRate ?? 1);
     tower.cooldown = 1 / rate;
     if (tower.volt > 0) {
       tower.volt -= 1;
@@ -2788,7 +2820,7 @@ export class EmberEngine {
           x,
           y,
           r: (0.48 + form * 0.06) * fat,
-          life: (1.5 + form * 0.2) * (shot.empowered ? 1.35 : 1) * ash,
+          life: (1.5 + form * 0.2) * (shot.empowered ? 1.35 : 1) * ash * (this.omenNow()?.burnLife ?? 1),
           tick: 0,
           tar: shot.tar,
         });
@@ -2876,6 +2908,7 @@ export class EmberEngine {
     for (const c of this.creeps) {
       if (c.alive && (c.kind === "hound" || c.kind === "ashfang")) packCount += 1;
     }
+    const omenSpeed = this.omenNow()?.creepSpeed ?? 1;
     for (const creep of this.creeps) {
       if (!creep.alive) {
         creep.death -= dt;
@@ -2900,6 +2933,7 @@ export class EmberEngine {
         (stats.flying ? 1 : this.fordSlow(creep.x, creep.y)) *
         pack *
         draft *
+        omenSpeed *
         (creep.hasteT > 0 ? 1.22 : 1);
       creep.slowT = Math.max(0, creep.slowT - dt);
       creep.rootT = Math.max(0, creep.rootT - dt);
@@ -3160,6 +3194,7 @@ export class EmberEngine {
       orderHeld,
       orderPayout,
       orderChain: this.watchChain,
+      omen: this.omenNow()?.name ?? null,
     };
     this.scoreGrade();
     this.notify();

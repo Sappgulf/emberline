@@ -235,7 +235,8 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
 
   const night = engine.phase === "wave" && engine.wave % 4 === 0;
   const lastStand = engine.lives <= 5;
-  const overlayKey = `${w}|${h}|${dpr}|${cell}|${night ? 1 : 0}|${lastStand ? 1 : 0}|${engine.map.id}`;
+  const omen = engine.omenNow();
+  const overlayKey = `${w}|${h}|${dpr}|${cell}|${night ? 1 : 0}|${lastStand ? 1 : 0}|${engine.map.id}|${omen?.rgb ?? ""}`;
   if (!overlayCache || overlayCache.key !== overlayKey) {
     const canvas = makeCanvas(w * dpr, h * dpr);
     const o = ctx2d(canvas);
@@ -256,6 +257,10 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     o.fillRect(0, 0, w, h);
     if (night) {
       o.fillStyle = "rgba(24, 28, 48, 0.12)";
+      o.fillRect(0, 0, w, h);
+    }
+    if (omen && (engine.phase === "ready" || engine.phase === "wave")) {
+      o.fillStyle = `rgba(${omen.rgb},0.05)`;
       o.fillRect(0, 0, w, h);
     }
     o.strokeStyle = "rgba(58,68,50,0.9)";
@@ -996,15 +1001,15 @@ function drawFormKit(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, 
   }
 }
 
-function drawChargeAura(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, time: number) {
+function drawChargeAura(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, time: number, motion = true) {
   if (!tower.volt && !tower.siege && !tower.storm && !tower.brace) return;
   const color = tower.volt ? COPPER : tower.siege ? EMBER : tower.storm ? "#e8c56a" : "#b67848";
   ctx.save();
   ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.45 + Math.sin(time * 6 + tower.id) * 0.22;
+  ctx.globalAlpha = motion ? 0.45 + Math.sin(time * 6 + tower.id) * 0.22 : 0.55;
   ctx.lineWidth = 2;
   ctx.setLineDash([cell * 0.1, cell * 0.08]);
-  ctx.lineDashOffset = -time * 24;
+  ctx.lineDashOffset = motion ? -time * 24 : 0;
   ctx.beginPath();
   ctx.arc(0, -cell * 0.05, cell * 0.42, 0, Math.PI * 2);
   ctx.stroke();
@@ -1079,7 +1084,7 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
     ctx.globalAlpha = 1;
   }
   drawSprite(ctx, tower.kind, 0, cell * 0.12, size);
-  drawChargeAura(ctx, tower, cell, time);
+  drawChargeAura(ctx, tower, cell, time, motion);
   drawMuzzleFlash(ctx, tower, cell, motion);
   drawFormKit(ctx, tower, cell, form, time);
   drawUpgradeForge(ctx, tower, cell, time);

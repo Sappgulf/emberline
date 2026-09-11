@@ -4665,3 +4665,67 @@
     font-size: 7px !important;
   }
 }
+
+/* Omens, set hints, and boss arrival. */
+.threat-omen {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.32rem 0 0;
+  padding: 0.28rem 0.42rem;
+  border: 1px solid color-mix(in srgb, var(--omen-color, #b7ab90) 55%, transparent);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--omen-color, #b7ab90) 10%, transparent);
+  color: var(--omen-color, #b7ab90);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1.15;
+}
+
+.threat-omen .intel-kicker {
+  color: var(--color-dust);
+  font-family: var(--font-sans);
+}
+
+.threat-omen small {
+  color: var(--color-dust);
+  font-family: var(--font-sans);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
+.relic-set-hint {
+  display: block;
+  margin-top: 0.3rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(106, 168, 180, 0.3);
+  color: var(--color-frost);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.boss-bar {
+  animation: boss-in 320ms ease-out;
+}
+
+@keyframes boss-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.wave-recap-omen {
+  margin-top: 0.28rem;
+  color: var(--color-dust);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

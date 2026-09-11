@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { COLS, CREEPS, START_GOLD, START_LIVES, HARD_LIVES, TOWERS, pathCells, blockedCells } from "./config.ts";
+import { COLS, CREEPS, START_GOLD, START_LIVES, HARD_LIVES, TOWERS, omenFor, pathCells, blockedCells } from "./config.ts";
 import { MAPS, endlessWave, leakCost, pathCellsOf, planHasAir, shopFor, watchOrderFor } from "./campaign.ts";
 import { EmberEngine } from "./engine.ts";
 
@@ -543,6 +543,7 @@ describe("EmberEngine", () => {
       orderHeld: true,
       orderPayout: 22,
       orderChain: 1,
+      omen: null,
     });
     assert.ok((e.hud().lastResult?.earned ?? 0) > 0);
     const text = JSON.parse(e.renderText()) as { coordinateSystem: string; phase: string; wave: { progress: number } };
@@ -1355,5 +1356,63 @@ describe("season systems", () => {
     e.damageCreep(lord, lord.maxHp + 999, 0, true);
     assert.equal(e.marks, before + 1);
     assert.equal(lord.alive, false);
+  });
+
+  it("keeps night omens deterministic and off the easy roads", () => {
+    assert.equal(omenFor(0, 1), null, "the first road opens clean");
+    assert.equal(omenFor(1, 4), null, "the second road stays clean");
+    assert.ok(omenFor(2, 3));
+    assert.equal(omenFor(3, 2)?.id, omenFor(3, 2)?.id);
+    assert.equal(omenFor(3, 2)?.id, "blood-tide");
+    assert.equal(omenFor(3, 1)?.id, "hollow-moon");
+    assert.equal(omenFor(3, 3)?.id, "bitter-wind");
+  });
+
+  it("folds the active omen into health and reports it to the HUD", () => {
+    const e = play();
+    e.loadMap(3);
+    e.phase = "wave";
+    e.wave = 2;
+    e.notify();
+    assert.equal(e.hud().omen?.id, "blood-tide");
+    assert.ok(Math.abs(e.hpMult() - 1.1) < 0.0001, "blood tide should add 10% health");
+    e.wave = 3;
+    e.notify();
+    assert.equal(e.hud().omen?.id, "bitter-wind");
+  });
+
+  it("celebrates a completed relic set and hints it in the shop", () => {
+    const e = play();
+    e.loadMap(3);
+    e.phase = "shop";
+    e.gold = 999;
+    e.relics.add("cold");
+    const hint = e.hud().sets.find((set) => set.id === "winter-vigil");
+    assert.equal(hint?.active, false);
+    assert.deepEqual(hint?.relics, ["cold", "salt"]);
+    e.buyRelic("salt");
+    assert.match(e.banner?.text ?? "", /Set complete — Winter vigil/);
+    assert.ok(e.activeSets().some((set) => set.id === "winter-vigil"));
+  });
+
+  it("blocks the ability button while a charge is still loaded", () => {
+    const e = play();
+    e.gold = 900;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    e.useAbility();
+    assert.equal(tower.volt, 3);
+    tower.abilityCd = 0;
+    e.notify();
+    assert.equal(e.hud().ability?.ready, false, "do not waste a second volley");
+  });
+
+  it("opens omen chronicle pages with the third road", () => {
+    const e = play();
+    assert.equal(e.hud().chronicle.find((entry) => entry.id === "omens")?.unlocked, false);
+    e.unlocked = 3;
+    e.notify();
+    assert.equal(e.hud().chronicle.find((entry) => entry.id === "omens")?.unlocked, true);
   });
 });

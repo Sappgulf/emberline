@@ -708,6 +708,7 @@ export function Emberline() {
                   ["Space / P / F", "Send the wave. Pause. Cycle 1× / 2× / 3×."],
                   ["Line two", "Same kind +10% rate. Bonds: Windcut, Ashring, Stormroot, Brand."],
                   ["Rites", "At the brief: spare purse, spare timber, or first ember."],
+                  ["Omens", "Some waves carry an omen. Read the forecast before you send."],
                   ["Camp", "After a road, choose a preparation for the next one."],
                   ["Elites", "Some prey run shielded, frenzied, warded, or hollow. They pay more."],
                   ["Abilities", "C or the ability button unleashes the selected tower's power."],
@@ -976,7 +977,7 @@ export function Emberline() {
                       ))}
                   </div>
                 )}
-                <ShopList items={hud.shopItems} relics={hud.relics} gold={hud.gold} />
+                <ShopList items={hud.shopItems} relics={hud.relics} sets={hud.sets} gold={hud.gold} />
               </div>
             </Overlay>
           )}
@@ -1129,7 +1130,7 @@ export function Emberline() {
                   className="pressable btn-wood ability-action min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
                   disabled={!playing || !hud.ability?.ready}
                   aria-label={hud.ability ? `${hud.ability.name}: ${hud.ability.detail}${hud.ability.cd > 0 ? `, ready in ${hud.ability.cd} seconds` : ", ready"}` : "No tower selected"}
-                  title={hud.ability ? `${hud.ability.name} — ${hud.ability.detail}` : "No tower selected"}
+                  title={hud.ability ? `${hud.ability.name} — ${hud.ability.detail} (C)` : "No tower selected"}
                   onClick={() => {
                     unlockAudio();
                     engine.useAbility();
@@ -1647,6 +1648,7 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
           {hud.objective.complete ? " · held" : ` · +${hud.objective.reward}g`}
         </p>
         <p className="desk-meta">Rite · {hud.riteName}</p>
+        {hud.omen && <p className="desk-meta">Omen · {hud.omen.name}</p>}
         {hud.campLabel && <p className="desk-meta">Camp · {hud.campLabel}</p>}
       </section>
       <section className="desk-card">
@@ -1795,6 +1797,13 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
           <span className="intel-kicker">Boss</span>
           {MAPS[hud.mapIndex]?.boss?.name ?? "The Emberlord"}
           <small>{MAPS[hud.mapIndex]?.boss?.title ?? "walker of roads"}</small>
+        </p>
+      )}
+      {hud.omen && (
+        <p className="threat-omen" style={{ ["--omen-color" as string]: hud.omen.color }}>
+          <span className="intel-kicker">Omen</span>
+          {hud.omen.name}
+          <small>{hud.omen.detail}</small>
         </p>
       )}
       {!intelOpen && hud.phase === "ready" && hud.lastResult && <CompactWaveRecap result={hud.lastResult} />}
@@ -1984,6 +1993,7 @@ function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
           ? `Order held · +${result.orderPayout}g · chain ${result.orderChain}`
           : "Order missed · chain reset"}
       </div>
+      {result.omen && <div className="wave-recap-omen">Omen · {result.omen}</div>}
     </div>
   );
 }
@@ -2169,23 +2179,28 @@ function Overlay({
 function ShopList({
   items,
   relics,
+  sets,
   gold,
 }: {
   items: HudSnap["shopItems"];
   relics: RelicId[];
+  sets: HudSnap["sets"];
   gold: number;
 }) {
   return (
     <div className="grid w-full grid-cols-2 gap-1.5 text-left md:grid-cols-3">
       {items.map((item) => {
         const owned = relics.includes(item.id);
+        const completing = sets.filter(
+          (set) => !set.active && set.relics.includes(item.id) && set.relics.every((id) => id === item.id || relics.includes(id)),
+        );
         return (
           <button
             key={item.id}
             type="button"
             disabled={owned || gold < item.cost}
             onClick={() => engine.buyRelic(item.id)}
-            aria-label={`${item.name}, ${owned ? "held" : `${item.cost} gold`}. ${item.blurb}`}
+            aria-label={`${item.name}, ${owned ? "held" : `${item.cost} gold`}. ${item.blurb}${completing.length ? ` Completes the ${completing[0].name} set.` : ""}`}
             className={`pressable plaque relic-card px-3 py-2.5 text-left ${owned ? "opacity-45" : ""}`}
             data-held={owned}
           >
@@ -2197,6 +2212,7 @@ function ShopList({
               <span className="shrink-0 text-xs text-copper">{owned ? "Held" : `${item.cost}g`}</span>
             </span>
             <span className="mt-0.5 block text-[11px] leading-snug text-dust">{item.blurb}</span>
+            {completing.length > 0 && <span className="relic-set-hint">Set · {completing[0].name}</span>}
           </button>
         );
       })}

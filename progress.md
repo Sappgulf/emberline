@@ -265,3 +265,14 @@ Original prompt: ok keep working. more upgrades across the game
 - Gameplay/visual further: killing a boss now pays a watch mark, boss waves telegraph at the gate during the ready phase, the threat forecast names the incoming boss, towers show a rotating charge aura while Volley/Siege/Overcharge/Brace are loaded, and low lives pulse the header count.
 - Mobile: selecting a tower no longer shrinks the board band — the selected-tower bar collapsed to a single six-button row, growing the phone board from 208×144 to 273×189.
 - Verified: 134 tests (6 new), typecheck, lint, production build, and `git diff --check` pass; live browser checks covered Glass Marsh, Keep Stair, and The Low Road at 1440×900 and 390×844 with zero console errors.
+
+## 2026-09-11 — night omens, set hints, and forecast polish
+
+- Completed: added deterministic night omens from the third road on (and always in the Long Night) — Bitter wind, Blood tide, Hollow moon, and Ash fall — each with real stat effects on creep health/speed, bounties, tower damage/rate/reach, and burn life, plus a board tint and a forecast chip so the player can plan before sending.
+- Completed: wave recaps now name the omen that was weathered; the watch desk lists the active omen; the Orders guide explains them.
+- Completed: the night market hints when a relic completes a set (`Set · Winter vigil` under the card), and completing one fires a banner, ring, float, and objective sting.
+- Completed: abilities no longer waste a cast while a charge (Volley/Siege/Overcharge/Brace) is still loaded; the ability tooltip names the C hotkey.
+- Completed: boss bar animates in, the codex chronicle gained omen, elite, and named-boss pages, and charge auras respect reduced motion.
+- Fixed while wiring: the omen gate now keeps both opening roads clean instead of leaking omens onto waves 3+ of the first two maps.
+- Verified in the live browser at 1440x900 and 390x844: Glass Marsh forecast shows `Omen Bitter wind` with accurate copy and no overflow; a full River Ford hold reached the night market at 2048g, showed `Set · Winter vigil` on Witch salt, and activated the set chip after purchase; zero browser diagnostics.
+- Source gates: 139 tests (5 new), typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
