@@ -54,6 +54,14 @@ describe("maps and shop", () => {
     assert.match(e.renderText(), /"field":\{"label":"Lantern bends"/);
   });
 
+  it("gives every road a fall and a rise", () => {
+    for (const map of MAPS) {
+      assert.ok(map.defeat.line.length > 20, `${map.id} needs a defeat beat`);
+      assert.ok(map.defeat.speaker.length > 0);
+      assert.ok(map.victory.line.length > 20, `${map.id} needs a victory beat`);
+    }
+  });
+
   it("keeps every map path axis-aligned and on the board", () => {
     for (const map of MAPS) {
       assert.ok(map.path.length >= 2);
@@ -135,6 +143,16 @@ describe("EmberEngine", () => {
     e.lives = 5;
     e.notify();
     assert.equal(e.hud().hornCost, Math.max(20, Math.floor(45 * 0.65)));
+  });
+
+  it("hands the HUD a defeat beat and a dawn epilogue", () => {
+    const e = play();
+    e.phase = "lost";
+    e.notify();
+    assert.equal(e.hud().story?.line, MAPS[0].defeat.line);
+    e.phase = "won";
+    e.notify();
+    assert.equal(e.hud().story?.line, MAPS[0].victory.line);
   });
 
   it("strong aim prefers a shaman over a grub", () => {

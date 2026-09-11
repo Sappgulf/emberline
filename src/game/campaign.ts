@@ -76,6 +76,7 @@ export interface MapDef {
   waves: WaveSpawn[][];
   briefing: StoryBeat;
   victory: StoryBeat;
+  defeat: StoryBeat;
   asides: string[];
   theme: MapTheme;
   profile: MapProfile;
@@ -298,6 +299,11 @@ export const MAPS: MapDef[] = [
       role: "Scout",
       line: "The pines ahead are singing. Wisps. Brother Ash has a stall if you still have coin.",
     },
+    defeat: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The gate is open and the Low Road is theirs. Set the packets again — the bend is still our best friend.",
+    },
     asides: [
       "First blood on the Low Road.",
       "Hold the two bends.",
@@ -402,6 +408,11 @@ export const MAPS: MapDef[] = [
       speaker: "Brother Ash",
       role: "Keep steward",
       line: "The stair is next. Buy glass if the bends feel short. Buy salt — the cloaks keep singing, but he does not walk yet.",
+    },
+    defeat: {
+      speaker: "Lumen Quill",
+      role: "Scout",
+      line: "Fog ate the arrows. Next time spark the skyline before they reach the switch.",
     },
     asides: [
       "The high switch. Runners and wisps together.",
@@ -513,6 +524,11 @@ export const MAPS: MapDef[] = [
       speaker: "Lumen Quill",
       role: "Scout",
       line: "The keep stands. The river is waking. Buy salt and glass. The ford does not forgive clumps.",
+    },
+    defeat: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The latch gave. Link the line at the stair and they cannot climb two abreast.",
     },
     asides: [
       "The stair begins.",
@@ -627,6 +643,11 @@ export const MAPS: MapDef[] = [
       role: "Watch-captain",
       line: "The ford holds. The copse still burns. One more latch — then dawn.",
     },
+    defeat: {
+      speaker: "Brother Ash",
+      role: "Keep steward",
+      line: "The ford ran red. Keep the banks choked and the wet ones never finish the crossing.",
+    },
     asides: [
       "The water takes tiles. Banks drag the pack.",
       "Wisps over the channel.",
@@ -729,6 +750,11 @@ export const MAPS: MapDef[] = [
       speaker: "Captain Sera Venn",
       role: "Watch-captain",
       line: "Dawn. Emberford keeps the watch. Take the relics and walk it again if the night still itches.",
+    },
+    defeat: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The last fire scattered. Crown a tower on the turn and burn the road twice.",
     },
     asides: [
       "The last fire. Air first.",
@@ -845,6 +871,11 @@ export const MAPS: MapDef[] = [
       role: "Scout",
       line: "The glass is quiet. The hollow still breathes ash beyond the fen — we are not done.",
     },
+    defeat: {
+      speaker: "Lumen Quill",
+      role: "Scout",
+      line: "The tide drank the line. Set your towers on the glass and let the reflection do the work.",
+    },
     asides: [
       "The marsh wakes. Read the waterline.",
       "Plate on the mirror road.",
@@ -951,6 +982,11 @@ export const MAPS: MapDef[] = [
       speaker: "Captain Sera Venn",
       role: "Watch-captain",
       line: "The ravine is quiet. One span left — the wicker does not hold still.",
+    },
+    defeat: {
+      speaker: "Brother Ash",
+      role: "Keep steward",
+      line: "The hollow ate the coals. Feed it cinder and oil — the draw rewards a patient fire.",
     },
     asides: [
       "Ash in the mouth. Feed the coals.",
@@ -1063,6 +1099,11 @@ export const MAPS: MapDef[] = [
       speaker: "Lumen Quill",
       role: "Scout",
       line: "The span is ours. Eight roads. Emberford has a watch through every dark — and the dawn is finally ours.",
+    },
+    defeat: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The span tore. Pin the draft with frost and thorns, and the dawn is one hold away.",
     },
     asides: [
       "The last arch. Pin the draft.",

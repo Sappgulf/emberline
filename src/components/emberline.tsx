@@ -292,9 +292,8 @@ export function Emberline() {
         : hud.hornCost === 0
         ? "Use free horn"
         : `Use horn for ${hud.hornCost} gold`;
-  const hornValue = hud.phase !== "wave" ? "Wave only" : hud.hornCd > 0 ? `${Math.ceil(hud.hornCd)}s` : hud.hornCost === 0 ? "Free" : `${hud.hornCost}g`;
+  const hornValue = hud.phase !== "wave" ? "Wave" : hud.hornCd > 0 ? `${Math.ceil(hud.hornCd)}s` : hud.hornCost === 0 ? "Free" : `${hud.hornCost}g`;
   const stallHint = hud.wave < 1 ? "Stall opens after the first wave" : hud.phase !== "ready" ? "Stall opens between waves" : "Open roadside stall";
-  const stallValue = hud.wave < 1 ? "After wave 1" : hud.phase !== "ready" ? "Between waves" : "Open";
   const mendHint = hud.lives >= hud.maxLives ? "The keep is already at full strength" : hud.gold < hud.mendCost ? `Mend costs ${hud.mendCost} gold` : `Mend the keep for ${hud.mendCost} gold`;
   const mendValue = hud.lives >= hud.maxLives ? "Full" : `${hud.mendCost}g`;
   const waveProgressLabel = hud.phase === "wave" ? `Wave ${hud.wave}` : hud.wave > 0 ? `Wave ${hud.wave} held` : "First watch";
@@ -324,7 +323,7 @@ export function Emberline() {
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {hud.bannerText ?? ""}
       </p>
-      <header className="watch-bar flex shrink-0 items-stretch">
+      <header className="watch-bar flex shrink-0 items-stretch" data-phase={hud.phase}>
         <div className="watch-title flex min-w-0 flex-1 flex-col justify-center px-4 py-2">
           <span className="watch-overline">Duskward watch</span>
           <p className="watch-map-name font-display text-xl leading-none text-copper">
@@ -340,7 +339,7 @@ export function Emberline() {
           )}
         </div>
         {hud.phase !== "title" && (
-          <>
+          <div className="watch-vitals">
             <div className="watch-progress" data-live={hud.phase === "wave"} aria-label={`${waveProgressLabel} progress`}>
               <div className="watch-progress-label">
                 <span>{waveProgressLabel}</span>
@@ -360,24 +359,24 @@ export function Emberline() {
                 <span style={{ width: `${Math.round(hud.waveProgress * 100)}%` }} />
               </div>
             </div>
-            <div className="watch-stat" title="Lives">
+            <div className="watch-stat" data-stat="lives" title="Lives">
               <img className="hud-ico" src="/ui/icon-heart.png" alt="" />
               <span className={`n ${hud.lives <= 5 ? "hurt" : ""}`}>{hud.lives}</span>
               <span className="u">lives</span>
             </div>
-            <div className="watch-stat" title="Gold">
+            <div className="watch-stat" data-stat="gold" title="Gold">
               <img className="hud-ico" src="/ui/icon-coin.png" alt="" />
               <span className="n gold">{hud.gold}</span>
               <span className="u">gold</span>
             </div>
-            <div className="watch-stat" title="Wave">
+            <div className="watch-stat" data-stat="wave" title="Wave">
               <img className="hud-ico" src="/ui/icon-wave.png" alt="" />
               <span className="n">
                 {hud.phase === "wave" ? hud.remaining : `${hud.wave}/${hud.totalWaves}`}
               </span>
               <span className="u">{hud.phase === "wave" ? "left" : "wave"}</span>
             </div>
-          </>
+          </div>
         )}
         <div className="watch-actions flex items-center gap-1 px-3">
           <button
@@ -660,6 +659,21 @@ export function Emberline() {
                       Orders
                     </button>
                   </div>
+                  <p className="keep-whisper">“The road bends. The watch holds.” — Sera Venn, watch-captain</p>
+                  <div className="keep-features" aria-label="Watch craft">
+                    <span>
+                      <b>Plant</b>Packets on grass, never the dirt.
+                    </span>
+                    <span>
+                      <b>Forge</b>Power, tempo, or reach — highest sets the form.
+                    </span>
+                    <span>
+                      <b>Bond</b>Pair towers for linked fire and richer lines.
+                    </span>
+                    <span>
+                      <b>Hold</b>Read the forecast, then send the wave.
+                    </span>
+                  </div>
                 </div>
                 <div className="keep-side">
                   <KeepRouteBoard hud={hud} />
@@ -703,6 +717,10 @@ export function Emberline() {
               dimmer
             >
               <p className="max-w-2xl text-sm leading-relaxed text-parchment">{hud.story.line}</p>
+              <p className="brief-route">
+                <span className="intel-kicker">Road {hud.mapIndex + 1} of {hud.mapTotal}</span>
+                {hud.route[hud.mapIndex]?.place ?? hud.mapName}
+              </p>
               <FieldNote field={hud.field} markerId={hud.route[hud.mapIndex]?.id} />
               <RitePicker rite={hud.rite} />
               <BriefWave hud={hud} />
@@ -744,8 +762,22 @@ export function Emberline() {
           )}
 
           {hud.phase === "lost" && (
-            <Overlay kicker="Breach" title="The keep fell">
-              <p className="text-sm text-dust">Wave {hud.wave} reached the gate on {hud.mapName}.</p>
+            <Overlay kicker="Breach" title="The keep fell" emblem>
+              <p className="text-sm text-dust">
+                Wave {hud.wave} of {hud.totalWaves} reached the gate on {hud.mapName}. {hud.lives > 0 ? `${hud.lives} ${hud.lives === 1 ? "life" : "lives"} left in the keep.` : "The gate is open."}
+              </p>
+              {hud.story && <StoryLine story={hud.story} />}
+              <div className="defeat-stats" aria-label="Watch state">
+                <span>
+                  <b>{hud.towerCount}</b> towers
+                </span>
+                <span>
+                  <b>{hud.gold}g</b> in the purse
+                </span>
+                <span>
+                  <b>{hud.wave}/{hud.totalWaves}</b> waves
+                </span>
+              </div>
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" className="pressable min-h-11 bg-copper px-6 text-sm font-semibold text-ink" onClick={() => engine.retryMap()}>
                   Hold this map
@@ -756,9 +788,13 @@ export function Emberline() {
           )}
 
           {hud.phase === "won" && (
-            <Overlay kicker="Dawn" title="The line held" surface="dawn">
+            <Overlay kicker="Dawn" title="The line held" surface="dawn" emblem>
+              {hud.story ? (
+                <StoryLine story={hud.story} />
+              ) : (
+                <p className="text-sm text-dust">{hud.mapTotal} maps. Emberford still stands.</p>
+              )}
               {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
-              <p className="text-sm text-dust">{hud.mapTotal} maps. Emberford still stands.</p>
               <WatchSummary hud={hud} />
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.keepRelics()}>
@@ -969,7 +1005,7 @@ export function Emberline() {
                 }}
               >
                 <span className="command-label">Scout</span>
-                <span className="command-value">{hud.phase !== "wave" ? "Wave only" : hud.scoutReady ? "Ready" : "Spent"}</span>
+                <span className="command-value">{hud.phase !== "wave" ? "Wave" : hud.scoutReady ? "Ready" : "Spent"}</span>
               </button>
               <button
                 type="button"
@@ -995,7 +1031,7 @@ export function Emberline() {
                 onClick={() => engine.openStall()}
               >
                 <span className="command-label">Stall</span>
-                <span className="command-value">{stallValue}</span>
+                <span className="command-value">{hud.wave < 1 ? "W1+" : hud.phase !== "ready" ? "Between" : "Open"}</span>
               </button>
               <button
                 type="button"
@@ -1435,7 +1471,7 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
   const [intelOpen, setIntelOpen] = useState(true);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 640px)");
+    const media = window.matchMedia("(max-width: 900px)");
     const sync = () => setIntelOpen(!media.matches);
     sync();
     media.addEventListener("change", sync);
@@ -1443,7 +1479,7 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
   }, []);
 
   useEffect(() => {
-    if (hud.phase === "wave" && window.matchMedia("(max-width: 640px)").matches) {
+    if (hud.phase === "wave" && window.matchMedia("(max-width: 900px)").matches) {
       setIntelOpen(false);
     }
   }, [hud.phase]);
@@ -1686,6 +1722,17 @@ function holdLabel(hold: string | undefined) {
   if (hold === "frayed") return "Line frayed";
   if (hold === "shaken") return "Keep shaken";
   return "Road clear";
+}
+
+function StoryLine({ story }: { story: NonNullable<HudSnap["story"]> }) {
+  return (
+    <blockquote className="story-line">
+      <p>{story.line}</p>
+      <cite>
+        {story.speaker} · {story.role}
+      </cite>
+    </blockquote>
+  );
 }
 
 function TowerIntel({ hud }: { hud: HudSnap }) {

@@ -64,7 +64,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     actors.push({
       y: t.r + 0.5,
       z: 0,
-      draw: () => drawTower(ctx, t, cell, t.id === engine.selectedId, engine.time),
+      draw: () => drawTower(ctx, t, cell, t.id === engine.selectedId, engine.time, !engine.reducedMotion),
     });
   }
   for (const c of engine.creeps) {
@@ -78,15 +78,30 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   for (const a of actors) a.draw();
 
   for (const burn of engine.burns) {
+    const strength = Math.max(0.1, burn.life / 2.4);
     ctx.save();
-    ctx.globalAlpha = Math.max(0.1, burn.life / 2.4) * 0.28;
+    ctx.globalAlpha = strength * 0.24;
     ctx.fillStyle = EMBER;
     ctx.beginPath();
     ctx.ellipse(burn.x * cell, burn.y * cell, burn.r * cell * 0.85, burn.r * cell * 0.42, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = strength * 0.45;
+    ctx.strokeStyle = "rgba(58,32,18,0.9)";
+    ctx.lineWidth = Math.max(1, cell * 0.03);
+    ctx.beginPath();
+    ctx.ellipse(burn.x * cell, burn.y * cell, burn.r * cell * 0.95, burn.r * cell * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    if (!engine.reducedMotion) {
+      const glow = 0.35 + Math.sin(engine.time * 9 + burn.x * 3) * 0.18;
+      ctx.globalAlpha = strength * glow;
+      ctx.fillStyle = "#ffd9a0";
+      ctx.beginPath();
+      ctx.arc(burn.x * cell + Math.sin(engine.time * 6 + burn.y) * cell * 0.08, burn.y * cell, cell * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
-  for (const s of engine.shots) drawShot(ctx, s, cell);
+  for (const s of engine.shots) drawShot(ctx, s, cell, !engine.reducedMotion);
   for (const b of engine.beams) {
     ctx.save();
     const a = Math.max(0, b.life / b.max);
@@ -111,6 +126,19 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     ctx.globalAlpha = a * 0.45;
     ctx.lineWidth = 8;
     ctx.stroke();
+    if (!engine.reducedMotion) {
+      ctx.globalAlpha = a * 0.7;
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "#fff8e0";
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#fff3c8";
+      ctx.beginPath();
+      ctx.arc(x2, y2, cell * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
   drawParticles(ctx, engine, cell);
@@ -144,6 +172,10 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   ctx.fillRect(0, 0, w, h);
   if (night && !engine.reducedMotion) {
     ctx.fillStyle = "rgba(24, 28, 48, 0.12)";
+    ctx.fillRect(0, 0, w, h);
+  }
+  if (engine.hitstop > 0 && !engine.reducedMotion) {
+    ctx.fillStyle = `rgba(255, 238, 196, ${Math.min(0.1, engine.hitstop * 1.6)})`;
     ctx.fillRect(0, 0, w, h);
   }
   ctx.strokeStyle = "rgba(58,68,50,0.9)";
@@ -645,6 +677,10 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
     ctx.beginPath();
     ctx.arc((engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell, range * cell, 0, Math.PI * 2);
     ctx.stroke();
+    const ghost = 0.42 + Math.sin(engine.time * 4) * 0.12;
+    drawSprite(ctx, engine.selectedKind, (engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell + cell * 0.12, cell * 0.82, {
+      alpha: ghost,
+    });
   }
 }
 
@@ -837,7 +873,36 @@ function drawFormKit(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, 
   }
 }
 
-function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, selected: boolean, time: number) {
+function drawMuzzleFlash(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, motion: boolean) {
+  if (!motion || tower.recoil <= 0.32) return;
+  const angle = tower.visAngle ?? tower.angle;
+  const flash = Math.min(1, (tower.recoil - 0.32) / 0.68);
+  const mx = Math.cos(angle) * cell * 0.42;
+  const my = Math.sin(angle) * cell * 0.42 - cell * 0.06;
+  const warm = tower.kind === "frost" ? "106,168,180" : tower.kind === "bramble" ? "122,154,88" : "240,160,70";
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.translate(mx, my);
+  ctx.rotate(angle);
+  ctx.globalAlpha = flash * 0.9;
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, cell * 0.34);
+  glow.addColorStop(0, "rgba(255,240,200,0.95)");
+  glow.addColorStop(0.4, `rgba(${warm},0.55)`);
+  glow.addColorStop(1, `rgba(${warm},0)`);
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, cell * 0.34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,244,210,0.85)";
+  ctx.lineWidth = Math.max(1, cell * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(cell * 0.04, 0);
+  ctx.lineTo(cell * (0.2 + flash * 0.12), 0);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, selected: boolean, time: number, motion = true) {
   const x = (tower.c + 0.5) * cell;
   const y = (tower.r + 0.5) * cell;
   const pop = easeOutBack(Math.min(1, tower.build));
@@ -875,6 +940,7 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
     ctx.globalAlpha = 1;
   }
   drawSprite(ctx, tower.kind, 0, cell * 0.12, size);
+  drawMuzzleFlash(ctx, tower, cell, motion);
   drawFormKit(ctx, tower, cell, form, time);
   drawUpgradeForge(ctx, tower, cell, time);
   for (let i = 0; i < MAX_UPGRADE; i++) {
@@ -919,10 +985,12 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
       ? Math.sin(creep.progress * 6) * 3
       : Math.sin(creep.progress * 10) * 1.2;
   const stretch = 1 + Math.sin(creep.progress * 10) * (creep.kind === "hound" || creep.kind === "ashfang" ? 0.08 : 0.03);
+  const spawnPop = creep.alive ? 0.72 + Math.min(1, creep.spawn) * 0.28 : 1;
+  const deathPop = creep.alive ? 1 : 1 + (1 - fade) * 0.4;
   ctx.save();
   ctx.translate(px, py + bob);
   ctx.rotate(creep.kind === "wisp" ? 0 : creep.facing);
-  ctx.scale(creep.squash, creep.squash * stretch);
+  ctx.scale(creep.squash * spawnPop * deathPop, creep.squash * stretch * spawnPop * deathPop);
   ctx.globalAlpha = fade * (creep.alive ? Math.max(0.4, creep.spawn) : 1);
   if (creep.kind === "lord" && creep.alive) {
     ctx.globalAlpha = 0.22 * fade;
@@ -1073,6 +1141,7 @@ function drawShot(
     ty?: number;
   },
   cell: number,
+  motion = true,
 ) {
   const loft = loftOf(shot);
   const x = shot.x * cell;
@@ -1089,6 +1158,28 @@ function drawShot(
             ? "shot-bramble"
             : null;
   const img = key ? spr(key) : null;
+  if (motion && shot.kind !== "mortar" && shot.kind !== "cinder") {
+    const prevX = shot.px * cell;
+    const prevY = shot.py * cell;
+    const trail = ctx.createLinearGradient(prevX, prevY, x, y);
+    const tint = shot.kind === "frost" ? "106,168,180" : "232,197,106";
+    trail.addColorStop(0, `rgba(${tint},0)`);
+    trail.addColorStop(1, `rgba(${tint},0.72)`);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = trail;
+    ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(1.5, cell * 0.055);
+    ctx.beginPath();
+    ctx.moveTo(prevX, prevY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${tint},0.6)`;
+    ctx.beginPath();
+    ctx.arc(x, y, cell * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(shot.kind === "mortar" ? ang * 0.18 : ang);
@@ -1159,37 +1250,106 @@ function drawShot(
 
 function drawParticles(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
   for (const p of engine.particles) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, p.life / p.max);
-    ctx.fillStyle = p.color;
-    ctx.strokeStyle = p.color;
+    const t = Math.max(0, p.life / p.max);
     const rad = Math.max(1, p.size * cell);
-    ctx.beginPath();
+    const x = p.x * cell;
+    const y = p.y * cell;
     if (p.kind === "ring") {
-      ctx.globalAlpha *= 0.7;
-      ctx.lineWidth = 2;
-      ctx.arc(p.x * cell, p.y * cell, rad * (1.2 + (1 - p.life / p.max) * 1.6), 0, Math.PI * 2);
+      ctx.save();
+      ctx.globalAlpha = t * 0.72;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = Math.max(1.5, cell * 0.04);
+      ctx.beginPath();
+      ctx.arc(x, y, rad * (1.2 + (1 - t) * 1.7), 0, Math.PI * 2);
       ctx.stroke();
-    } else {
-      ctx.arc(p.x * cell, p.y * cell, rad, 0, Math.PI * 2);
-      ctx.fill();
+      if (!engine.reducedMotion && t > 0.45) {
+        ctx.globalAlpha = (t - 0.45) * 1.6;
+        ctx.globalCompositeOperation = "lighter";
+        ctx.strokeStyle = "#fff6dc";
+        ctx.lineWidth = Math.max(1, cell * 0.02);
+        ctx.stroke();
+      }
+      ctx.restore();
+      continue;
     }
+    if (p.kind === "shard") {
+      ctx.save();
+      ctx.globalAlpha = t;
+      ctx.translate(x, y);
+      ctx.rotate(p.rot + (1 - t) * 2.4);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(rad * 2.4, 0);
+      ctx.lineTo(0, -rad * 0.72);
+      ctx.lineTo(-rad * 1.5, 0);
+      ctx.lineTo(0, rad * 0.72);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (p.kind === "smoke") {
+      ctx.save();
+      ctx.globalAlpha = t * 0.4;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(x, y, rad * (1.4 + (1 - t) * 0.9), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (p.kind === "spark" || p.kind === "ember" || p.kind === "mote") {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = t * 0.85;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(x, y, rad * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = t * 0.55;
+      ctx.beginPath();
+      ctx.arc(x, y, rad * 1.35, 0, Math.PI * 2);
+      ctx.fill();
+      if (p.kind === "ember" && cell > 20) {
+        ctx.globalAlpha = t * 0.5;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = Math.max(1, rad * 0.8);
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - p.vx * cell * 0.06, y - p.vy * cell * 0.06);
+        ctx.stroke();
+      }
+      ctx.restore();
+      continue;
+    }
+    ctx.save();
+    ctx.globalAlpha = t;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 }
 
 function drawFloaters(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
   for (const f of engine.floaters) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, f.life / f.max);
-    ctx.fillStyle = f.color;
-    ctx.font = `700 ${Math.min(16, Math.max(11, cell * 0.14))}px Figtree, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.shadowColor = "rgba(18,22,15,0.8)";
-    ctx.shadowBlur = 4;
+    const t = f.life / f.max;
+    const age = 1 - t;
+    const pop = age < 0.16 ? 0.72 + (age / 0.16) * 0.34 : 1.06 - Math.min(1, (age - 0.16) / 0.84) * 0.08;
     const fx = Math.min(COLS * cell - 8, Math.max(8, f.x * cell));
     const fy = Math.min(ROWS * cell - 8, Math.max(14, f.y * cell));
-    ctx.fillText(f.text, fx, fy);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, t * 1.6);
+    ctx.translate(fx, fy);
+    ctx.scale(pop, pop);
+    ctx.font = `700 ${Math.min(16, Math.max(11, cell * 0.14))}px Figtree, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(18,22,15,0.85)";
+    ctx.strokeText(f.text, 0, 0);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, 0, 0);
     ctx.restore();
   }
 }
@@ -1197,13 +1357,20 @@ function drawFloaters(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: 
 function drawBanner(ctx: CanvasRenderingContext2D, engine: EmberEngine, w: number, cell: number) {
   if (!engine.banner) return;
   const t = engine.banner.life / engine.banner.max;
+  const enter = Math.min(1, (1 - t) * 4.5);
+  const pop = 0.82 + enter * 0.18;
   ctx.save();
   ctx.globalAlpha = Math.min(1, t * 2);
+  ctx.translate(w / 2, cell * 0.7);
+  ctx.scale(pop, pop);
   ctx.fillStyle = PARCHMENT;
   ctx.font = `700 ${Math.max(16, cell * 0.38)}px Fraunces, serif`;
   ctx.textAlign = "center";
-  ctx.shadowColor = "rgba(18,22,15,0.85)";
-  ctx.shadowBlur = 10;
-  ctx.fillText(engine.banner.text, w / 2, cell * 0.7);
+  ctx.lineWidth = Math.max(3, cell * 0.09);
+  ctx.strokeStyle = "rgba(18,22,15,0.85)";
+  ctx.strokeText(engine.banner.text, 0, 0);
+  ctx.shadowColor = "rgba(224,120,56,0.55)";
+  ctx.shadowBlur = 12;
+  ctx.fillText(engine.banner.text, 0, 0);
   ctx.restore();
 }

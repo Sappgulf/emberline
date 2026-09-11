@@ -252,7 +252,7 @@ export interface Particle {
   max: number;
   size: number;
   color: string;
-  kind: "spark" | "smoke" | "ember" | "ring" | "mote";
+  kind: "spark" | "smoke" | "ember" | "ring" | "mote" | "shard";
   rot: number;
 }
 
@@ -798,7 +798,14 @@ export class EmberEngine {
       mapIndex: this.mapIndex,
       mapTotal: MAPS.length,
       relics: [...this.relics],
-      story: this.phase === "brief" ? map.briefing : this.phase === "shop" ? map.victory : null,
+      story:
+        this.phase === "brief"
+          ? map.briefing
+          : this.phase === "shop" || this.phase === "won"
+            ? map.victory
+            : this.phase === "lost"
+              ? map.defeat
+              : null,
       shopItems: shopFor(this.mapIndex, this.wave),
       moving: this.movingId != null,
       moveCost: this.moveCost(),
@@ -1485,6 +1492,8 @@ export class EmberEngine {
       this.selectedId = mover.id;
       this.banner = null;
       this.burst(c + 0.5, r + 0.5, "#d4a054", 10, "spark");
+      this.ring(c + 0.5, r + 0.5, "#d4a054");
+      this.burst(c + 0.5, r + 0.62, "#4a3a22", 3, "smoke");
       const bond = this.bondFor(mover);
       this.float(c + 0.5, r + 0.1, bond ? `${bond.label} link` : "Moved", bond ? "#6aa8b4" : "#d4a054");
       sfx.place();
@@ -1548,6 +1557,8 @@ export class EmberEngine {
     this.lastPlaceT = this.time;
     sfx.place();
     this.burst(c + 0.5, r + 0.5, "#d4a054", 4, "spark");
+    this.ring(c + 0.5, r + 0.5, "#d4a054");
+    this.burst(c + 0.5, r + 0.62, "#4a3a22", 4, "smoke");
     const bond = this.bondFor(tower);
     if (bond) this.float(c + 0.5, r + 0.15, `${bond.label} +8%`, "#6aa8b4");
     else if (this.lineBonus(tower) > 1) this.float(c + 0.5, r + 0.15, "Lined", "#d4a054");
@@ -1756,6 +1767,10 @@ export class EmberEngine {
     const boss = kind === "lord";
     this.burst(start.x, start.y, "#e07838", boss ? 14 : 3, "ember");
     if (boss) {
+      this.poof(start.x, start.y, "#e07838", 1.6);
+      this.ring(start.x, start.y, "#e07838");
+      this.ring(start.x, start.y, "#d4a054");
+      this.trauma = Math.min(1, this.trauma + 0.22);
       this.float(start.x, start.y - 0.65, "EMBERLORD", "#e07838");
       this.banner = { text: "Emberlord approaching", life: 1.8, max: 1.8 };
       sfx.boss();
@@ -1799,6 +1814,29 @@ export class EmberEngine {
     });
   }
 
+  poof(x: number, y: number, color: string, power = 1) {
+    if (this.reducedMotion) return;
+    this.burst(x, y, color, Math.round(8 * power), "spark");
+    if (this.particles.length > 150) return;
+    const shards = Math.round(4 * power);
+    for (let i = 0; i < shards; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = 0.7 + Math.random() * 1.5;
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s - 0.35,
+        life: 0.32 + Math.random() * 0.26,
+        max: 0.58,
+        size: 0.045 + Math.random() * 0.05,
+        color,
+        kind: "shard",
+        rot: a,
+      });
+    }
+  }
+
   float(x: number, y: number, text: string, color: string) {
     if (this.floaters.length > 36) this.floaters.splice(0, 12);
     this.floaters.push({ x, y, text, life: 0.85, max: 0.85, color });
@@ -1838,7 +1876,7 @@ export class EmberEngine {
     if (creep.hp <= 0 && creep.alive) {
       creep.alive = false;
       creep.death = 0.28;
-      let gold = Math.round(
+      const gold = Math.round(
         (CREEPS[creep.kind].gold +
           this.towers.filter((t) => this.formOf(t) >= 4).length +
           (this.wave % 4 === 0 ? 2 : 0)) *
@@ -1876,10 +1914,12 @@ export class EmberEngine {
         }
       }
       this.float(creep.x, creep.y, `+${gold}`, "#d4a054");
-      this.burst(creep.x, creep.y, creep.kind === "lord" ? "#e07838" : "#5a7a48", creep.kind === "lord" ? 22 : 12, "spark");
-      this.burst(creep.x, creep.y, "#3a4432", 6, "smoke");
+      const deathColor = creep.kind === "lord" ? "#e07838" : creep.kind === "shell" ? "#7a8470" : "#5a7a48";
+      this.poof(creep.x, creep.y, deathColor, creep.kind === "lord" ? 2.4 : creep.kind === "shell" ? 1.4 : 1);
+      this.burst(creep.x, creep.y, "#3a4432", creep.kind === "lord" ? 12 : 6, "smoke");
       this.ring(creep.x, creep.y, "#d4a054");
       if (creep.kind === "lord") {
+        this.ring(creep.x, creep.y, "#e07838");
         this.trauma = Math.min(1, this.trauma + 0.55);
         this.hitstop = Math.max(this.hitstop, 0.08);
       }
@@ -2103,7 +2143,12 @@ export class EmberEngine {
   impact(shot: Shot, x: number, y: number) {
     const color = shot.kind === "frost" ? "#6aa8b4" : shot.kind === "mortar" ? "#e07838" : "#d4a054";
     this.burst(x, y, color, shot.kind === "mortar" ? 5 : shot.splash > 0 ? 8 : 5, "spark");
-    if (shot.kind !== "mortar") this.ring(x, y, color);
+    if (shot.kind === "mortar") {
+      this.ring(x, y, "#e07838");
+      this.poof(x, y, "#e07838", 0.9);
+    } else {
+      this.ring(x, y, color);
+    }
     if (shot.splash > 0) {
       this.burst(x, y, "#4a3a22", shot.kind === "mortar" ? 3 : 6, "smoke");
       const r2 = shot.splash * shot.splash;
@@ -2477,19 +2522,23 @@ export class EmberEngine {
       }
     }
     this.moteAcc += dt;
-    if (!this.reducedMotion && !this.paused && this.moteAcc > 0.18 && this.particles.length < 140) {
+    if (!this.reducedMotion && !this.paused && this.moteAcc > 0.14 && this.particles.length < 140) {
       this.moteAcc = 0;
-      const gate = this.waypoint(0);
+      const node = this.path[Math.floor(Math.random() * Math.max(1, this.path.length - 1))] ?? this.path[0];
+      const drift = Math.random();
+      const px = drift < 0.42 ? this.waypoint(0).x : node.c + 0.5;
+      const py = drift < 0.42 ? this.waypoint(0).y : node.r + 0.5;
+      const ember = drift > 0.72;
       this.particles.push({
-        x: gate.x + (Math.random() - 0.5) * 0.5,
-        y: gate.y + (Math.random() - 0.5) * 0.3,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: -0.45 - Math.random() * 0.4,
-        life: 1.4,
-        max: 1.4,
-        size: 0.04 + Math.random() * 0.04,
-        color: "#e07838",
-        kind: "mote",
+        x: px + (Math.random() - 0.5) * 0.6,
+        y: py + (Math.random() - 0.5) * 0.4,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: ember ? -0.35 - Math.random() * 0.35 : -0.5 - Math.random() * 0.4,
+        life: ember ? 1.2 + Math.random() * 0.6 : 1.4,
+        max: 1.8,
+        size: 0.03 + Math.random() * 0.04,
+        color: ember ? "#e07838" : "#d4a054",
+        kind: ember ? "ember" : "mote",
         rot: 0,
       });
     }
