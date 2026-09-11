@@ -78,6 +78,13 @@ Original prompt: ok keep working. more upgrades across the game
 
 ## Loose ends
 
+## 2026-09-10 — Glass Marsh campaign expansion
+
+- Generated with the built-in imagegen skill: a transparent forged-copper and moon-glass route seal for the new Glass Marsh campaign route; resized to `public/assets/sprites/route-glass-marsh-v1.png` and kept the original generation output outside the repo.
+- Added a sixth campaign map with six waves, a moonlit marsh theme, a unique Glass Tide field rule, waterline objective, route marker, briefing, victory beat, and threat pacing that mixes air, armor, shamans, hounds, and the Emberlord.
+- Added shared waterline placement logic to the engine, a Canvas telegraph for eligible glass-lane tiles, range/power combat modifiers, dynamic six-map title/finish copy, and a six-column responsive route rail.
+- Added focused engine coverage for the new map contract and waterline rule; browser and source gates follow after the integration pass.
+
 ## 2026-09-06 — full visual and gameplay audit pass
 
 - Audited the live title, briefing, ready, paused, active-wave, wave-recap, Bestiary, roadside-stall, relic-purchase, and compact command-deck states in the in-app browser.

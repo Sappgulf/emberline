@@ -554,7 +554,7 @@ export function Emberline() {
           {hud.phase === "title" && !hud.codex && !hud.campaign && (
             <Overlay kicker="Keep watch" title="Emberline" emblem>
               <p className="max-w-sm text-sm leading-relaxed text-dust">
-                Plant on grass. Line two towers. Hold five maps until dawn. Space to begin.
+                Plant on grass. Line two towers. Hold {hud.mapTotal} maps until dawn. Space to begin.
               </p>
               <WatchLedger hud={hud} />
               <div className="menu-actions">
@@ -635,7 +635,7 @@ export function Emberline() {
           {hud.phase === "won" && (
             <Overlay kicker="Dawn" title="The line held" surface="dawn">
               {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
-              <p className="text-sm text-dust">Five maps. Emberford still stands.</p>
+              <p className="text-sm text-dust">{hud.mapTotal} maps. Emberford still stands.</p>
               <WatchSummary hud={hud} />
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.keepRelics()}>

@@ -305,7 +305,7 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   min-height: 4.35rem;
   margin: 0;
   padding: 0.45rem 0.65rem;

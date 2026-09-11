@@ -22,9 +22,10 @@ function emptyGrass(e: EmberEngine): { c: number; r: number } {
 }
 
 describe("maps and shop", () => {
-  it("ships five maps ending at the copse", () => {
-    assert.equal(MAPS.length, 5);
+  it("ships six maps ending at the glass marsh", () => {
+    assert.equal(MAPS.length, 6);
     assert.equal(MAPS[4].id, "ember-copse");
+    assert.equal(MAPS[5].id, "glass-marsh");
     assert.ok(shopFor(1, 0).some((s) => s.id === "cord"));
     assert.ok(shopFor(2, 0).some((s) => s.id === "flint"));
   });
@@ -33,8 +34,8 @@ describe("maps and shop", () => {
     for (const map of MAPS) {
       assert.ok(map.profile.label.length > 0);
       assert.ok(map.profile.detail.length > 0);
-      assert.ok(["lanterns", "pine-fog", "keep-ash", "river-rain", "emberfall"].includes(map.profile.ambient));
-      assert.ok(["gate", "pine", "keep", "rock"].includes(map.profile.marker));
+      assert.ok(["lanterns", "pine-fog", "keep-ash", "river-rain", "emberfall", "glass-tide"].includes(map.profile.ambient));
+      assert.ok(["gate", "pine", "keep", "rock", "glass"].includes(map.profile.marker));
       assert.ok(map.profile.rule.label.length > 0);
       assert.ok(map.profile.rule.objectiveTitle.length > 0);
       assert.ok(map.profile.rule.target > 0);
@@ -89,6 +90,28 @@ describe("maps and shop", () => {
     const b = [...pathCellsOf(MAPS[0].path)].sort();
     assert.deepEqual(a, b);
     assert.ok(blockedCells().size > 0);
+  });
+
+  it("makes the glass tide rule reward deliberate waterline placement", () => {
+    const e = play();
+    e.loadMap(MAPS.length - 1);
+    e.clearField();
+    e.phase = "ready";
+    e.gold = 400;
+    const cells = [...Array(9).keys()].flatMap((r) => [...Array(COLS).keys()].map((c) => ({ c, r })));
+    const nearWater = cells.find((cell) => e.canBuild(cell.c, cell.r) && e.besideWater(cell));
+    assert.ok(nearWater);
+    e.tapCell(nearWater.c, nearWater.r);
+    const tower = e.towers[0];
+    assert.equal(e.hud().objective.current, 1);
+    assert.equal(e.fieldRangeMultiplier(tower), 1.14);
+
+    e.chooseKind("spark");
+    const secondNearWater = cells.find((cell) => e.canBuild(cell.c, cell.r) && e.besideWater(cell));
+    assert.ok(secondNearWater);
+    e.tapCell(secondNearWater.c, secondNearWater.r);
+    assert.equal(e.hud().objective.complete, true);
+    assert.equal(e.fieldDamageMultiplier(e.towers[1]), 1.12);
   });
 });
 

@@ -35,7 +35,7 @@ export function spriteUrl(key: string) {
 
 export const ROUTE_MARKER_REVISION = "v1";
 
-export const ROUTE_MARKER_KEYS = ["low-road", "pine-cut", "keep-stair", "river-ford", "ember-copse"] as const;
+export const ROUTE_MARKER_KEYS = ["low-road", "pine-cut", "keep-stair", "river-ford", "ember-copse", "glass-marsh"] as const;
 
 export type RouteMarkerAsset = (typeof ROUTE_MARKER_KEYS)[number];
 

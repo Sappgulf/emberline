@@ -530,6 +530,8 @@ export class EmberEngine {
       current = this.wave > 0 && this.phase !== "wave" && this.waveLeaks === 0 ? 1 : 0;
     } else if (rule.id === "emberfall") {
       current = this.towers.some((tower) => towerForm(tower.dmgLvl, tower.rateLvl) >= 4) ? 1 : 0;
+    } else if (rule.id === "glass-tide") {
+      current = Math.min(rule.target, this.towers.filter((tower) => this.besideWater(tower)).length);
     }
     return { current, target: rule.target, complete: current >= rule.target };
   }
@@ -589,6 +591,15 @@ export class EmberEngine {
     );
   }
 
+  besideWater(tower: Pick<Tower, "c" | "r">) {
+    return (
+      this.waterSet.has(`${tower.c + 1},${tower.r}`) ||
+      this.waterSet.has(`${tower.c - 1},${tower.r}`) ||
+      this.waterSet.has(`${tower.c},${tower.r + 1}`) ||
+      this.waterSet.has(`${tower.c},${tower.r - 1}`)
+    );
+  }
+
   linkedTowerCount() {
     return Math.min(
       this.towers.length,
@@ -604,6 +615,7 @@ export class EmberEngine {
   fieldDamageMultiplier(tower: Tower) {
     if (this.map.profile.rule.id === "stone-latch" && this.besidePath(tower)) return 1.12;
     if (this.map.profile.rule.id === "emberfall" && towerForm(tower.dmgLvl, tower.rateLvl) >= 4) return 1.16;
+    if (this.map.profile.rule.id === "glass-tide" && tower.kind === "spark" && this.besideWater(tower)) return 1.12;
     return 1;
   }
 
@@ -612,8 +624,9 @@ export class EmberEngine {
   }
 
   fieldRangeMultiplier(tower: Tower) {
-    if (this.map.profile.rule.id !== "pine-fog") return 1;
-    return tower.kind === "spark" ? 1.12 : 0.9;
+    if (this.map.profile.rule.id === "pine-fog") return tower.kind === "spark" ? 1.12 : 0.9;
+    if (this.map.profile.rule.id === "glass-tide" && this.besideWater(tower)) return 1.14;
+    return 1;
   }
 
   buildHud(): HudSnap {

@@ -288,6 +288,18 @@ function drawAmbient(ctx: CanvasRenderingContext2D, cell: number, engine: EmberE
       ctx.arc(x, y, Math.max(1, cell * 0.025 + (i % 2) * cell * 0.018), 0, Math.PI * 2);
       ctx.fill();
     }
+  } else if (ambient === "glass-tide") {
+    ctx.strokeStyle = "#9be6db";
+    ctx.lineWidth = Math.max(1, cell * 0.018);
+    for (let i = 0; i < 10; i++) {
+      const x = ((i * 67 + 18) % Math.max(1, width - 8)) + 4;
+      const y = ((i * 41 + 22 + Math.sin(time * 0.8 + i) * cell * 0.12) % Math.max(1, height - 10)) + 5;
+      ctx.globalAlpha = 0.08 + (i % 3) * 0.025;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + cell * 0.22, y - cell * 0.08, x + cell * 0.44, y);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -331,6 +343,27 @@ function drawFieldRule(ctx: CanvasRenderingContext2D, cell: number, engine: Embe
       ctx.beginPath();
       ctx.arc((tower.c + 0.5) * cell, (tower.r + 0.5) * cell, cell * 0.8, 0, Math.PI * 2);
       ctx.fill();
+    }
+  } else if (rule === "glass-tide" && (engine.phase === "ready" || engine.phase === "wave")) {
+    const pulse = 0.07 + Math.sin(engine.time * 2.8) * 0.025;
+    ctx.fillStyle = `rgba(155,230,219,${pulse})`;
+    ctx.strokeStyle = "rgba(155,230,219,0.32)";
+    ctx.lineWidth = Math.max(1, cell * 0.016);
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!engine.canBuild(c, r) || !engine.besideWater({ c, r })) continue;
+        ctx.fillRect(c * cell + 2, r * cell + 2, cell - 4, cell - 4);
+        ctx.strokeRect(c * cell + 3, r * cell + 3, cell - 6, cell - 6);
+      }
+    }
+    for (const tower of engine.towers) {
+      if (!engine.besideWater(tower)) continue;
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = "#9be6db";
+      ctx.beginPath();
+      ctx.arc((tower.c + 0.5) * cell, (tower.r + 0.5) * cell, cell * 0.72, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
   }
   ctx.restore();

@@ -15,9 +15,9 @@ export interface StoryBeat {
   line: string;
 }
 
-export type MapAmbient = "lanterns" | "pine-fog" | "keep-ash" | "river-rain" | "emberfall";
-export type MapMarker = "gate" | "pine" | "keep" | "rock";
-export type FieldRuleId = "lantern-aura" | "pine-fog" | "stone-latch" | "ford-banks" | "emberfall";
+export type MapAmbient = "lanterns" | "pine-fog" | "keep-ash" | "river-rain" | "emberfall" | "glass-tide";
+export type MapMarker = "gate" | "pine" | "keep" | "rock" | "glass";
+export type FieldRuleId = "lantern-aura" | "pine-fog" | "stone-latch" | "ford-banks" | "emberfall" | "glass-tide";
 
 export interface FieldRule {
   id: FieldRuleId;
@@ -683,6 +683,121 @@ export const MAPS: MapDef[] = [
       "Hounds in the copse.",
       "Do not sell the line.",
       "He walks. Burn the road.",
+    ],
+  },
+  {
+    id: "glass-marsh",
+    name: "Glass Marsh",
+    place: "The moonlit fen",
+    theme: {
+      moss: "#1c2c2b",
+      lit: "#35625d",
+      bank: "#14201f",
+      path: "#5b4934",
+      pathLit: "#876846",
+      ink: "#0c1514",
+      water: "#21444a",
+      waterLit: "#5caaa1",
+    },
+    profile: {
+      label: "Glass tide",
+      detail: "The marsh mirrors every mistake.",
+      ambient: "glass-tide",
+      marker: "glass",
+      rule: {
+        id: "glass-tide",
+        label: "Glass tide",
+        detail: "Towers beside the water gain reach; Spark bends the reflection into extra power.",
+        objectiveTitle: "Set the sightline",
+        objectiveDetail: "Build two towers beside the marsh water.",
+        target: 2,
+        reward: 75,
+      },
+    },
+    water: [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [5, 0],
+      [6, 0],
+      [5, 2],
+      [10, 5],
+      [11, 5],
+      [12, 5],
+      [9, 8],
+      [10, 8],
+      [11, 8],
+    ],
+    path: [
+      { c: 0, r: 5 },
+      { c: 4, r: 5 },
+      { c: 4, r: 1 },
+      { c: 8, r: 1 },
+      { c: 8, r: 7 },
+      { c: 2, r: 7 },
+      { c: 2, r: 3 },
+      { c: 12, r: 3 },
+    ],
+    props: [
+      { c: 1, r: 2, kind: "reed" },
+      { c: 3, r: 0, kind: "pine" },
+      { c: 9, r: 0, kind: "pine" },
+      { c: 12, r: 0, kind: "oak" },
+      { c: 0, r: 8, kind: "reed" },
+      { c: 1, r: 8, kind: "fence" },
+      { c: 4, r: 8, kind: "shroom" },
+      { c: 6, r: 4, kind: "rock" },
+      { c: 7, r: 4, kind: "stump" },
+      { c: 3, r: 6, kind: "oak" },
+      { c: 10, r: 2, kind: "lamp" },
+      { c: 12, r: 8, kind: "pine" },
+    ],
+    waves: [
+      [
+        { kind: "wisp", count: 8, gap: 0.3, delay: 0 },
+        { kind: "grub", count: 10, gap: 0.3, delay: 1.2 },
+      ],
+      [
+        { kind: "shell", count: 6, gap: 0.55, delay: 0 },
+        { kind: "runner", count: 14, gap: 0.23, delay: 1.6 },
+      ],
+      [
+        { kind: "wisp", count: 12, gap: 0.23, delay: 0 },
+        { kind: "shaman", count: 3, gap: 0.9, delay: 2 },
+      ],
+      [
+        { kind: "hound", count: 12, gap: 0.24, delay: 0 },
+        { kind: "shell", count: 8, gap: 0.4, delay: 1.8 },
+      ],
+      [
+        { kind: "wisp", count: 14, gap: 0.2, delay: 0 },
+        { kind: "shaman", count: 4, gap: 0.85, delay: 2.4 },
+        { kind: "runner", count: 10, gap: 0.22, delay: 4 },
+      ],
+      [
+        { kind: "shell", count: 10, gap: 0.4, delay: 0 },
+        { kind: "wisp", count: 12, gap: 0.22, delay: 1.8 },
+        { kind: "lord", count: 1, gap: 1, delay: 4 },
+        { kind: "hound", count: 10, gap: 0.22, delay: 5.5 },
+      ],
+    ],
+    briefing: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The marsh is a mirror with teeth. Set towers beside the water, keep the sky covered, and do not let the Emberlord find a clean reflection.",
+    },
+    victory: {
+      speaker: "Lumen Quill",
+      role: "Scout",
+      line: "The glass is quiet. Emberford has a road through every dark now — and the dawn is finally ours.",
+    },
+    asides: [
+      "The marsh wakes. Read the waterline.",
+      "Plate on the mirror road.",
+      "Wisps above the reeds. Keep Spark close.",
+      "Hounds and shell in the same reflection.",
+      "The cloaks will hide in the glare.",
+      "The Emberlord has found the water.",
     ],
   },
 ];
