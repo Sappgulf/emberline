@@ -301,6 +301,7 @@ export interface HudSnap {
   canUndo: boolean;
   nextAir: boolean;
   airCovered: boolean;
+  airHint: string | null;
   sellRefund: number;
   muted: boolean;
   route: RouteNodeSnap[];
@@ -318,6 +319,8 @@ export interface HudSnap {
     maxHp: number;
     leak: number;
     flying: boolean;
+    low: boolean;
+    dodge: boolean;
     armor: number;
   } | null;
   kindred: boolean;
@@ -785,7 +788,8 @@ export class EmberEngine {
       codex: this.codex,
       canUndo: this.canUndo(),
       nextAir: planHasAir(map.waves, previewIndex),
-      airCovered: this.towers.some((tw) => TOWERS[tw.kind].hitsAir),
+      airCovered: this.coversPreview(previewPlan).covered,
+      airHint: this.coversPreview(previewPlan).hint,
       sellRefund: t ? this.refundFor(t) : 0,
       muted: this.muted,
       route: MAPS.map((entry, index) => {
@@ -822,6 +826,8 @@ export class EmberEngine {
           maxHp: marked.maxHp,
           leak: leakCost(marked.kind),
           flying: CREEPS[marked.kind].flying,
+          low: CREEPS[marked.kind].low,
+          dodge: marked.dodge,
           armor: CREEPS[marked.kind].armor,
         };
       })(),
@@ -1136,6 +1142,12 @@ export class EmberEngine {
     this.gold = this.startGold() + (this.mapIndex > 0 ? 40 : 0);
     this.lives = this.maxLives();
     this.phase = "ready";
+    const fresh = (Object.keys(TOWERS) as TowerKind[]).filter(
+      (kind) => TOWER_UNLOCK[kind] > 0 && TOWER_UNLOCK[kind] === this.mapIndex,
+    );
+    if (fresh.length > 0) {
+      this.banner = { text: `${fresh.map((kind) => TOWERS[kind].name).join(" · ")} unsealed`, life: 2.4, max: 2.4 };
+    }
     this.notify();
   }
 
@@ -1239,8 +1251,23 @@ export class EmberEngine {
     const stats = CREEPS[creep.kind];
     if (!stats.flying) return true;
     if (TOWERS[tower.kind].hitsAir) return true;
-    if (stats.low && (tower.kind === "mortar" || tower.kind === "cinder" || tower.kind === "pike")) return true;
+    if (stats.low && this.strikesLow(tower.kind)) return true;
     return false;
+  }
+
+  strikesLow(kind: TowerKind) {
+    return TOWERS[kind].hitsAir || kind === "mortar" || kind === "cinder" || kind === "pike";
+  }
+
+  coversPreview(plan: MapDef["waves"][number] | undefined) {
+    if (!plan || plan.length === 0) return { covered: true, hint: null as string | null };
+    const needsHigh = plan.some((entry) => CREEPS[entry.kind].flying && !CREEPS[entry.kind].low);
+    const needsLow = plan.some((entry) => CREEPS[entry.kind].low);
+    const hasHigh = this.towers.some((tower) => TOWERS[tower.kind].hitsAir);
+    const hasLow = this.towers.some((tower) => this.strikesLow(tower.kind));
+    if (needsHigh && !hasHigh) return { covered: false, hint: "Plant Bow or Spark" };
+    if (needsLow && !hasLow) return { covered: false, hint: "Plant Mortar or Pike" };
+    return { covered: true, hint: null as string | null };
   }
 
   chooseKind(kind: TowerKind | null) {

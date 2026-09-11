@@ -312,7 +312,7 @@ export function Emberline() {
     hud.phase === "lost";
 
   const packets = Object.keys(TOWERS) as TowerKind[];
-  const recommendedCounters = counterPlan(hud.wavePreview);
+  const recommendedCounters = counterPlan(hud.wavePreview, hud.arsenal);
 
   return (
     <div
@@ -458,12 +458,13 @@ export function Emberline() {
           )}
 
           {playing && hud.marked && (
-            <div className="inspect-card pointer-events-none absolute right-2 top-2 z-10 max-w-[14rem] px-3 py-2">
+            <div className="inspect-card pointer-events-none absolute left-2 top-14 z-10 max-w-[14rem] px-3 py-2">
               <p className="font-display text-base leading-none text-copper">{hud.marked.name}</p>
               <p className="mt-1 text-[11px] text-dust">
                 {hud.marked.hp}/{hud.marked.maxHp} hp · leak {hud.marked.leak}
-                {hud.marked.flying ? " · air" : ""}
+                {hud.marked.low ? " · low air" : hud.marked.flying ? " · air" : ""}
                 {hud.marked.armor ? ` · plate ${hud.marked.armor}` : ""}
+                {hud.marked.dodge ? " · first dodge" : ""}
               </p>
               <div className="mt-1 h-1.5 overflow-hidden bg-ink">
                 <div className="h-full bg-ember" style={{ width: `${Math.max(4, (hud.marked.hp / hud.marked.maxHp) * 100)}%` }} />
@@ -870,6 +871,7 @@ export function Emberline() {
                       unlockAudio();
                       engine.chooseKind(kind);
                     }}
+                    data-sealed={locked}
                     className={`pressable packet ${locked || hud.gold < def.cost ? "opacity-40" : ""}`}
                   >
                     <span className="key">{i + 1}</span>
@@ -958,10 +960,10 @@ export function Emberline() {
                 }}
               >
                 <span className="command-label">
-                  {hud.phase === "wave" ? "Wave active" : hud.nextAir && !hud.airCovered ? "Air check" : "Send wave"}
+                  {hud.phase === "wave" ? "Wave active" : hud.airHint ? "Air check" : "Send wave"}
                 </span>
                 <span className="command-value">
-                  {hud.phase === "wave" ? `${hud.remaining} left` : hud.nextAir && !hud.airCovered ? "Choose Bow" : `Wave ${hud.wave + 1}`}
+                  {hud.phase === "wave" ? `${hud.remaining} left` : hud.airHint ? hud.airHint : `Wave ${hud.wave + 1}`}
                 </span>
               </button>
             </div>
@@ -1171,7 +1173,7 @@ const THREAT_LABEL: Record<HudSnap["threatTier"], string> = {
 
 const THREAT_NOTE: Record<HudSnap["threatTier"], string> = {
   light: "The road is quiet. Build for the bend.",
-  mixed: "Mixed bodies on the road. Cover the air and armor.",
+  mixed: "Mixed bodies. Cover armor, knaves, and low moths.",
   severe: "Heavy pressure ahead. Keep the horn ready.",
 };
 
@@ -1199,7 +1201,7 @@ function CampaignRail({ route }: { route: HudSnap["route"] }) {
 
 function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: (kind: TowerKind) => void }) {
   const uncoveredAir = hud.nextAir && !hud.airCovered;
-  const counters = counterPlan(hud.wavePreview);
+  const counters = counterPlan(hud.wavePreview, hud.arsenal);
   const [intelOpen, setIntelOpen] = useState(true);
 
   useEffect(() => {
@@ -1386,12 +1388,13 @@ function WatchOrder({ order }: { order: HudSnap["watchOrder"] }) {
   );
 }
 
-function counterPlan(wave: HudSnap["wavePreview"]): TowerKind[] {
+function counterPlan(wave: HudSnap["wavePreview"], arsenal: HudSnap["arsenal"] = []): TowerKind[] {
   const needed = new Set<TowerKind>();
   for (const item of wave) {
     for (const kind of COUNTERS[item.kind]) needed.add(kind);
   }
-  return COUNTER_ORDER.filter((kind) => needed.has(kind)).slice(0, 4);
+  const open = new Set(arsenal.filter((item) => item.unlocked).map((item) => item.kind));
+  return COUNTER_ORDER.filter((kind) => needed.has(kind) && (open.size === 0 || open.has(kind))).slice(0, 4);
 }
 
 function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
@@ -1454,7 +1457,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
   const rate = towerRate(hud, tower);
   const bondText = hud.bond
     ? `Bonded with ${TOWERS[hud.bond.partner].short} · ${hud.bond.label} +${Math.round(hud.bond.bonus * 100)}% power`
-    : "No bond active · pair complementary towers for +8% power";
+    : "No bond · pair Windcut, Ashring, Stormroot, or Brand";
   return (
     <section className="tower-intel" aria-label={`${def.name} selected tower details`}>
       <div className="tower-intel-heading">

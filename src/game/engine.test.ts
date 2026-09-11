@@ -947,6 +947,31 @@ describe("watch depth", () => {
     assert.equal(e.pickTarget(mortar)?.kind, "moth");
   });
 
+  it("counts mortar as cover for moths but not wisps", () => {
+    const e = play();
+    e.unlocked = 6;
+    e.loadMap(6);
+    e.clearField();
+    e.phase = "ready";
+    e.gold = 400;
+    const mothPlan = e.map.waves[0];
+    assert.equal(e.coversPreview(mothPlan).covered, false);
+    const grass = emptyGrass(e);
+    e.chooseKind("mortar");
+    e.tapCell(grass.c, grass.r);
+    assert.equal(e.coversPreview(mothPlan).covered, true);
+    assert.equal(e.coversPreview(MAPS[1].waves[0]).covered, false);
+  });
+
+  it("unseals the pike when the keep stair brief is taken", () => {
+    const e = play();
+    e.unlocked = 2;
+    e.loadMap(2);
+    e.phase = "brief";
+    e.dismissBrief();
+    assert.match(e.banner?.text ?? "", /Pike/);
+  });
+
   it("lets a knave dodge the first bite unless marked", () => {
     const e = play();
     e.phase = "wave";

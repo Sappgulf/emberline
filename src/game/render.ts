@@ -596,17 +596,19 @@ function drawRouteTags(ctx: CanvasRenderingContext2D, cell: number, engine: Embe
 }
 
 function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
-  const glass = engine.relics.has("glass") ? 1.12 : 1;
   const selected = engine.selectedTower();
   if (selected) {
-    const range =
-      rangeAt(selected.kind, selected.rangeLvl) *
-      glass *
-      (selected.empowered ? 1.18 : 1) *
-      engine.fieldRangeMultiplier(selected);
+    const range = engine.sightRange(selected);
     ctx.beginPath();
     ctx.arc((selected.c + 0.5) * cell, (selected.r + 0.5) * cell, range * cell, 0, Math.PI * 2);
-    const ink = selected.kind === "frost" ? "106,168,180" : selected.kind === "mortar" ? "224,120,56" : "212,160,84";
+    const ink =
+      selected.kind === "frost"
+        ? "106,168,180"
+        : selected.kind === "mortar" || selected.kind === "cinder"
+          ? "224,120,56"
+          : selected.kind === "pike"
+            ? "176,120,72"
+            : "212,160,84";
     ctx.fillStyle = `rgba(${ink},0.08)`;
     ctx.fill();
     ctx.strokeStyle = `rgba(${ink},0.55)`;
@@ -655,7 +657,8 @@ function easeOutBack(t: number) {
 function kindInk(kind: Tower["kind"]) {
   if (kind === "frost") return FROST;
   if (kind === "spark") return COPPER;
-  if (kind === "mortar") return EMBER;
+  if (kind === "mortar" || kind === "cinder") return EMBER;
+  if (kind === "pike") return "#b07848";
   if (kind === "ward") return "#c4a060";
   if (kind === "bramble") return "#4a6a32";
   return "#6d8a4a";
@@ -804,6 +807,19 @@ function drawFormKit(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, 
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
+  if (tower.kind === "pike" && form >= 2) {
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.04, cell * 0.04);
+    ctx.lineTo(cell * (0.16 + form * 0.04), -cell * (0.22 + form * 0.03));
+    ctx.stroke();
+  }
+  if (tower.kind === "cinder" && form >= 2) {
+    ctx.globalAlpha = 0.55 + Math.sin(time * 6 + tower.id) * 0.2;
+    ctx.beginPath();
+    ctx.arc(0, -cell * 0.16, cell * (0.06 + form * 0.015), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   if (tower.empowered) {
     ctx.fillStyle = EMBER;
     ctx.beginPath();
@@ -947,6 +963,15 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
     ctx.beginPath();
     ctx.arc(0, 0, size * 1.2, 0, Math.PI * 2);
     ctx.stroke();
+  }
+  if (creep.kind === "knave" && creep.dodge && creep.alive) {
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = "rgba(232,220,196,0.55)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.08, size * 1.45, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
   if (marked && creep.alive) {
     ctx.strokeStyle = EMBER;
