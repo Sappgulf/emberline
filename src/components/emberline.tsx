@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RotateCcw } from "lucide-react";
-import { COLS, CREEPS, FORM_NAME, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type TowerKind } from "@/game/config";
+import { COLS, CREEPS, FORM_NAME, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type EmberlitBranch, type TowerKind } from "@/game/config";
 import { relicUrl, routeMarkerUrl, spriteUrl } from "@/game/assets";
 import { BESTIARY, RITES, type RelicId, type WatchRiteId } from "@/game/campaign";
 import { EmberEngine, type HudSnap, type TowerUpgradeBranch } from "@/game/engine";
@@ -77,9 +77,11 @@ export function Emberline() {
   const readyActionRef = useRef<HTMLButtonElement>(null);
   const campaignTriggerRef = useRef<HTMLButtonElement>(null);
   const codexTriggerRef = useRef<HTMLButtonElement>(null);
+  const hallTriggerRef = useRef<HTMLButtonElement>(null);
   const hud = useHud();
   const [cell, setCell] = useState(40);
   const [hoverCell, setHoverCell] = useState<HoverCell | null>(null);
+  const [codexTab, setCodexTab] = useState<"bestiary" | "chronicle">("bestiary");
 
   const restoreOverlayTrigger = useCallback((target: { current: HTMLButtonElement | null }) => {
     window.requestAnimationFrame(() => target.current?.focus());
@@ -92,7 +94,10 @@ export function Emberline() {
     engine.toggleCodex();
     restoreOverlayTrigger(codexTriggerRef);
   }, [restoreOverlayTrigger]);
-
+  const closeHall = useCallback(() => {
+    engine.toggleHall();
+    restoreOverlayTrigger(hallTriggerRef);
+  }, [restoreOverlayTrigger]);
   useEffect(() => {
     if (hud.phase === "ready") readyActionRef.current?.focus();
   }, [hud.phase]);
@@ -153,6 +158,10 @@ export function Emberline() {
         if (e.key === "Escape") engine.toggleHelp();
         return;
       }
+      if (engine.hall) {
+        if (e.key === "Escape") engine.toggleHall();
+        return;
+      }
       if (engine.codex) {
         if (e.key === "Escape") closeCodex();
         return;
@@ -203,6 +212,10 @@ export function Emberline() {
       if (e.key === "u" || e.key === "U") engine.toggleMute();
       if (e.key === "s" || e.key === "S") engine.openStall();
       if (e.key === "k" || e.key === "K") engine.scoutMark();
+      if (e.key === "c" || e.key === "C") engine.useAbility();
+      if (e.key === "g" || e.key === "G") {
+        if (engine.phase === "title") engine.toggleHall();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -305,6 +318,7 @@ export function Emberline() {
     hud.codex ||
     hud.campaign ||
     hud.help ||
+    hud.hall ||
     hud.phase === "title" ||
     hud.phase === "brief" ||
     hud.phase === "shop" ||
@@ -328,6 +342,7 @@ export function Emberline() {
           <span className="watch-overline">Duskward watch</span>
           <p className="watch-map-name font-display text-xl leading-none text-copper">
             {hud.phase === "title" ? "Emberline" : hud.mapName}
+            {hud.endless && <span className="ml-2 font-sans text-[10px] tracking-[0.18em] text-ember">LONG NIGHT</span>}
             {hud.hard && <span className="ml-2 font-sans text-[10px] tracking-[0.18em] text-ember">HARD</span>}
           </p>
           {hud.phase !== "title" && (
@@ -477,6 +492,27 @@ export function Emberline() {
               <span>Every pair pays +3g</span>
             </div>
           )}
+          {playing && hud.boss && (
+            <div
+              className="boss-bar"
+              role="status"
+              aria-live="polite"
+              data-second={hud.boss.phase > 0}
+              style={{ ["--boss-color" as string]: hud.boss.color }}
+            >
+              <span className="boss-kicker">Boss · {hud.boss.phase > 0 ? "second wind" : "first phase"}</span>
+              <span className="boss-identity">
+                <strong>{hud.boss.name}</strong>
+                <small>{hud.boss.title}</small>
+              </span>
+              <span className="boss-track" aria-hidden="true">
+                <span style={{ width: `${Math.max(0, Math.round((hud.boss.hp / Math.max(1, hud.boss.maxHp)) * 100))}%` }} />
+              </span>
+              <span className="boss-hp">
+                {hud.boss.hp}/{hud.boss.maxHp}
+              </span>
+            </div>
+          )}
         </div>
         {playing && (
           <div className="intel-stack intel-stack-dock" aria-label="Watch intelligence">
@@ -491,40 +527,79 @@ export function Emberline() {
           </div>
         )}
           {hud.codex && (
-            <Overlay size="wide" kicker="Codex" title="Bestiary" onClose={closeCodex} close="Close">
-              <div className="bestiary-grid w-full text-left">
-                {BESTIARY.map((b) => {
-                  const creep = CREEPS[b.kind];
-                  return (
-                    <article key={b.kind} className="bestiary-card plaque">
-                      <div className="bestiary-art">
-                        <img src={spriteUrl(b.kind)} alt="" />
-                      </div>
-                      <div className="bestiary-copy">
-                        <div className="bestiary-heading">
-                          <div>
-                            <span className="intel-kicker">Field guide</span>
-                            <p className="font-display text-lg leading-none text-copper">{creep.name}</p>
-                          </div>
-                          <span className="bestiary-role">{creep.flying ? "Air" : creep.armor > 0 ? "Armored" : "Ground"}</span>
-                        </div>
-                        <p className="mt-2 text-[11px] leading-snug text-dust">{b.weak}</p>
-                        <div className="bestiary-counter-row">
-                          <span className="intel-kicker">Counter</span>
-                          <div className="counter-pills">
-                            {COUNTERS[b.kind].slice(0, 3).map((kind) => (
-                              <span key={kind} className={`counter-pill counter-${kind}`}>
-                                <img src={spriteUrl(kind)} alt="" />
-                                {TOWERS[kind].short}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+            <Overlay
+              size="wide"
+              kicker="Codex"
+              title={codexTab === "bestiary" ? "Bestiary" : "Chronicle"}
+              onClose={closeCodex}
+              close="Close"
+            >
+              <div className="codex-tabs" role="tablist" aria-label="Codex sections">
+                <button
+                  type="button"
+                  role="tab"
+                  className="pressable codex-tab"
+                  aria-selected={codexTab === "bestiary"}
+                  onClick={() => setCodexTab("bestiary")}
+                >
+                  Bestiary
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  className="pressable codex-tab"
+                  aria-selected={codexTab === "chronicle"}
+                  onClick={() => setCodexTab("chronicle")}
+                >
+                  Chronicle
+                  <span className="codex-tab-count">{hud.chronicle.filter((entry) => entry.unlocked).length}/{hud.chronicle.length}</span>
+                </button>
               </div>
+              {codexTab === "bestiary" ? (
+                <div className="bestiary-grid w-full text-left">
+                  {BESTIARY.map((b) => {
+                    const creep = CREEPS[b.kind];
+                    return (
+                      <article key={b.kind} className="bestiary-card plaque">
+                        <div className="bestiary-art">
+                          <img src={spriteUrl(b.kind)} alt="" />
+                        </div>
+                        <div className="bestiary-copy">
+                          <div className="bestiary-heading">
+                            <div>
+                              <span className="intel-kicker">Field guide</span>
+                              <p className="font-display text-lg leading-none text-copper">{creep.name}</p>
+                            </div>
+                            <span className="bestiary-role">{creep.flying ? "Air" : creep.armor > 0 ? "Armored" : "Ground"}</span>
+                          </div>
+                          <p className="mt-2 text-[11px] leading-snug text-dust">{b.weak}</p>
+                          <div className="bestiary-counter-row">
+                            <span className="intel-kicker">Counter</span>
+                            <div className="counter-pills">
+                              {COUNTERS[b.kind].slice(0, 3).map((kind) => (
+                                <span key={kind} className={`counter-pill counter-${kind}`}>
+                                  <img src={spriteUrl(kind)} alt="" />
+                                  {TOWERS[kind].short}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="chronicle-grid w-full text-left">
+                  {hud.chronicle.map((entry) => (
+                    <article key={entry.id} className="chronicle-card plaque" data-locked={!entry.unlocked}>
+                      <span className="intel-kicker">{entry.kicker}</span>
+                      <strong>{entry.unlocked ? entry.title : "Sealed"}</strong>
+                      <p>{entry.unlocked ? entry.body : "Walk more roads to open this page."}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
             </Overlay>
           )}
 
@@ -601,10 +676,14 @@ export function Emberline() {
                   ["Space / P / F", "Send the wave. Pause. Cycle 1× / 2× / 3×."],
                   ["Line two", "Same kind +10% rate. Bonds: Windcut, Ashring, Stormroot, Brand."],
                   ["Rites", "At the brief: spare purse, spare timber, or first ember."],
+                  ["Camp", "After a road, choose a preparation for the next one."],
+                  ["Elites", "Some prey run shielded, frenzied, warded, or hollow. They pay more."],
+                  ["Abilities", "C or the ability button unleashes the selected tower's power."],
                   ["Ashfangs", "The first bite howls. Nearby creeps run. Frost and Ward catch them."],
                   ["Lanterns", "Towers in the glow fire faster. Wick makes every road glow."],
                   ["Hard watch", "14 lives, tougher creeps, richer bounties. Shells splinter."],
-                  ["Emberlit", "Crown a tower, then spend 70g. Each kind awakens once."],
+                  ["Emberlit", "Crown a tower, then choose one of two awakenings for 70g."],
+                  ["Watch hall", "Marks from held roads buy permanent perks. G opens it."],
                 ].map(([k, v]) => (
                   <div key={k} className="plaque px-3 py-2">
                     <p className="text-[10px] tracking-[0.16em] text-copper uppercase">{k}</p>
@@ -614,7 +693,64 @@ export function Emberline() {
               </div>
             </Overlay>
           )}
-          {hud.phase === "title" && !hud.codex && !hud.campaign && !hud.help && (
+          {hud.hall && (
+            <Overlay kicker="Keep ledger" title="Watch hall" close="Close" onClose={closeHall} size="wide">
+              <div className="hall-grid">
+                <section className="hall-card plaque" aria-label="Watch marks">
+                  <span className="intel-kicker">Watch marks</span>
+                  <strong className="hall-marks">{hud.marks}</strong>
+                  <p>
+                    Marks are earned by holding roads, cutting bosses, and walking the Long Night. Spend them on permanent watch perks.
+                  </p>
+                </section>
+                <section className="hall-card plaque" aria-label="Long Night">
+                  <span className="intel-kicker">Long Night</span>
+                  <strong>{hud.unlocked >= hud.mapTotal ? `Best night ${hud.bestEndless}` : "Sealed"}</strong>
+                  {hud.unlocked >= hud.mapTotal ? (
+                    <button
+                      type="button"
+                      className="pressable send-flag min-h-10 px-4 text-xs"
+                      onClick={() => {
+                        unlockAudio();
+                        engine.startEndless();
+                      }}
+                    >
+                      Walk the Long Night
+                    </button>
+                  ) : (
+                    <p>Hold all eight roads to open the endless night.</p>
+                  )}
+                  <p>Every wave grows heavier. Bosses walk every fourth night.</p>
+                </section>
+              </div>
+              <div className="hall-perks" aria-label="Watch perks">
+                {hud.perkOptions.map((perk) => (
+                  <article key={perk.id} className="hall-perk plaque" data-maxed={perk.tier >= perk.max}>
+                    <div className="hall-perk-heading">
+                      <span className="intel-kicker">{perk.name}</span>
+                      <span className="hall-pips" aria-label={`${perk.tier} of ${perk.max} invested`}>
+                        {Array.from({ length: perk.max }, (_, i) => (
+                          <i key={i} data-on={i < perk.tier} />
+                        ))}
+                      </span>
+                    </div>
+                    <p>{perk.detail}</p>
+                    <button
+                      type="button"
+                      className="pressable stamp min-h-9 px-3 text-[11px] text-copper disabled:opacity-40"
+                      disabled={!perk.canBuy}
+                      aria-label={perk.tier >= perk.max ? `${perk.name} fully invested` : `Invest in ${perk.name} for ${perk.cost} marks`}
+                      onClick={() => engine.buyPerk(perk.id)}
+                    >
+                      {perk.tier >= perk.max ? "Fully invested" : `${perk.cost} marks`}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </Overlay>
+          )}
+
+          {hud.phase === "title" && !hud.codex && !hud.campaign && !hud.help && !hud.hall && (
             <Overlay kicker="Keep watch" title="Emberline" emblem size="keep">
               <div className="keep-book">
                 <div className="keep-main">
@@ -658,6 +794,22 @@ export function Emberline() {
                     <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleHelp()}>
                       Orders
                     </button>
+                    <button ref={hallTriggerRef} type="button" className="pressable stamp hall-trigger min-h-11 px-5 text-sm text-copper" onClick={() => engine.toggleHall()}>
+                      Watch hall
+                      {hud.marks > 0 && <span className="hall-badge">{hud.marks}</span>}
+                    </button>
+                    {hud.unlocked >= hud.mapTotal && (
+                      <button
+                        type="button"
+                        className="pressable stamp min-h-11 px-5 text-sm text-ember"
+                        onClick={() => {
+                          unlockAudio();
+                          engine.startEndless();
+                        }}
+                      >
+                        Long Night
+                      </button>
+                    )}
                   </div>
                   <p className="keep-whisper">“The road bends. The watch holds.” — Sera Venn, watch-captain</p>
                   <div className="keep-features" aria-label="Watch craft">
@@ -739,6 +891,30 @@ export function Emberline() {
             >
               {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
               <p className="text-sm text-dust">{hud.story?.line ?? `${hud.gold}g in the purse.`}</p>
+              {hud.camp && (
+                <section className="camp-panel" aria-label={`Camp: ${hud.camp.title}`}>
+                  <div className="camp-heading">
+                    <span className="intel-kicker">Camp · {hud.camp.title}</span>
+                    <p>{hud.camp.detail}</p>
+                  </div>
+                  <div className="camp-options">
+                    {hud.camp.options.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className="pressable plaque camp-option"
+                        aria-pressed={option.chosen}
+                        aria-label={`${option.name}: ${option.blurb}`}
+                        onClick={() => engine.chooseCamp(option.id)}
+                      >
+                        <span className="intel-kicker">{option.chosen ? "Ready" : "Prepare"}</span>
+                        <strong>{option.name}</strong>
+                        <small>{option.blurb}</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
               <div className="shop-board">
                 <div className="shop-satchel" aria-label="Satchel">
                   <span className="intel-kicker">Satchel</span>
@@ -756,16 +932,34 @@ export function Emberline() {
                   )}
                   <strong>{hud.gold}g</strong>
                 </div>
+                {hud.sets.some((set) => set.active) && (
+                  <div className="set-row" aria-label="Active relic sets">
+                    <span className="intel-kicker">Sets</span>
+                    {hud.sets
+                      .filter((set) => set.active)
+                      .map((set) => (
+                        <span key={set.id} className="set-chip" title={set.detail}>
+                          {set.name}
+                        </span>
+                      ))}
+                  </div>
+                )}
                 <ShopList items={hud.shopItems} relics={hud.relics} gold={hud.gold} />
               </div>
             </Overlay>
           )}
 
           {hud.phase === "lost" && (
-            <Overlay kicker="Breach" title="The keep fell" emblem>
-              <p className="text-sm text-dust">
-                Wave {hud.wave} of {hud.totalWaves} reached the gate on {hud.mapName}. {hud.lives > 0 ? `${hud.lives} ${hud.lives === 1 ? "life" : "lives"} left in the keep.` : "The gate is open."}
-              </p>
+            <Overlay kicker={hud.endless ? "Long Night" : "Breach"} title={hud.endless ? "The night took the line" : "The keep fell"} emblem>
+              {hud.endless ? (
+                <p className="text-sm text-dust">
+                  You held {hud.wave > 1 ? `${hud.wave - 1} full ${hud.wave - 1 === 1 ? "night" : "nights"}` : "no nights"} on {hud.mapName}. Best night: {hud.bestEndless}.
+                </p>
+              ) : (
+                <p className="text-sm text-dust">
+                  Wave {hud.wave} of {hud.totalWaves} reached the gate on {hud.mapName}. {hud.lives > 0 ? `${hud.lives} ${hud.lives === 1 ? "life" : "lives"} left in the keep.` : "The gate is open."}
+                </p>
+              )}
               {hud.story && <StoryLine story={hud.story} />}
               <div className="defeat-stats" aria-label="Watch state">
                 <span>
@@ -775,12 +969,12 @@ export function Emberline() {
                   <b>{hud.gold}g</b> in the purse
                 </span>
                 <span>
-                  <b>{hud.wave}/{hud.totalWaves}</b> waves
+                  <b>{hud.endless ? hud.bestEndless : `${hud.wave}/${hud.totalWaves}`}</b> {hud.endless ? "best night" : "waves"}
                 </span>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" className="pressable min-h-11 bg-copper px-6 text-sm font-semibold text-ink" onClick={() => engine.retryMap()}>
-                  Hold this map
+                  {hud.endless ? "Walk again" : "Hold this map"}
                 </button>
                 <Restart />
               </div>
@@ -799,6 +993,16 @@ export function Emberline() {
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.keepRelics()}>
                   March again with relics
+                </button>
+                <button
+                  type="button"
+                  className="pressable send-flag min-h-11 px-5 text-sm"
+                  onClick={() => {
+                    unlockAudio();
+                    engine.startEndless();
+                  }}
+                >
+                  Walk the Long Night
                 </button>
                 <Restart />
               </div>
@@ -851,7 +1055,7 @@ export function Emberline() {
                   )}
                 </p>
               </div>
-              <div className="selected-tower-actions grid grid-cols-2 gap-1 sm:grid-cols-5">
+              <div className="selected-tower-actions grid grid-cols-2 gap-1 sm:grid-cols-6">
                 <button
                   type="button"
                   className="pressable btn-wood upgrade-action upgrade-action-damage min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
@@ -888,6 +1092,20 @@ export function Emberline() {
                   <span className="upgrade-main">Reach {hud.selectedTower.rangeLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.range}g`}</span>
                   {hud.selectedTower.rangeLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud, "range")}</span>}
                 </button>
+                <button
+                  type="button"
+                  className="pressable btn-wood ability-action min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
+                  disabled={!playing || !hud.ability?.ready}
+                  aria-label={hud.ability ? `${hud.ability.name}: ${hud.ability.detail}${hud.ability.cd > 0 ? `, ready in ${hud.ability.cd} seconds` : ", ready"}` : "No tower selected"}
+                  title={hud.ability ? `${hud.ability.name} — ${hud.ability.detail}` : "No tower selected"}
+                  onClick={() => {
+                    unlockAudio();
+                    engine.useAbility();
+                  }}
+                >
+                  <span className="upgrade-main">{hud.ability?.name ?? "Ability"}</span>
+                  <span className="upgrade-preview">{hud.ability && hud.ability.cd > 0 ? `${hud.ability.cd}s` : hud.ability?.detail}</span>
+                </button>
                 <button type="button" className="pressable packet min-h-10 px-3 text-xs text-dust" onClick={() => engine.sellSelected()}>
                   Sell {hud.sellRefund}g
                 </button>
@@ -900,16 +1118,26 @@ export function Emberline() {
                   {hud.moving ? "Tap grass" : `Move ${hud.moveCost}g`}
                 </button>
               </div>
-              {hud.formName === "Crowned" && !hud.selectedTower.empowered && (
-                <button
-                  type="button"
-                  className="pressable send-flag upgrade-action upgrade-action-emberlit min-h-10 px-4 text-xs font-semibold disabled:opacity-40"
-                  data-branch="emberlit"
-                  disabled={!playing || hud.gold < 70}
-                  onClick={() => engine.empowerSelected()}
-                >
-                  Emberlit 70g
-                </button>
+              {hud.emberlitOptions && (
+                <div className="emberlit-picker" role="group" aria-label="Choose an Emberlit awakening">
+                  {([
+                    ["a", hud.emberlitOptions.a],
+                    ["b", hud.emberlitOptions.b],
+                  ] as Array<[EmberlitBranch, { name: string; detail: string }]>).map(([branch, option]) => (
+                    <button
+                      key={branch}
+                      type="button"
+                      className="pressable send-flag emberlit-option min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
+                      data-branch={branch}
+                      disabled={!playing || hud.gold < 70}
+                      aria-label={`Awaken Emberlit ${option.name} for 70 gold: ${option.detail}`}
+                      onClick={() => engine.empowerSelected(branch)}
+                    >
+                      <span className="upgrade-main">Emberlit · {option.name} 70g</span>
+                      <span className="upgrade-preview">{option.detail}</span>
+                    </button>
+                  ))}
+                </div>
               )}
               {hud.canUndo && (
                 <button type="button" className="text-[11px] text-copper" onClick={() => engine.undoLast()}>
@@ -1005,7 +1233,9 @@ export function Emberline() {
                 }}
               >
                 <span className="command-label">Scout</span>
-                <span className="command-value">{hud.phase !== "wave" ? "Wave" : hud.scoutReady ? "Ready" : "Spent"}</span>
+                <span className="command-value">
+                  {hud.phase !== "wave" ? "Wave" : hud.scoutReady ? `Ready${hud.scoutsLeft > 1 ? ` ×${hud.scoutsLeft}` : ""}` : "Spent"}
+                </span>
               </button>
               <button
                 type="button"
@@ -1062,7 +1292,7 @@ export function Emberline() {
                   {hud.phase === "wave" ? "Wave active" : hud.airHint ? "Air check" : "Send wave"}
                 </span>
                 <span className="command-value">
-                  {hud.phase === "wave" ? `${hud.remaining} left` : hud.airHint ? hud.airHint : `Wave ${hud.wave + 1}`}
+                  {hud.phase === "wave" ? `${hud.remaining} left` : hud.airHint ? hud.airHint : hud.endless ? `Night ${hud.wave + 1}` : `Wave ${hud.wave + 1}`}
                 </span>
               </button>
             </div>
@@ -1132,6 +1362,7 @@ function towerPower(
       (hud.relics.includes("whet") ? 1.12 : 1) *
       (hud.relics.includes("ember") && tower.kind === "mortar" ? 1.2 : 1) *
       (1 + (form - 1) * 0.06) *
+      (1 + (hud.setBonus?.damage ?? 0)) *
       hud.lineBonus *
       (1 + (hud.bond?.bonus ?? 0)) *
       (hud.fieldBoost?.damage ?? 1),
@@ -1139,7 +1370,7 @@ function towerPower(
 }
 
 function towerRate(hud: HudSnap, tower: NonNullable<HudSnap["selectedTower"]>, rateLevel = tower.rateLvl) {
-  return rateAt(tower.kind, rateLevel) * (hud.fieldBoost?.rate ?? 1);
+  return rateAt(tower.kind, rateLevel) * (hud.fieldBoost?.rate ?? 1) * (1 + (hud.setBonus?.rate ?? 0));
 }
 
 function towerReach(hud: HudSnap, tower: NonNullable<HudSnap["selectedTower"]>, rangeLevel = tower.rangeLvl) {
@@ -1275,6 +1506,10 @@ function WatchLedger({ hud }: { hud: HudSnap }) {
           <strong>{hud.relics.length}</strong>
           <small>Relics carried</small>
         </span>
+        <span>
+          <strong>{hud.marks}</strong>
+          <small>Watch marks</small>
+        </span>
       </div>
       <p>
         <span className="intel-kicker">Next road</span>
@@ -1379,6 +1614,7 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
           {hud.objective.complete ? " · held" : ` · +${hud.objective.reward}g`}
         </p>
         <p className="desk-meta">Rite · {hud.riteName}</p>
+        {hud.campLabel && <p className="desk-meta">Camp · {hud.campLabel}</p>}
       </section>
       <section className="desk-card">
         <span className="intel-kicker">Now · wave {hud.previewWave}</span>
@@ -1414,6 +1650,11 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
             <span>
               <b>+{hud.waveEarned}g</b>
             </span>
+            {hud.eliteCount > 0 && (
+              <span>
+                <b>{hud.eliteCount}</b> elite
+              </span>
+            )}
           </div>
         </section>
       )}
@@ -1430,6 +1671,9 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
               </li>
             ))}
           </ul>
+        )}
+        {hud.sets.some((set) => set.active) && (
+          <p className="desk-meta">Set · {hud.sets.filter((set) => set.active).map((set) => set.name).join(" · ")}</p>
         )}
         {sealed.length > 0 && (
           <p className="desk-meta">
@@ -1507,7 +1751,10 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
         </button>
       </div>
       <div className="threat-title" aria-live="polite">
-        <h2>Wave {hud.previewWave}</h2>
+        <h2>
+          {hud.endless ? `Night ${hud.previewWave}` : `Wave ${hud.previewWave}`}
+          {hud.eliteCount > 0 && <span className="threat-elite"> · {hud.eliteCount} elite</span>}
+        </h2>
         <span>{hud.phase === "wave" ? `${hud.remaining}/${hud.waveTotal} left` : "Ready to send"}</span>
       </div>
       {!intelOpen && hud.phase === "ready" && hud.lastResult && <CompactWaveRecap result={hud.lastResult} />}

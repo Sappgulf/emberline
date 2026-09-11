@@ -246,3 +246,13 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified with the required web-game Playwright client: local Vite ready-state canvas screenshot and deterministic text state completed without an error artifact.
 - Verified with regular Playwright fallback at exact 320×900, 390×900, and 1440×900 viewports: no horizontal overflow, no page errors, and the unlock/locked copy is accessible at every width.
 - Source gates: 98 tests, typecheck, lint, auth invariant, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-11 — named bosses, camps, Emberlit branches, elites, sets, marks, and the Long Night
+
+- Completed: every lord road now names its boss (Mirefather, Cinderhide, Mirrorskin, Hollowjaw, Wicker Crown) with a taunt line, a half-health second phase, and a distinct ground effect (summon, burn, ward, frenzy); a live boss bar with phase state sits over the board.
+- Completed: between-road camps offer two preparations each (gold, lives, next-road damage, cheap horn oil, an extra scout, or a watch mark) chosen in the night market and applied on the next briefing.
+- Completed: Emberlit is now a choice of two awakenings per tower (Split shaft/Deadeye, Deep oil/Cluster shell, Deep freeze/Rimebind, Fork/Overcharge, Grasping root/Bloodthorn, Sunder/Sanctum, Pierce plate/Impale, Clung coals/Tarfire) and every tower has an active ability on a cooldown (Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm) bound to C.
+- Completed: four elite affixes (shielded, frenzied, warded, hollow) spawn deterministically from the second road with auras, tags, bonus bounty, chill immunity, and death splinters; five relic sets (Winter vigil, Forge fire, Watchlight, Keepfield, Bounty belt) fold bonuses into damage, rate, chill duration, mend price, and start gold with truthful HUD previews.
+- Completed: the Bestiary gained a Chronicle tab whose pages unlock by held roads and carried relics; the title gained a Watch hall (marks, four three-tier perks, Long Night entry and personal best) plus an endless mode with generated waves, scaling health, and a boss every fourth night.
+- Verified in the live browser at 1440x900 and 390x844: title → hall → chronicle → campaign → brief → ready → five-wave River Ford hold with named boss bar and both Emberlit branch buttons, camp choice and active relic-set chips in the night market, endless Night 1 ready state with `LONG NIGHT` header, and no document overflow or browser diagnostics.
+- Source gates: 129 tests (13 new season tests), typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.

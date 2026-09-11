@@ -35,6 +35,113 @@ export type TowerKind = "bow" | "mortar" | "frost" | "spark" | "bramble" | "ward
 export type CreepKind = "grub" | "runner" | "shell" | "wisp" | "shaman" | "hound" | "lord" | "moth" | "knave" | "ashfang";
 export type Aim = "first" | "last" | "close" | "strong";
 export type PropKind = "pine" | "oak" | "rock" | "stump" | "reed" | "lamp" | "shroom" | "cart" | "fence";
+export type AffixId = "shielded" | "frenzied" | "warded" | "hollow";
+export type EmberlitBranch = "a" | "b";
+export type PerkId = "purse" | "wall" | "whet" | "rest";
+
+export const PERKS: ReadonlyArray<{ id: PerkId; name: string; detail: string; max: number; costs: number[] }> = [
+  { id: "purse", name: "Keep purse", detail: "+20 starting gold per mark spent.", max: 3, costs: [2, 4, 6] },
+  { id: "wall", name: "Stone wall", detail: "+1 keep life per mark spent.", max: 3, costs: [2, 4, 6] },
+  { id: "whet", name: "Grindstone", detail: "+4% tower damage per mark spent.", max: 3, costs: [2, 4, 6] },
+  { id: "rest", name: "Mend stone", detail: "Mends cost 10g less per mark spent.", max: 3, costs: [2, 4, 6] },
+];
+
+export const AFFIXES: Record<
+  AffixId,
+  { id: AffixId; name: string; tag: string; detail: string; color: string; hpMult: number; speedMult: number; gold: number; armor: number; slowResist?: boolean }
+> = {
+  shielded: {
+    id: "shielded",
+    name: "Shielded",
+    tag: "Shield",
+    detail: "Plated elite. More hp, more armor, richer bounty.",
+    color: "#b7ab90",
+    hpMult: 1.35,
+    speedMult: 1,
+    gold: 3,
+    armor: 3,
+  },
+  frenzied: {
+    id: "frenzied",
+    name: "Frenzied",
+    tag: "Frenzy",
+    detail: "Runs a fifth faster with a richer bounty.",
+    color: "#e07838",
+    hpMult: 1,
+    speedMult: 1.2,
+    gold: 3,
+    armor: 0,
+  },
+  warded: {
+    id: "warded",
+    name: "Warded",
+    tag: "Ward",
+    detail: "Chill cannot hold it. Tougher and plated.",
+    color: "#6aa8b4",
+    hpMult: 1.15,
+    speedMult: 1,
+    gold: 3,
+    armor: 2,
+    slowResist: true,
+  },
+  hollow: {
+    id: "hollow",
+    name: "Hollow",
+    tag: "Hollow",
+    detail: "Bursts into two grubs when it falls.",
+    color: "#7a8470",
+    hpMult: 1.1,
+    speedMult: 1,
+    gold: 2,
+    armor: 0,
+  },
+};
+
+export const EMBERLIT: Record<TowerKind, { a: { name: string; detail: string }; b: { name: string; detail: string } }> = {
+  bow: {
+    a: { name: "Split shaft", detail: "Arrows pierce one extra creep." },
+    b: { name: "Deadeye", detail: "Arrows deal 30% more damage." },
+  },
+  mortar: {
+    a: { name: "Deep oil", detail: "Oil spreads wider and burns longer." },
+    b: { name: "Cluster shell", detail: "Shots splash wider and hit 25% harder." },
+  },
+  frost: {
+    a: { name: "Deep freeze", detail: "Chill splashes and pins a beat." },
+    b: { name: "Rimebind", detail: "Chill holds 50% longer and roots on hit." },
+  },
+  spark: {
+    a: { name: "Fork", detail: "The bolt jumps one extra time." },
+    b: { name: "Overcharge", detail: "Bolts deal 30% more damage." },
+  },
+  bramble: {
+    a: { name: "Grasping root", detail: "Thorns root from the first timber." },
+    b: { name: "Bloodthorn", detail: "Hits bleed the target for 3 seconds." },
+  },
+  ward: {
+    a: { name: "Sunder", detail: "The ring cracks plate." },
+    b: { name: "Sanctum", detail: "The ring hits 20% harder and reaches wider." },
+  },
+  pike: {
+    a: { name: "Pierce plate", detail: "The spear ignores armor." },
+    b: { name: "Impale", detail: "Spears hit 35% harder and pin longer." },
+  },
+  cinder: {
+    a: { name: "Clung coals", detail: "Coals cling and burn longer." },
+    b: { name: "Tarfire", detail: "Coals slow everything they burn." },
+  },
+};
+
+export const ABILITIES: Record<TowerKind, { name: string; detail: string; cd: number }> = {
+  bow: { name: "Volley", detail: "Next three shots fire at double tempo.", cd: 12 },
+  mortar: { name: "Siege shell", detail: "Next shot splashes wider and hits 50% harder.", cd: 14 },
+  frost: { name: "Nova", detail: "Freeze every creep in reach for a beat.", cd: 15 },
+  spark: { name: "Overcharge", detail: "Next bolt forks through every creep in reach.", cd: 14 },
+  bramble: { name: "Briar", detail: "Root every creep in reach.", cd: 13 },
+  ward: { name: "Sanctum", detail: "Blast and chill every creep in reach.", cd: 15 },
+  pike: { name: "Brace", detail: "Next spear ignores plate and pins.", cd: 12 },
+  cinder: { name: "Firestorm", detail: "Set a wide burn on the road ahead.", cd: 14 },
+};
 
 export const PROPS: ReadonlyArray<{ c: number; r: number; kind: PropKind }> = [
   { c: 0, r: 0, kind: "pine" },

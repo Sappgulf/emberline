@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { COLS, CREEPS, START_GOLD, START_LIVES, HARD_LIVES, TOWERS, pathCells, blockedCells } from "./config.ts";
-import { MAPS, leakCost, pathCellsOf, planHasAir, shopFor, watchOrderFor } from "./campaign.ts";
+import { MAPS, endlessWave, leakCost, pathCellsOf, planHasAir, shopFor, watchOrderFor } from "./campaign.ts";
 import { EmberEngine } from "./engine.ts";
 
 function play(): EmberEngine {
@@ -1085,5 +1085,192 @@ describe("watch depth", () => {
     const e = play();
     assert.ok(e.hud().opening.length > 0);
     assert.equal(e.hud().riteName.includes("purse") || e.hud().rite === "coin", true);
+  });
+});
+
+describe("season systems", () => {
+  it("names the boss of each lord road and exposes its phase state", () => {
+    for (const map of MAPS) {
+      const lordWaves = map.waves.filter((plan) => plan.some((entry) => entry.kind === "lord"));
+      if (lordWaves.length > 0) assert.ok(map.boss, `${map.id} needs a named boss`);
+      else assert.equal(map.boss, undefined, `${map.id} should not name a boss without a lord`);
+    }
+    const e = play();
+    e.loadMap(3);
+    e.phase = "wave";
+    e.wave = 1;
+    e.spawn("lord");
+    const lord = e.creeps[0];
+    assert.equal(lord.bossName, MAPS[3].boss?.name);
+    e.notify();
+    assert.equal(e.hud().boss?.name, MAPS[3].boss?.name);
+    assert.equal(e.hud().boss?.phase, 0);
+  });
+
+  it("triggers a named boss second phase at half health", () => {
+    const e = play();
+    e.loadMap(3);
+    e.phase = "wave";
+    e.wave = 1;
+    e.spawn("lord");
+    const lord = e.creeps[0];
+    const before = e.creeps.length;
+    e.damageCreep(lord, Math.ceil(lord.maxHp * 0.6), 0, true);
+    for (let i = 0; i < 4; i++) e.tick(1 / 60);
+    assert.equal(lord.bossPhase, 1);
+    assert.equal(e.hud().boss?.phase, 1);
+    assert.equal(e.creeps.length > before, true, "Mirefather should summon the pack");
+  });
+
+  it("carries a camp preparation into the next road", () => {
+    const e = play();
+    e.phase = "shop";
+    e.chooseCamp("gold");
+    assert.equal(e.hud().camp?.options.find((option) => option.chosen)?.id, "gold");
+    e.phase = "brief";
+    e.dismissBrief();
+    assert.equal(e.campLabel, "Bank the coals");
+    assert.equal(e.campChoice, null);
+    assert.equal(e.gold, e.startGold() + 40 + 60);
+  });
+
+  it("pays a watch mark for the mark camp and stores the choice", () => {
+    const e = play();
+    const start = e.marks;
+    e.loadMap(3);
+    e.phase = "stall";
+    e.chooseCamp("mark");
+    assert.equal(e.marks, start + 1);
+    assert.equal(e.campChoice, "mark");
+  });
+
+  it("activates relic sets and folds their bonuses into the run", () => {
+    const e = play();
+    e.relics.add("cold");
+    e.relics.add("salt");
+    assert.ok(e.activeSets().some((set) => set.id === "winter-vigil"));
+    assert.ok(e.setAmount("slow") > 0);
+    e.relics.add("purse");
+    e.relics.add("cord");
+    assert.equal(e.startGold(), START_GOLD + 50 + 40);
+  });
+
+  it("spawns deterministic elites once the roads harden", () => {
+    const e = play();
+    e.wave = 3;
+    e.spawnCount = 1;
+    e.spawn("grub");
+    const elite = e.creeps[0];
+    assert.ok(elite.elite, "expected a deterministic elite");
+    assert.ok(elite.maxHp > 44, "elite should be tougher than a base grub");
+    e.notify();
+    assert.equal(e.hud().eliteCount, 1);
+  });
+
+  it("lets a warded elite shrug off chill", () => {
+    const e = play();
+    e.wave = 3;
+    let attempts = 0;
+    while (attempts < 40) {
+      e.creeps = [];
+      e.spawnCount = attempts;
+      e.spawn("runner");
+      if (e.creeps[0]?.elite === "warded") break;
+      attempts += 1;
+    }
+    const warded = e.creeps[0];
+    assert.equal(warded.elite, "warded");
+    e.damageCreep(warded, 5, 0.5, false);
+    assert.equal(warded.slowT, 0);
+  });
+
+  it("stores an Emberlit branch and exposes the two options", () => {
+    const e = play();
+    e.gold = 900;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    tower.dmgLvl = 4;
+    e.notify();
+    assert.ok(e.hud().emberlitOptions);
+    e.empowerSelected("b");
+    assert.equal(tower.emberlit, "b");
+    assert.equal(tower.empowered, true);
+    e.notify();
+    assert.equal(e.hud().emberlitOptions, null);
+    assert.equal(JSON.parse(e.renderText()).selectedTower.emberlit, "b");
+  });
+
+  it("fires tower abilities on a cooldown", () => {
+    const e = play();
+    e.gold = 900;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    e.useAbility();
+    assert.equal(tower.volt, 3, "bow volley should load three fast shots");
+    assert.ok(tower.abilityCd > 0);
+    assert.equal(e.hud().ability?.ready, false);
+    const cd = tower.abilityCd;
+    e.useAbility();
+    assert.equal(tower.abilityCd, cd, "ability should not fire while cooling down");
+  });
+
+  it("buys persistent watch perks with marks", () => {
+    const e = play();
+    e.phase = "title";
+    e.marks = 20;
+    const before = e.startGold();
+    e.buyPerk("purse");
+    assert.equal(e.marks, 18);
+    assert.equal(e.perks.purse, 1);
+    assert.equal(e.startGold(), before + 20);
+    e.buyPerk("purse");
+    e.buyPerk("purse");
+    assert.equal(e.perks.purse, 3);
+    e.buyPerk("purse");
+    assert.equal(e.marks, 8, "maxed perks should not spend marks");
+  });
+
+  it("opens the Long Night only after all eight roads", () => {
+    const e = play();
+    e.phase = "title";
+    e.unlocked = 7;
+    e.startEndless();
+    assert.equal(e.endless, false, "sealed until the campaign is held");
+    e.unlocked = MAPS.length;
+    e.startEndless();
+    assert.equal(e.endless, true);
+    assert.equal(e.phase, "brief");
+    e.dismissBrief();
+    assert.equal(e.phase, "ready");
+    e.startWave();
+    assert.equal(e.wave, 1);
+    assert.ok((e.wavePlan(0) ?? []).length > 0, "endless should generate a wave");
+    assert.equal(e.wavesLeft(), false, "endless never runs out of roads");
+  });
+
+  it("scales endless health and pays a boss every fourth night", () => {
+    const e = play();
+    e.phase = "title";
+    e.unlocked = MAPS.length;
+    e.startEndless();
+    e.dismissBrief();
+    e.wave = 4;
+    assert.ok((endlessWave(4) ?? []).some((entry) => entry.kind === "lord"));
+    assert.ok(e.hpMult() > 1);
+  });
+
+  it("gates chronicle pages behind held roads and relics", () => {
+    const e = play();
+    const locked = e.hud().chronicle.find((entry) => entry.id === "wicker-span");
+    assert.equal(locked?.unlocked, false);
+    e.unlocked = MAPS.length;
+    e.notify();
+    assert.equal(e.hud().chronicle.find((entry) => entry.id === "wicker-span")?.unlocked, true);
+    assert.equal(e.hud().chronicle.find((entry) => entry.id === "cord")?.unlocked, false);
+    e.relics.add("cord");
+    e.notify();
+    assert.equal(e.hud().chronicle.find((entry) => entry.id === "cord")?.unlocked, true);
   });
 });

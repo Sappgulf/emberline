@@ -1,4 +1,4 @@
-import { COLS, MAX_UPGRADE, ROWS, rangeAt, towerForm, type PropKind } from "./config.ts";
+import { AFFIXES, COLS, MAX_UPGRADE, ROWS, rangeAt, towerForm, type PropKind } from "./config.ts";
 import { type Creep, type EmberEngine, type Tower } from "./engine.ts";
 import { drawSprite, spr } from "./sprites.ts";
 
@@ -71,7 +71,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     actors.push({
       y: c.y,
       z: 1,
-      draw: () => drawCreep(ctx, c, cell, engine.path.length, c.id === engine.markedId),
+      draw: () => drawCreep(ctx, c, cell, engine.path.length, c.id === engine.markedId, engine.time),
     });
   }
   actors.sort((a, b) => a.y - b.y || a.z - b.z);
@@ -961,7 +961,7 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
   ctx.restore();
 }
 
-function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pathLen: number, marked = false) {
+function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pathLen: number, marked = false, time = 0) {
   const px = creep.x * cell;
   const py = creep.y * cell;
   const fade = creep.alive ? 1 : Math.max(0, creep.death / 0.28);
@@ -1007,6 +1007,45 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
     ctx.arc(0, 0, size * 2.05, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
+    if (creep.bossPhase) {
+      ctx.strokeStyle = `rgba(255,180,110,${0.4 + Math.sin(time * 6) * 0.18})`;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 2.35, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  if (creep.elite && creep.alive) {
+    const affix = AFFIXES[creep.elite];
+    ctx.strokeStyle = affix.color;
+    ctx.globalAlpha = (0.55 + Math.sin(creep.progress * 7) * 0.18) * fade;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([size * 0.42, size * 0.3]);
+    ctx.lineDashOffset = creep.progress * -cell * 0.3;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.75, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = fade * 0.95;
+    ctx.fillStyle = affix.color;
+    ctx.font = `700 ${Math.max(6, cell * 0.095)}px Figtree, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(affix.tag.toUpperCase(), 0, -size * 1.75);
+    ctx.globalAlpha = fade;
+  }
+  if (creep.wardT && creep.wardT > 0 && creep.alive) {
+    ctx.strokeStyle = `rgba(150,220,230,${0.5 + Math.sin(time * 5) * 0.2})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+      const px = Math.cos(a) * size * 1.55;
+      const py = Math.sin(a) * size * 1.55;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
   }
   if (creep.kind === "shaman" && creep.alive) {
     ctx.strokeStyle = "rgba(122,90,168,0.55)";
@@ -1088,7 +1127,7 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
       ctx.textBaseline = "middle";
       ctx.shadowColor = "rgba(18,22,15,0.9)";
       ctx.shadowBlur = 4;
-      ctx.fillText("EMBERLORD", 0, -size * 1.48);
+      ctx.fillText((creep.bossName ?? "Emberlord").toUpperCase(), 0, -size * 1.48);
       ctx.restore();
     }
     if (creep.alive && creep.flash > 0) {
