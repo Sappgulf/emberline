@@ -141,6 +141,15 @@ export function Emberline() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "?" || e.key === "/") {
+        e.preventDefault();
+        engine.toggleHelp();
+        return;
+      }
+      if (engine.help) {
+        if (e.key === "Escape") engine.toggleHelp();
+        return;
+      }
       if (engine.codex) {
         if (e.key === "Escape") closeCodex();
         return;
@@ -240,10 +249,8 @@ export function Emberline() {
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return null;
-    const ox = e.nativeEvent.offsetX;
-    const oy = e.nativeEvent.offsetY;
-    const x = Number.isFinite(ox) ? ox : e.clientX - rect.left;
-    const y = Number.isFinite(oy) ? oy : e.clientY - rect.top;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     const c = Math.floor((x / rect.width) * COLS);
     const r = Math.floor((y / rect.height) * ROWS);
     if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return null;
@@ -291,6 +298,7 @@ export function Emberline() {
   const menu =
     hud.codex ||
     hud.campaign ||
+    hud.help ||
     hud.phase === "title" ||
     hud.phase === "brief" ||
     hud.phase === "shop" ||
@@ -314,6 +322,7 @@ export function Emberline() {
           <span className="watch-overline">Duskward watch</span>
           <p className="watch-map-name font-display text-xl leading-none text-copper">
             {hud.phase === "title" ? "Emberline" : hud.mapName}
+            {hud.hard && <span className="ml-2 font-sans text-[10px] tracking-[0.18em] text-ember">HARD</span>}
           </p>
           {hud.phase !== "title" && (
             <div className="mt-1.5 flex gap-1" aria-label={`Map ${hud.mapIndex + 1} of ${hud.mapTotal}`}>
@@ -372,6 +381,14 @@ export function Emberline() {
             onClick={() => engine.toggleMute()}
           >
             {hud.muted ? "Muted" : "Sound"}
+          </button>
+          <button
+            type="button"
+            className="pressable packet px-2 py-1 text-[10px] text-dust"
+            aria-label="How to watch"
+            onClick={() => engine.toggleHelp()}
+          >
+            ?
           </button>
           {playing && (
             <button
@@ -435,6 +452,20 @@ export function Emberline() {
             </div>
           )}
 
+          {playing && hud.marked && (
+            <div className="inspect-card pointer-events-none absolute right-2 top-2 z-10 max-w-[14rem] px-3 py-2">
+              <p className="font-display text-base leading-none text-copper">{hud.marked.name}</p>
+              <p className="mt-1 text-[11px] text-dust">
+                {hud.marked.hp}/{hud.marked.maxHp} hp · leak {hud.marked.leak}
+                {hud.marked.flying ? " · air" : ""}
+                {hud.marked.armor ? ` · plate ${hud.marked.armor}` : ""}
+              </p>
+              <div className="mt-1 h-1.5 overflow-hidden bg-ink">
+                <div className="h-full bg-ember" style={{ width: `${Math.max(4, (hud.marked.hp / hud.marked.maxHp) * 100)}%` }} />
+              </div>
+              <p className="mt-1 text-[10px] tracking-wide text-ember">Marked +18%</p>
+            </div>
+          )}
           {playing && hud.hero && (
             <p
               className="pointer-events-none absolute left-2 top-2 z-10 max-w-[70%] bg-ink/80 px-3 py-1.5 text-[12px] text-copper"
@@ -562,11 +593,34 @@ export function Emberline() {
             </Overlay>
           )}
 
-          {hud.phase === "title" && !hud.codex && !hud.campaign && (
+          {hud.help && (
+            <Overlay kicker="Orders" title="How to watch" close="Close" onClose={() => engine.toggleHelp()} wide>
+              <div className="grid w-full grid-cols-1 gap-1.5 text-left sm:grid-cols-2">
+                {[
+                  ["1–6", "Pick a packet. Click grass to plant."],
+                  ["Click a creep", "Mark it. Towers focus and hit harder."],
+                  ["Q / E", "Upgrade damage / rate. X sell. Z undo."],
+                  ["H / M / S", "Horn, Mend, stall after a wave."],
+                  ["Space / P / F", "Send wave. Pause. Speed."],
+                  ["Line two", "Same kind +10% rate. Bow+Frost Windcut. Mortar+Ward Ashring. Spark+Bramble Stormroot."],
+                ].map(([k, v]) => (
+                  <div key={k} className="plaque px-3 py-2">
+                    <p className="text-[10px] tracking-[0.16em] text-copper uppercase">{k}</p>
+                    <p className="mt-0.5 text-xs text-parchment">{v}</p>
+                  </div>
+                ))}
+              </div>
+            </Overlay>
+          )}
+          {hud.phase === "title" && !hud.codex && !hud.campaign && !hud.help && (
             <Overlay kicker="Keep watch" title="Emberline" emblem>
               <p className="max-w-sm text-sm leading-relaxed text-dust">
-                Plant on grass. Line two towers. Hold {hud.mapTotal} maps until dawn. Space to begin.
+                Plant on grass. Line two towers. Tap a creep to mark it. Hold {hud.mapTotal} maps until dawn.
               </p>
+              <label className="flex cursor-pointer items-center justify-center gap-2 text-xs text-dust">
+                <input type="checkbox" checked={hud.hard} onChange={(e) => engine.setHard(e.target.checked)} className="accent-ember" />
+                Hard watch — 14 lives, tougher creeps, richer bounties
+              </label>
               <WatchLedger hud={hud} />
               <div className="menu-actions">
                 <button
@@ -596,6 +650,9 @@ export function Emberline() {
                 </button>
                 <button ref={codexTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleCodex()}>
                   Bestiary
+                </button>
+                <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleHelp()}>
+                  Orders
                 </button>
               </div>
             </Overlay>
@@ -676,6 +733,7 @@ export function Emberline() {
                   <div className="selected-tower-tags" aria-label={`${hud.formName} form${hud.selectedTower.empowered ? ", Emberlit awakened" : ""}`}>
                     <span className="tower-form-chip" data-form={formKey(hud.selectedTower, hud.formName)}>{hud.formName}</span>
                     {hud.selectedTower.empowered && <span className="tower-ascension-chip">Emberlit</span>}
+                    {hud.kindred && <span className="tower-form-chip">Kindred +10% rate</span>}
                     {hud.selectedTower.lastUpgrade && (
                       <span className="tower-upgrade-result" data-branch={hud.selectedTower.lastUpgrade} role="status" aria-live="polite">
                         {upgradeResultLabel(hud.selectedTower.lastUpgrade)}

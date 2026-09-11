@@ -71,7 +71,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     actors.push({
       y: c.y,
       z: 1,
-      draw: () => drawCreep(ctx, c, cell, engine.path.length),
+      draw: () => drawCreep(ctx, c, cell, engine.path.length, c.id === engine.markedId),
     });
   }
   actors.sort((a, b) => a.y - b.y || a.z - b.z);
@@ -875,7 +875,7 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
   ctx.restore();
 }
 
-function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pathLen: number) {
+function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pathLen: number, marked = false) {
   const px = creep.x * cell;
   const py = creep.y * cell;
   const fade = creep.alive ? 1 : Math.max(0, creep.death / 0.28);
@@ -930,6 +930,15 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
     ctx.beginPath();
     ctx.arc(0, 0, size * 1.2, 0, Math.PI * 2);
     ctx.stroke();
+  }
+  if (marked && creep.alive) {
+    ctx.strokeStyle = EMBER;
+    ctx.lineWidth = 2.4;
+    ctx.globalAlpha = 0.55 + Math.sin(creep.progress * 8) * 0.2;
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.1, size * 1.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = fade;
   }
   if (creep.alive && creep.progress >= pathLen - 2.2) {
     ctx.strokeStyle = BLOOD;

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { COLS, CREEPS, START_GOLD, START_LIVES, TOWERS, pathCells, blockedCells } from "./config.ts";
+import { COLS, CREEPS, START_GOLD, START_LIVES, HARD_LIVES, TOWERS, pathCells, blockedCells } from "./config.ts";
 import { MAPS, leakCost, pathCellsOf, planHasAir, shopFor, watchOrderFor } from "./campaign.ts";
 import { EmberEngine } from "./engine.ts";
 
@@ -792,5 +792,83 @@ describe("creep stats", () => {
       assert.equal(stats.flying, kind === "wisp");
       assert.ok(stats.hp > 0 && stats.speed > 0);
     }
+  });
+});
+
+describe("watch depth", () => {
+  it("marks a creep so towers prefer it over aim", () => {
+    const e = play();
+    e.gold = 400;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.towers[0].aim = "strong";
+    e.spawn("grub");
+    e.spawn("shaman");
+    for (const c of e.creeps) {
+      c.x = grass.c + 0.5;
+      c.y = grass.r + 0.5;
+    }
+    const grub = e.creeps.find((c) => c.kind === "grub")!;
+    e.markCreep(grub);
+    assert.equal(e.pickTarget(e.towers[0])?.kind, "grub");
+    assert.equal(e.hud().marked?.kind, "grub");
+  });
+
+  it("splinters a shell into a grub away from the gate", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("shell");
+    const shell = e.creeps[0];
+    shell.wp = 1;
+    e.damageCreep(shell, 999, 0, true);
+    assert.equal(shell.alive, false);
+    assert.equal(e.creeps.some((c) => c.alive && c.kind === "grub"), true);
+  });
+
+  it("does not splinter a shell already on the keep tile", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("shell");
+    const shell = e.creeps[0];
+    shell.wp = e.path.length - 1;
+    e.damageCreep(shell, 999, 0, true);
+    assert.equal(e.creeps.some((c) => c.alive && c.kind === "grub"), false);
+  });
+
+  it("starts a hard watch with fewer lives and fatter creeps", () => {
+    const e = new EmberEngine();
+    e.setHard(true);
+    e.startFromTitle();
+    e.dismissBrief();
+    e.reducedMotion = true;
+    assert.equal(e.lives, HARD_LIVES);
+    e.spawn("grub");
+    assert.ok(e.creeps[0].hp > CREEPS.grub.hp);
+  });
+
+  it("kindred bows fire faster", () => {
+    const e = play();
+    e.gold = 400;
+    const a = emptyGrass(e);
+    e.tapCell(a.c, a.r);
+    e.spawn("grub");
+    const grub = e.creeps[0];
+    grub.x = a.c + 0.5;
+    grub.y = a.r + 0.5;
+    e.fire(e.towers[0], grub);
+    const alone = e.towers[0].cooldown;
+    const neighbors = [
+      { c: a.c + 1, r: a.r },
+      { c: a.c - 1, r: a.r },
+      { c: a.c, r: a.r + 1 },
+      { c: a.c, r: a.r - 1 },
+    ];
+    const n = neighbors.find((p) => e.canBuild(p.c, p.r));
+    assert.ok(n);
+    e.chooseKind("bow");
+    e.tapCell(n.c, n.r);
+    e.fire(e.towers[0], grub);
+    assert.ok(e.towers[0].cooldown < alone);
+    assert.equal(e.hud().kindred, true);
   });
 });

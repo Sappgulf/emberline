@@ -803,13 +803,13 @@ export const MAPS: MapDef[] = [
 ];
 
 export const BESTIARY = [
-  { kind: "grub" as const, weak: "Anything. Bows on the bends are enough. A leak costs one life." },
+  { kind: "grub" as const, weak: "Anything. Bows on the bends are enough. A leak costs one life. Shells hatch one when they die." },
   { kind: "runner" as const, weak: "Aim First. Frost and Bramble catch them. A leak costs one life." },
-  { kind: "shell" as const, weak: "Mortar and Bramble. Arrows tickle plate. A leak costs two lives." },
+  { kind: "shell" as const, weak: "Mortar and Bramble. Arrows tickle plate. Dies into a grub unless it is already at the gate. A leak costs two lives." },
   { kind: "wisp" as const, weak: "Longbow and Spark only. Mortar and Bramble go blind. A leak costs one life." },
-  { kind: "shaman" as const, weak: "Kill first. Salt halves the song. Spark the clump. A leak costs two lives." },
-  { kind: "hound" as const, weak: "Frost and Ash Ward. Aim First. A leak costs one life." },
-  { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, and time. A leak costs three lives." },
+  { kind: "shaman" as const, weak: "Kill first. Salt halves the song. Spark the clump. Mark them. A leak costs two lives." },
+  { kind: "hound" as const, weak: "Frost and Ash Ward. Three living hounds run as a pack. A leak costs one life." },
+  { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, and a mark. A leak costs three lives." },
 ];
 
 export function describePlan(waves: WaveSpawn[][], index: number): string {

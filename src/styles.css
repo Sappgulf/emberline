@@ -3210,6 +3210,12 @@
   }
 }
 
+.inspect-card {
+  background: rgba(18, 22, 15, 0.86);
+  border: 1px solid rgba(138, 106, 56, 0.5);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
 @media (max-width: 360px) {
   .menu-actions > button:not(:first-child) {
     min-width: 0;
