@@ -328,7 +328,7 @@ function drawFieldRule(ctx: CanvasRenderingContext2D, cell: number, engine: Embe
     }
   } else if (rule === "emberfall") {
     for (const tower of engine.towers) {
-      if (towerForm(tower.dmgLvl, tower.rateLvl) < 4) continue;
+      if (towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl) < 4) continue;
       const glow = ctx.createRadialGradient(
         (tower.c + 0.5) * cell,
         (tower.r + 0.5) * cell,
@@ -471,7 +471,7 @@ function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   for (const t of engine.towers) {
     if (t.kind !== "ward") continue;
     const range =
-      rangeAt(t.kind, t.dmgLvl) *
+      rangeAt(t.kind, t.rangeLvl) *
       (engine.relics.has("glass") ? 1.12 : 1) *
       (t.empowered ? 1.18 : 1) *
       engine.fieldRangeMultiplier(t);
@@ -598,7 +598,7 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   const selected = engine.selectedTower();
   if (selected) {
     const range =
-      rangeAt(selected.kind, selected.dmgLvl) *
+      rangeAt(selected.kind, selected.rangeLvl) *
       glass *
       (selected.empowered ? 1.18 : 1) *
       engine.fieldRangeMultiplier(selected);
@@ -823,7 +823,7 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
   const x = (tower.c + 0.5) * cell;
   const y = (tower.r + 0.5) * cell;
   const pop = easeOutBack(Math.min(1, tower.build));
-  const form = towerForm(tower.dmgLvl, tower.rateLvl);
+  const form = towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl);
   const kick = tower.recoil * cell * 0.08;
   ctx.save();
   ctx.translate(x - Math.cos(tower.angle) * kick, y + Math.sin(time * 2.1 + tower.id) * 0.8 - Math.sin(tower.angle) * kick);
@@ -861,9 +861,11 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
   drawUpgradeForge(ctx, tower, cell, time);
   for (let i = 0; i < MAX_UPGRADE; i++) {
     ctx.fillStyle = i < tower.dmgLvl ? EMBER : "rgba(58,68,50,0.9)";
-    ctx.fillRect(-cell * 0.18 + i * cell * 0.1, cell * 0.22, cell * 0.08, cell * 0.045);
+    ctx.fillRect(-cell * 0.18 + i * cell * 0.1, cell * 0.2, cell * 0.08, cell * 0.035);
     ctx.fillStyle = i < tower.rateLvl ? COPPER : "rgba(58,68,50,0.9)";
-    ctx.fillRect(-cell * 0.18 + i * cell * 0.1, cell * 0.28, cell * 0.08, cell * 0.035);
+    ctx.fillRect(-cell * 0.18 + i * cell * 0.1, cell * 0.25, cell * 0.08, cell * 0.03);
+    ctx.fillStyle = i < tower.rangeLvl ? FROST : "rgba(58,68,50,0.9)";
+    ctx.fillRect(-cell * 0.18 + i * cell * 0.1, cell * 0.3, cell * 0.08, cell * 0.03);
   }
   if (selected) {
     ctx.fillStyle = PARCHMENT;

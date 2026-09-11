@@ -174,6 +174,7 @@ export function Emberline() {
       if (e.key === "m" || e.key === "M") engine.mendKeep();
       if (e.key === "q" || e.key === "Q") engine.upgradeDamage();
       if (e.key === "e" || e.key === "E") engine.upgradeRate();
+      if (e.key === "r" || e.key === "R") engine.upgradeRange();
       if (e.key === "x" || e.key === "X") engine.sellSelected();
       if (e.key === "z" || e.key === "Z") engine.undoLast();
       if (e.key === "Tab") {
@@ -599,7 +600,7 @@ export function Emberline() {
                 {[
                   ["1–6", "Pick a packet. Click grass to plant."],
                   ["Click a creep", "Mark it. Towers focus and hit harder."],
-                  ["Q / E", "Upgrade damage / rate. X sell. Z undo."],
+                  ["Q / E / R", "Upgrade damage, rate, or reach. X sell. Z undo."],
                   ["H / M / S", "Horn, Mend, stall after a wave."],
                   ["Space / P / F", "Send wave. Pause. Speed."],
                   ["Line two", "Same kind +10% rate. Bow+Frost Windcut. Mortar+Ward Ashring. Spark+Bramble Stormroot."],
@@ -615,7 +616,7 @@ export function Emberline() {
           {hud.phase === "title" && !hud.codex && !hud.campaign && !hud.help && (
             <Overlay kicker="Keep watch" title="Emberline" emblem>
               <p className="max-w-sm text-sm leading-relaxed text-dust">
-                Plant on grass. Line two towers. Tap a creep to mark it. Hold {hud.mapTotal} maps until dawn.
+                Plant on grass. Forge damage, rate, or reach. Tap a creep to mark it. Hold {hud.mapTotal} maps until dawn.
               </p>
               <label className="flex cursor-pointer items-center justify-center gap-2 text-xs text-dust">
                 <input type="checkbox" checked={hud.hard} onChange={(e) => engine.setHard(e.target.checked)} className="accent-ember" />
@@ -734,6 +735,9 @@ export function Emberline() {
                     <span className="tower-form-chip" data-form={formKey(hud.selectedTower, hud.formName)}>{hud.formName}</span>
                     {hud.selectedTower.empowered && <span className="tower-ascension-chip">Emberlit</span>}
                     {hud.kindred && <span className="tower-form-chip">Kindred +10% rate</span>}
+                    <span className="tower-form-chip" aria-label={`Power ${hud.selectedTower.dmgLvl}, tempo ${hud.selectedTower.rateLvl}, reach ${hud.selectedTower.rangeLvl}`}>
+                      P{hud.selectedTower.dmgLvl} T{hud.selectedTower.rateLvl} R{hud.selectedTower.rangeLvl}
+                    </span>
                     {hud.selectedTower.lastUpgrade && (
                       <span className="tower-upgrade-result" data-branch={hud.selectedTower.lastUpgrade} role="status" aria-live="polite">
                         {upgradeResultLabel(hud.selectedTower.lastUpgrade)}
@@ -746,7 +750,7 @@ export function Emberline() {
                     placementMessageValue
                   ) : (
                     <>
-                      {formBlurb(hud.selectedTower.kind, hud.formName)}
+                      {formBlurb(hud.selectedTower.kind, hud.formName, hud.selectedTower.empowered)}
                       {hud.bond && (
                         <span className="ml-2 text-frost">
                           Bond: {hud.bond.label} +{Math.round(hud.bond.bonus * 100)}%
@@ -757,7 +761,7 @@ export function Emberline() {
                   )}
                 </p>
               </div>
-              <div className="selected-tower-actions grid grid-cols-2 gap-1 sm:grid-cols-4">
+              <div className="selected-tower-actions grid grid-cols-2 gap-1 sm:grid-cols-5">
                 <button
                   type="button"
                   className="pressable btn-wood upgrade-action upgrade-action-damage min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
@@ -781,6 +785,18 @@ export function Emberline() {
                 >
                   <span className="upgrade-main">Rate {hud.selectedTower.rateLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.rate}g`}</span>
                   {hud.selectedTower.rateLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud, "rate")}</span>}
+                </button>
+                <button
+                  type="button"
+                  className="pressable btn-wood upgrade-action upgrade-action-range min-h-10 px-3 text-xs font-semibold disabled:opacity-40"
+                  data-branch="range"
+                  disabled={!playing || hud.selectedTower.rangeLvl >= MAX_UPGRADE || hud.gold < hud.nextCosts.range}
+                  aria-label={upgradeAriaLabel(hud, "range", hud.nextCosts.range)}
+                  title={upgradeAriaLabel(hud, "range", hud.nextCosts.range)}
+                  onClick={() => engine.upgradeRange()}
+                >
+                  <span className="upgrade-main">Reach {hud.selectedTower.rangeLvl >= MAX_UPGRADE ? "max" : `${hud.nextCosts.range}g`}</span>
+                  {hud.selectedTower.rangeLvl < MAX_UPGRADE && <span className="upgrade-preview">{upgradePreview(hud, "range")}</span>}
                 </button>
                 <button type="button" className="pressable packet min-h-10 px-3 text-xs text-dust" onClick={() => engine.sellSelected()}>
                   Sell {hud.sellRefund}g
@@ -943,7 +959,15 @@ export function Emberline() {
   );
 }
 
-function formBlurb(kind: TowerKind, form: string) {
+function formBlurb(kind: TowerKind, form: string, empowered = false) {
+  if (empowered) {
+    if (kind === "bow") return "Emberlit. Arrows pierce one extra creep.";
+    if (kind === "mortar") return "Emberlit. Oil spreads wider and burns longer.";
+    if (kind === "frost") return "Emberlit. Chill splashes and pins a beat.";
+    if (kind === "spark") return "Emberlit. The bolt jumps one extra time.";
+    if (kind === "ward") return "Emberlit. The ring cracks plate.";
+    return "Emberlit. Thorns root from the first timber.";
+  }
   if (form === "Bound") return "The ring holds. A little more bite and reach.";
   if (form === "Tempered") {
     if (kind === "bow") return "Arrows pierce one creep behind the first.";
@@ -961,7 +985,7 @@ function formBlurb(kind: TowerKind, form: string) {
     if (kind === "ward") return "The ring holds a long chill.";
     return "Long root.";
   }
-  return "Green timber. Upgrade damage or rate to change form.";
+  return "Green timber. Upgrade damage, rate, or reach to change form.";
 }
 
 function formKey(tower: NonNullable<HudSnap["selectedTower"]>, form: string) {
@@ -970,13 +994,20 @@ function formKey(tower: NonNullable<HudSnap["selectedTower"]>, form: string) {
 
 function upgradeResultLabel(branch: TowerUpgradeBranch) {
   if (branch === "emberlit") return "Emberlit awakened";
+  if (branch === "range") return "Reach tuned";
   return branch === "damage" ? "Power tuned" : "Tempo tuned";
 }
 
-type UpgradeBranch = "damage" | "rate";
+type UpgradeBranch = "damage" | "rate" | "range";
 
-function towerPower(hud: HudSnap, tower: NonNullable<HudSnap["selectedTower"]>, damageLevel = tower.dmgLvl, rateLevel = tower.rateLvl) {
-  const form = towerForm(damageLevel, rateLevel);
+function towerPower(
+  hud: HudSnap,
+  tower: NonNullable<HudSnap["selectedTower"]>,
+  damageLevel = tower.dmgLvl,
+  rateLevel = tower.rateLvl,
+  rangeLevel = tower.rangeLvl,
+) {
+  const form = towerForm(damageLevel, rateLevel, rangeLevel);
   return Math.round(
     damageAt(tower.kind, damageLevel) *
       (hud.relics.includes("whet") ? 1.12 : 1) *
@@ -992,35 +1023,57 @@ function towerRate(hud: HudSnap, tower: NonNullable<HudSnap["selectedTower"]>, r
   return rateAt(tower.kind, rateLevel) * (hud.fieldBoost?.rate ?? 1);
 }
 
+function towerReach(hud: HudSnap, tower: NonNullable<HudSnap["selectedTower"]>, rangeLevel = tower.rangeLvl) {
+  return (
+    rangeAt(tower.kind, rangeLevel) *
+    (hud.relics.includes("glass") ? 1.12 : 1) *
+    (tower.empowered ? 1.18 : 1) *
+    (hud.fieldBoost?.range ?? 1)
+  );
+}
+
 function upgradePreview(hud: HudSnap, branch: UpgradeBranch) {
   const tower = hud.selectedTower;
   if (!tower) return "";
   const nextDamage = branch === "damage" ? tower.dmgLvl + 1 : tower.dmgLvl;
   const nextRate = branch === "rate" ? tower.rateLvl + 1 : tower.rateLvl;
-  const currentForm = towerForm(tower.dmgLvl, tower.rateLvl);
-  const nextForm = towerForm(nextDamage, nextRate);
+  const nextRange = branch === "range" ? tower.rangeLvl + 1 : tower.rangeLvl;
+  const currentForm = towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl);
+  const nextForm = towerForm(nextDamage, nextRate, nextRange);
   const stat =
     branch === "damage"
-      ? `P ${towerPower(hud, tower)}→${towerPower(hud, tower, nextDamage, nextRate)}`
-      : `R ${towerRate(hud, tower).toFixed(1)}→${towerRate(hud, tower, nextRate).toFixed(1)}×`;
+      ? `P ${towerPower(hud, tower)}→${towerPower(hud, tower, nextDamage, nextRate, nextRange)}`
+      : branch === "rate"
+        ? `R ${towerRate(hud, tower).toFixed(1)}→${towerRate(hud, tower, nextRate).toFixed(1)}×`
+        : `H ${towerReach(hud, tower).toFixed(1)}→${towerReach(hud, tower, nextRange).toFixed(1)}`;
   return nextForm === currentForm ? stat : `→ ${FORM_NAME[nextForm]} · ${stat}`;
 }
 
 function upgradeAriaLabel(hud: HudSnap, branch: UpgradeBranch, cost: number) {
   const tower = hud.selectedTower;
   if (!tower) return "Tower upgrade unavailable";
-  const level = branch === "damage" ? tower.dmgLvl : tower.rateLvl;
-  const label = branch === "damage" ? "Damage" : "Rate";
-  if (level >= MAX_UPGRADE) return `${label} upgrade maxed at ${FORM_NAME[towerForm(tower.dmgLvl, tower.rateLvl)]} form`;
-  const current = branch === "damage" ? towerPower(hud, tower) : towerRate(hud, tower).toFixed(2);
-  const next = branch === "damage" ? towerPower(hud, tower, tower.dmgLvl + 1, tower.rateLvl) : towerRate(hud, tower, tower.rateLvl + 1).toFixed(2);
-  const currentForm = towerForm(tower.dmgLvl, tower.rateLvl);
+  const level = branch === "damage" ? tower.dmgLvl : branch === "rate" ? tower.rateLvl : tower.rangeLvl;
+  const label = branch === "damage" ? "Damage" : branch === "rate" ? "Rate" : "Reach";
+  if (level >= MAX_UPGRADE) {
+    return `${label} upgrade maxed at ${FORM_NAME[towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl)]} form`;
+  }
+  const current =
+    branch === "damage" ? towerPower(hud, tower) : branch === "rate" ? towerRate(hud, tower).toFixed(2) : towerReach(hud, tower).toFixed(2);
+  const next =
+    branch === "damage"
+      ? towerPower(hud, tower, tower.dmgLvl + 1, tower.rateLvl, tower.rangeLvl)
+      : branch === "rate"
+        ? towerRate(hud, tower, tower.rateLvl + 1).toFixed(2)
+        : towerReach(hud, tower, tower.rangeLvl + 1).toFixed(2);
+  const currentForm = towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl);
   const nextForm = towerForm(
     branch === "damage" ? tower.dmgLvl + 1 : tower.dmgLvl,
     branch === "rate" ? tower.rateLvl + 1 : tower.rateLvl,
+    branch === "range" ? tower.rangeLvl + 1 : tower.rangeLvl,
   );
   const formEffect = nextForm !== currentForm ? ` and advances the tower to ${FORM_NAME[nextForm]} form` : "";
-  const effect = `changes ${branch === "damage" ? "power" : "fire rate"} from ${current} to ${next}${formEffect}`;
+  const stat = branch === "damage" ? "power" : branch === "rate" ? "fire rate" : "reach";
+  const effect = `changes ${stat} from ${current} to ${next}${formEffect}`;
   return `Upgrade ${label.toLowerCase()} for ${cost} gold; ${effect}`;
 }
 
@@ -1378,11 +1431,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
   if (!tower) return null;
   const def = TOWERS[tower.kind];
   const power = towerPower(hud, tower);
-  const range =
-    rangeAt(tower.kind, tower.dmgLvl) *
-      (hud.relics.includes("glass") ? 1.12 : 1) *
-      (tower.empowered ? 1.18 : 1) *
-      (hud.fieldBoost?.range ?? 1);
+  const range = towerReach(hud, tower);
   const rate = towerRate(hud, tower);
   const bondText = hud.bond
     ? `Bonded with ${TOWERS[hud.bond.partner].short} · ${hud.bond.label} +${Math.round(hud.bond.bonus * 100)}% power`
@@ -1420,7 +1469,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
       </div>
       <p className="tower-intel-bond" data-active={Boolean(hud.bond)}>{bondText}</p>
       <p className="tower-intel-copy">{def.blurb}</p>
-      <p className="tower-intel-path">Power {tower.dmgLvl} · Tempo {tower.rateLvl} · {hud.field.rule.label}</p>
+      <p className="tower-intel-path">Power {tower.dmgLvl} · Tempo {tower.rateLvl} · Reach {tower.rangeLvl} · {hud.field.rule.label}</p>
       <p className="tower-intel-meta">
         Aim {AIM_LABEL[hud.towerAim]} <span aria-hidden="true">·</span> Line +{Math.round((hud.lineBonus - 1) * 100)}%
       </p>

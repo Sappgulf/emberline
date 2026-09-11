@@ -118,6 +118,7 @@ describe("maps and shop", () => {
 describe("EmberEngine", () => {
   it("describes pierce as a form, not a damage-only upgrade", () => {
     assert.equal(TOWERS.bow.blurb.includes("Tempered pierces"), true);
+    assert.equal(TOWERS.bow.blurb.includes("Emberlit"), true);
     assert.equal(TOWERS.mortar.blurb.includes("wisps"), true);
     assert.equal(TOWERS.ward.blurb.includes("ring"), true);
   });
@@ -346,6 +347,44 @@ describe("EmberEngine", () => {
     assert.equal(tower.lastUpgrade, "rate");
     assert.ok(tower.upgradeT > 0);
     assert.equal(e.hud().formName, "Bound");
+  });
+
+  it("lets reach alone change form and grow sight", () => {
+    const e = play();
+    e.gold = 500;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    const before = e.sightRange(tower);
+    e.upgradeRange();
+    assert.equal(tower.rangeLvl, 2);
+    assert.equal(e.hud().formName, "Bound");
+    assert.ok(e.sightRange(tower) > before);
+    assert.equal(tower.upgradeBranch, "range");
+    const text = JSON.parse(e.renderText()) as { selectedTower: { rangeLevel: number; form: string } };
+    assert.equal(text.selectedTower.rangeLevel, 2);
+    assert.equal(text.selectedTower.form, "Bound");
+  });
+
+  it("gives emberlit bows an extra pierce", () => {
+    const e = play();
+    e.gold = 900;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    tower.dmgLvl = 4;
+    tower.rateLvl = 4;
+    e.notify();
+    e.empowerSelected();
+    e.spawn("grub");
+    const grub = e.creeps[0];
+    grub.x = grass.c + 0.5;
+    grub.y = grass.r + 0.5;
+    e.fire(tower, grub);
+    const shot = e.shots[0];
+    assert.ok(shot);
+    assert.equal(shot.pierce, 3);
+    assert.equal(shot.empowered, true);
   });
 
   it("keeps packet intent through rejected taps and clears it after a plant", () => {

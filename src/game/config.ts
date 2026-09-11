@@ -12,8 +12,8 @@ export const REFUND_RATE = 0.55;
 export const MAX_UPGRADE = 4;
 export const FORM_NAME = ["", "Timber", "Bound", "Tempered", "Crowned"] as const;
 
-export function towerForm(dmgLvl: number, rateLvl: number) {
-  return Math.max(1, Math.min(MAX_UPGRADE, Math.max(dmgLvl, rateLvl))) as 1 | 2 | 3 | 4;
+export function towerForm(dmgLvl: number, rateLvl: number, rangeLvl = 1) {
+  return Math.max(1, Math.min(MAX_UPGRADE, Math.max(dmgLvl, rateLvl, rangeLvl))) as 1 | 2 | 3 | 4;
 }
 export const TICK = 1 / 60;
 export const HORN_COST = 45;
@@ -91,7 +91,7 @@ export const TOWERS: Record<
     id: "bow",
     name: "Longbow",
     short: "Bow",
-    blurb: "Fast arrows. Hits wisps. Tempered pierces one; Crowned pierces two.",
+    blurb: "Fast arrows. Hits wisps. Tempered pierces one; Crowned pierces two. Emberlit adds a pierce.",
     cost: 60,
     range: 2.45,
     damage: 14,
@@ -106,7 +106,7 @@ export const TOWERS: Record<
     id: "mortar",
     name: "Mortar",
     short: "Mortar",
-    blurb: "Lobs splash on the dirt. Burns oil. Blind to wisps. Cracks shells.",
+    blurb: "Lobs splash on the dirt. Burns oil. Blind to wisps. Cracks shells. Emberlit fattens the oil.",
     cost: 115,
     range: 2.2,
     damage: 34,
@@ -121,7 +121,7 @@ export const TOWERS: Record<
     id: "frost",
     name: "Frost Spire",
     short: "Frost",
-    blurb: "Chills. Hits air. Tempered splashes cold. Hurts hounds and runners.",
+    blurb: "Chills. Hits air. Tempered splashes cold. Hurts hounds and runners. Emberlit pins a beat.",
     cost: 90,
     range: 2.7,
     damage: 7,
@@ -136,7 +136,7 @@ export const TOWERS: Record<
     id: "spark",
     name: "Spark Coil",
     short: "Spark",
-    blurb: "Instant bolt. Ignores armor. Tempered chains. Best on wisps and shamans.",
+    blurb: "Instant bolt. Ignores armor. Tempered chains. Best on wisps and shamans. Emberlit jumps once more.",
     cost: 125,
     range: 3.05,
     damage: 38,
@@ -151,7 +151,7 @@ export const TOWERS: Record<
     id: "bramble",
     name: "Bramble",
     short: "Thorn",
-    blurb: "Close thorns. Ground only. Tempered roots. Hurts runners and shells.",
+    blurb: "Close thorns. Ground only. Tempered roots. Hurts runners and shells. Emberlit roots from timber.",
     cost: 70,
     range: 1.55,
     damage: 9,
@@ -166,7 +166,7 @@ export const TOWERS: Record<
     id: "ward",
     name: "Ash Ward",
     short: "Ward",
-    blurb: "Pulse in a ring. Hits air. Slows everyone it covers. Hurts hounds.",
+    blurb: "Pulse in a ring. Hits air. Slows everyone it covers. Hurts hounds. Emberlit cracks plate.",
     cost: 85,
     range: 2.15,
     damage: 6,
@@ -277,6 +277,10 @@ export function upgradeRateCost(kind: TowerKind, level: number): number {
   return Math.round(TOWERS[kind].cost * 0.4 * level);
 }
 
+export function upgradeRangeCost(kind: TowerKind, level: number): number {
+  return Math.round(TOWERS[kind].cost * 0.38 * level);
+}
+
 export function damageAt(kind: TowerKind, level: number): number {
   return TOWERS[kind].damage * (1 + 0.38 * (level - 1));
 }
@@ -285,8 +289,8 @@ export function rateAt(kind: TowerKind, level: number): number {
   return TOWERS[kind].fireRate * (1 + 0.22 * (level - 1));
 }
 
-export function rangeAt(kind: TowerKind, dmgLvl: number): number {
-  return TOWERS[kind].range * (1 + 0.09 * (dmgLvl - 1));
+export function rangeAt(kind: TowerKind, rangeLvl: number): number {
+  return TOWERS[kind].range * (1 + 0.11 * (rangeLvl - 1));
 }
 
 export function pathCells(): Set<string> {

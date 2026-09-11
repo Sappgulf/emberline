@@ -23,6 +23,7 @@ import {
   rateAt,
   upgradeDamageCost,
   upgradeRateCost,
+  upgradeRangeCost,
   type Aim,
   type CreepKind,
   type TowerKind,
@@ -113,11 +114,12 @@ type TowerBondDefinition = Omit<TowerBondSnap, "bonus">;
 
 const TOWER_BOND_BONUS = 0.08;
 
-export type TowerUpgradeBranch = "damage" | "rate" | "emberlit";
+export type TowerUpgradeBranch = "damage" | "rate" | "range" | "emberlit";
 
 const UPGRADE_FX_DURATION: Record<TowerUpgradeBranch, number> = {
   damage: 1.15,
   rate: 1.15,
+  range: 1.15,
   emberlit: 1.45,
 };
 
@@ -156,6 +158,7 @@ export interface Tower {
   r: number;
   dmgLvl: number;
   rateLvl: number;
+  rangeLvl: number;
   cooldown: number;
   angle: number;
   visAngle: number;
@@ -221,6 +224,7 @@ export interface Shot {
   form: number;
   ox: number;
   oy: number;
+  empowered: boolean;
 }
 
 export interface Particle {
@@ -262,7 +266,7 @@ export interface HudSnap {
   field: MapDef["profile"];
   objective: ObjectiveSnap;
   fieldBoost: { damage: number; rate: number; range: number } | null;
-  nextCosts: { dmg: number; rate: number } | null;
+  nextCosts: { dmg: number; rate: number; range: number } | null;
   aim: Aim;
   paused: boolean;
   speed: number;
@@ -480,6 +484,19 @@ export class EmberEngine {
     return 1;
   }
 
+  formOf(tower: Tower) {
+    return towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl);
+  }
+
+  sightRange(tower: Tower) {
+    return (
+      rangeAt(tower.kind, tower.rangeLvl) *
+      (this.relics.has("glass") ? 1.12 : 1) *
+      (tower.empowered ? 1.18 : 1) *
+      this.fieldRangeMultiplier(tower)
+    );
+  }
+
   hpMult() {
     return this.hard ? HARD_HP : 1;
   }
@@ -520,6 +537,7 @@ export class EmberEngine {
             cell: { c: hud.selectedTower.c, r: hud.selectedTower.r },
             damageLevel: hud.selectedTower.dmgLvl,
             rateLevel: hud.selectedTower.rateLvl,
+            rangeLevel: hud.selectedTower.rangeLvl,
             form: hud.formName,
             aim: hud.selectedTower.aim,
             empowered: hud.selectedTower.empowered,
@@ -538,6 +556,7 @@ export class EmberEngine {
         cell: { c: tower.c, r: tower.r },
         damageLevel: tower.dmgLvl,
         rateLevel: tower.rateLvl,
+        rangeLevel: tower.rangeLvl,
         aim: tower.aim,
         empowered: tower.empowered,
       })),
@@ -576,7 +595,7 @@ export class EmberEngine {
     } else if (rule.id === "ford-banks") {
       current = this.wave > 0 && this.phase !== "wave" && this.waveLeaks === 0 ? 1 : 0;
     } else if (rule.id === "emberfall") {
-      current = this.towers.some((tower) => towerForm(tower.dmgLvl, tower.rateLvl) >= 4) ? 1 : 0;
+      current = this.towers.some((tower) => this.formOf(tower) >= 4) ? 1 : 0;
     } else if (rule.id === "glass-tide") {
       current = Math.min(rule.target, this.towers.filter((tower) => this.besideWater(tower)).length);
     }
@@ -661,7 +680,7 @@ export class EmberEngine {
 
   fieldDamageMultiplier(tower: Tower) {
     if (this.map.profile.rule.id === "stone-latch" && this.besidePath(tower)) return 1.12;
-    if (this.map.profile.rule.id === "emberfall" && towerForm(tower.dmgLvl, tower.rateLvl) >= 4) return 1.16;
+    if (this.map.profile.rule.id === "emberfall" && this.formOf(tower) >= 4) return 1.16;
     if (this.map.profile.rule.id === "glass-tide" && tower.kind === "spark" && this.besideWater(tower)) return 1.12;
     return 1;
   }
@@ -699,7 +718,7 @@ export class EmberEngine {
       phase: this.phase,
       selectedKind: this.selectedKind,
       selectedTower: t,
-      formName: t ? FORM_NAME[towerForm(t.dmgLvl, t.rateLvl)] : "",
+      formName: t ? FORM_NAME[this.formOf(t)] : "",
       remaining,
       waveTotal,
       waveProgress,
@@ -719,6 +738,7 @@ export class EmberEngine {
         ? {
             dmg: t.dmgLvl >= MAX_UPGRADE ? 0 : this.upgradePrice(upgradeDamageCost(t.kind, t.dmgLvl + 1)),
             rate: t.rateLvl >= MAX_UPGRADE ? 0 : this.upgradePrice(upgradeRateCost(t.kind, t.rateLvl + 1)),
+            range: t.rangeLvl >= MAX_UPGRADE ? 0 : this.upgradePrice(upgradeRangeCost(t.kind, t.rangeLvl + 1)),
           }
         : null,
       aim: this.aim,
@@ -820,11 +840,11 @@ export class EmberEngine {
     if (!this.playing()) return false;
     if (this.time - this.lastPlaceT > 3.2) return false;
     const t = this.towers.find((x) => x.id === this.lastPlaceId);
-    return !!t && t.dmgLvl === 1 && t.rateLvl === 1 && !t.empowered;
+    return !!t && t.dmgLvl === 1 && t.rateLvl === 1 && t.rangeLvl === 1 && !t.empowered;
   }
 
   refundFor(t: Tower) {
-    const rate = t.dmgLvl === 1 && t.rateLvl === 1 && !t.empowered ? 0.7 : REFUND_RATE;
+    const rate = t.dmgLvl === 1 && t.rateLvl === 1 && t.rangeLvl === 1 && !t.empowered ? 0.7 : REFUND_RATE;
     return Math.floor(t.spent * rate);
   }
 
@@ -1216,7 +1236,7 @@ export class EmberEngine {
   empowerSelected() {
     if (!this.playing()) return;
     const t = this.selectedTower();
-    if (!t || t.empowered || towerForm(t.dmgLvl, t.rateLvl) < 4) {
+    if (!t || t.empowered || this.formOf(t) < 4) {
       sfx.deny();
       return;
     }
@@ -1360,6 +1380,7 @@ export class EmberEngine {
       r,
       dmgLvl: 1,
       rateLvl: 1,
+      rangeLvl: 1,
       cooldown: 0.15,
       angle: -Math.PI / 2,
       visAngle: -Math.PI / 2,
@@ -1395,7 +1416,7 @@ export class EmberEngine {
       sfx.deny();
       return;
     }
-    const previousForm = towerForm(t.dmgLvl, t.rateLvl);
+    const previousForm = this.formOf(t);
     this.gold -= cost;
     this.lastPlaceId = -1;
     t.dmgLvl += 1;
@@ -1405,7 +1426,7 @@ export class EmberEngine {
     t.upgradeBranch = "damage";
     t.lastUpgrade = "damage";
     this.burst(t.c + 0.5, t.r + 0.35, "#e07838", 10, "spark");
-    const nextForm = towerForm(t.dmgLvl, t.rateLvl);
+    const nextForm = this.formOf(t);
     this.float(
       t.c + 0.5,
       t.r - 0.2,
@@ -1425,7 +1446,7 @@ export class EmberEngine {
       sfx.deny();
       return;
     }
-    const previousForm = towerForm(t.dmgLvl, t.rateLvl);
+    const previousForm = this.formOf(t);
     this.gold -= cost;
     this.lastPlaceId = -1;
     t.rateLvl += 1;
@@ -1435,11 +1456,41 @@ export class EmberEngine {
     t.upgradeBranch = "rate";
     t.lastUpgrade = "rate";
     this.burst(t.c + 0.5, t.r + 0.35, "#d4a054", 10, "spark");
-    const nextForm = towerForm(t.dmgLvl, t.rateLvl);
+    const nextForm = this.formOf(t);
     this.float(
       t.c + 0.5,
       t.r - 0.2,
       nextForm > previousForm ? `${FORM_NAME[nextForm]} form` : "Tempo tuned",
+      nextForm >= 4 ? "#e07838" : "#d4a054",
+    );
+    sfx.upgrade();
+    this.notify();
+  }
+
+  upgradeRange() {
+    if (!this.playing()) return;
+    const t = this.selectedTower();
+    if (!t || t.rangeLvl >= MAX_UPGRADE) return;
+    const cost = this.upgradePrice(upgradeRangeCost(t.kind, t.rangeLvl + 1));
+    if (this.gold < cost) {
+      sfx.deny();
+      return;
+    }
+    const previousForm = this.formOf(t);
+    this.gold -= cost;
+    this.lastPlaceId = -1;
+    t.rangeLvl += 1;
+    t.spent += cost;
+    t.build = 0.55;
+    t.upgradeT = UPGRADE_FX_DURATION.range;
+    t.upgradeBranch = "range";
+    t.lastUpgrade = "range";
+    this.burst(t.c + 0.5, t.r + 0.35, "#6aa8b4", 10, "spark");
+    const nextForm = this.formOf(t);
+    this.float(
+      t.c + 0.5,
+      t.r - 0.2,
+      nextForm > previousForm ? `${FORM_NAME[nextForm]} form` : "Reach tuned",
       nextForm >= 4 ? "#e07838" : "#d4a054",
     );
     sfx.upgrade();
@@ -1617,7 +1668,7 @@ export class EmberEngine {
       creep.death = 0.28;
       let gold = Math.round(
         (CREEPS[creep.kind].gold +
-          this.towers.filter((t) => towerForm(t.dmgLvl, t.rateLvl) >= 4).length +
+          this.towers.filter((t) => this.formOf(t) >= 4).length +
           (this.wave % 4 === 0 ? 2 : 0)) *
           this.goldMult(),
       );
@@ -1694,7 +1745,7 @@ export class EmberEngine {
 
   fire(tower: Tower, target: Creep) {
     const def = TOWERS[tower.kind];
-    const form = towerForm(tower.dmgLvl, tower.rateLvl);
+    const form = this.formOf(tower);
     let dmg =
       damageAt(tower.kind, tower.dmgLvl) *
       (this.relics.has("whet") ? 1.12 : 1) *
@@ -1725,24 +1776,21 @@ export class EmberEngine {
     const sx = tower.c + 0.5 + Math.cos(tower.angle) * muzzle;
     const sy = tower.r + 0.5 + Math.sin(tower.angle) * muzzle;
     if (tower.kind === "ward") {
-      const range =
-        rangeAt(tower.kind, tower.dmgLvl) *
-        (this.relics.has("glass") ? 1.12 : 1) *
-        (tower.empowered ? 1.18 : 1) *
-        this.fieldRangeMultiplier(tower);
+      const range = this.sightRange(tower);
       this.ring(tower.c + 0.5, tower.r + 0.5, "#d4a054");
-      const slow = def.slow + (form >= 3 ? 0.12 : 0);
+      const slow = def.slow + (form >= 3 ? 0.12 : 0) + (tower.empowered ? 0.08 : 0);
       for (const c of this.creeps) {
         if (!c.alive) continue;
         const dx = c.x - (tower.c + 0.5);
         const dy = c.y - (tower.r + 0.5);
         if (dx * dx + dy * dy > range * range) continue;
         const mark = c.id === this.markedId ? MARK_BONUS : 1;
-        this.damageCreep(c, dmg * mark, slow);
+        this.damageCreep(c, dmg * mark, slow, tower.empowered);
       }
       return;
     }
-    const splash = tower.kind === "frost" && form >= 3 ? (form >= 4 ? 0.95 : 0.7) : def.splash;
+    const splash =
+      tower.kind === "frost" && (form >= 3 || tower.empowered) ? (form >= 4 ? 0.95 : 0.7) : def.splash;
     if (def.beam) {
       this.beams.push({
         x1: sx,
@@ -1754,10 +1802,10 @@ export class EmberEngine {
         color: form >= 4 ? "#fff4c8" : "#e8c56a",
       });
       this.damageCreep(target, dmg, 0, true);
-      this.burst(target.x, target.y, "#e8c56a", form >= 3 ? 11 : 8, "spark");
-      if (form >= 3) {
+      this.burst(target.x, target.y, "#e8c56a", form >= 3 || tower.empowered ? 11 : 8, "spark");
+      const hops = (form >= 4 ? 2 : form >= 3 ? 1 : 0) + (tower.empowered ? 1 : 0);
+      if (hops > 0) {
         const chained = new Set<number>([target.id]);
-        const hops = form >= 4 ? 2 : 1;
         let from = target;
         for (let h = 0; h < hops; h++) {
           const extra = this.pickTarget(tower, chained);
@@ -1798,11 +1846,12 @@ export class EmberEngine {
       slow: def.slow * (this.relics.has("cold") && tower.kind === "frost" ? 1.35 : 1) * (form >= 4 && tower.kind === "frost" ? 1.2 : 1),
       ttl: 1.4,
       angle: tower.angle,
-      pierce: tower.kind === "bow" ? (form >= 4 ? 2 : form >= 3 ? 1 : 0) : 0,
+      pierce: tower.kind === "bow" ? (form >= 4 ? 2 : form >= 3 ? 1 : 0) + (tower.empowered ? 1 : 0) : 0,
       hit: new Set(),
       form,
       ox: sx,
       oy: sy,
+      empowered: tower.empowered,
     });
     const spark = tower.kind === "frost" ? "#6aa8b4" : tower.kind === "mortar" ? "#e07838" : "#d4a054";
     if (tower.kind === "mortar") this.burst(sx, sy, spark, 2, "spark");
@@ -1810,17 +1859,16 @@ export class EmberEngine {
     else if (tower.kind === "mortar") sfx.shootMortar();
     else if (tower.kind === "bramble") sfx.shootBramble();
     else sfx.shootFrost();
-    if (tower.kind === "bramble" && form >= 3) {
-      target.rootT = Math.max(target.rootT, form >= 4 ? 0.95 : 0.55);
+    if (tower.kind === "bramble" && (form >= 3 || tower.empowered)) {
+      target.rootT = Math.max(target.rootT, form >= 4 || tower.empowered ? 0.95 : 0.55);
+    }
+    if (tower.kind === "frost" && tower.empowered) {
+      target.rootT = Math.max(target.rootT, 0.28);
     }
   }
 
   pickTarget(tower: Tower, ignore: Set<number> = new Set()): Creep | null {
-    const range =
-      rangeAt(tower.kind, tower.dmgLvl) *
-      (this.relics.has("glass") ? 1.12 : 1) *
-      (tower.empowered ? 1.18 : 1) *
-      this.fieldRangeMultiplier(tower);
+    const range = this.sightRange(tower);
     const cx = tower.c + 0.5;
     const cy = tower.r + 0.5;
     const r2 = range * range;
@@ -1871,13 +1919,23 @@ export class EmberEngine {
         if (!creep.alive) continue;
         const dx = creep.x - x;
         const dy = creep.y - y;
-        if (dx * dx + dy * dy <= r2) this.damageCreep(creep, shot.damage, shot.slow, false, true);
+        if (dx * dx + dy * dy <= r2) {
+          this.damageCreep(creep, shot.damage, shot.slow, false, true);
+          if (shot.kind === "frost" && shot.empowered) creep.rootT = Math.max(creep.rootT, 0.28);
+        }
       }
       this.trauma = Math.min(1, this.trauma + (shot.kind === "mortar" ? 0.05 : 0.1));
       this.hitstop = Math.max(this.hitstop, shot.kind === "mortar" ? 0.02 : 0.035);
       if (shot.kind === "mortar") {
         const form = shot.form || 1;
-        this.burns.push({ x, y, r: 0.48 + form * 0.06, life: 1.5 + form * 0.2, tick: 0 });
+        const fat = shot.empowered ? 1.18 : 1;
+        this.burns.push({
+          x,
+          y,
+          r: (0.48 + form * 0.06) * fat,
+          life: (1.5 + form * 0.2) * (shot.empowered ? 1.35 : 1),
+          tick: 0,
+        });
       }
       return;
     }
@@ -1933,7 +1991,7 @@ export class EmberEngine {
       this.farmT += dt;
       if (this.farmT >= 1.15) {
         this.farmT = 0;
-        const n = this.towers.filter((t) => towerForm(t.dmgLvl, t.rateLvl) >= 4).length;
+        const n = this.towers.filter((t) => this.formOf(t) >= 4).length;
         if (n > 0) {
           const pay = n * (this.lives <= 5 ? 2 : 1);
           this.gold += pay;
@@ -2198,7 +2256,7 @@ export class EmberEngine {
   }
 
   scoreGrade() {
-    const crowned = this.towers.filter((t) => towerForm(t.dmgLvl, t.rateLvl) >= 4).length;
+    const crowned = this.towers.filter((t) => this.formOf(t) >= 4).length;
     const life = this.lives / Math.max(1, this.maxLives());
     const rank = life >= 0.75 && this.gold >= 50 ? "Dawn" : life >= 0.45 ? "Dusk" : "Ember";
     this.grade = `${rank} · ${this.lives} lives · ${this.gold}g · ${crowned} crowned`;

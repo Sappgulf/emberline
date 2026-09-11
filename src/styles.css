@@ -1306,6 +1306,11 @@
   box-shadow: 0 0 0 1px rgba(212, 160, 84, 0.14), 0 0 14px rgba(212, 160, 84, 0.12);
 }
 
+.selected-tower-bar[data-upgrade="range"] .upgrade-action-range {
+  border-color: rgba(106, 168, 180, 0.78);
+  box-shadow: 0 0 0 1px rgba(106, 168, 180, 0.14), 0 0 14px rgba(106, 168, 180, 0.12);
+}
+
 .selected-tower-actions {
   flex: 1 1 22rem;
 }
@@ -1509,6 +1514,10 @@
 
 .upgrade-action[data-branch="rate"] .upgrade-preview {
   color: var(--color-copper);
+}
+
+.upgrade-action[data-branch="range"] .upgrade-preview {
+  color: var(--color-frost);
 }
 
 .dispatch {
