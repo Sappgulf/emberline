@@ -15,9 +15,9 @@ export interface StoryBeat {
   line: string;
 }
 
-export type MapAmbient = "lanterns" | "pine-fog" | "keep-ash" | "river-rain" | "emberfall" | "glass-tide";
-export type MapMarker = "gate" | "pine" | "keep" | "rock" | "glass";
-export type FieldRuleId = "lantern-aura" | "pine-fog" | "stone-latch" | "ford-banks" | "emberfall" | "glass-tide";
+export type MapAmbient = "lanterns" | "pine-fog" | "keep-ash" | "river-rain" | "emberfall" | "glass-tide" | "ash-draw" | "wicker-draft";
+export type MapMarker = "gate" | "pine" | "keep" | "rock" | "glass" | "ash" | "wicker";
+export type FieldRuleId = "lantern-aura" | "pine-fog" | "stone-latch" | "ford-banks" | "emberfall" | "glass-tide" | "ash-draw" | "wicker-draft";
 
 export interface FieldRule {
   id: FieldRuleId;
@@ -29,7 +29,7 @@ export interface FieldRule {
   reward: number;
 }
 
-export type WatchOrderId = "clean" | "sky" | "song" | "crown";
+export type WatchOrderId = "clean" | "sky" | "song" | "crown" | "veil" | "knife";
 
 export interface WatchOrder {
   id: WatchOrderId;
@@ -136,6 +136,32 @@ export function watchOrderFor(plan: WaveSpawn[] | undefined): WatchOrder | null 
       reward: 34,
       target,
       targetKind: "shaman",
+    };
+  }
+
+  const mothCount = countFor("moth");
+  if (mothCount > 0) {
+    const target = Math.min(4, mothCount);
+    return {
+      id: "veil",
+      title: "Clip the veil",
+      detail: `Burn ${target} Moths. Mortar, pike, and cinder can reach the low ones.`,
+      reward: 30,
+      target,
+      targetKind: "moth",
+    };
+  }
+
+  const knaveCount = countFor("knave");
+  if (knaveCount > 0) {
+    const target = Math.min(3, knaveCount);
+    return {
+      id: "knife",
+      title: "Catch the knave",
+      detail: `Drop ${target} Knaves. Frost, bramble, or a mark beats the first dodge.`,
+      reward: 32,
+      target,
+      targetKind: "knave",
     };
   }
 
@@ -341,6 +367,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "wisp", count: 10, gap: 0.24, delay: 0 },
         { kind: "hound", count: 8, gap: 0.26, delay: 1.8 },
+        { kind: "moth", count: 8, gap: 0.22, delay: 2.6 },
         { kind: "shell", count: 4, gap: 0.55, delay: 3.2 },
       ],
     ],
@@ -429,6 +456,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "shell", count: 8, gap: 0.55, delay: 0 },
         { kind: "runner", count: 12, gap: 0.24, delay: 1.6 },
+        { kind: "knave", count: 6, gap: 0.38, delay: 2.8 },
       ],
       [
         { kind: "shaman", count: 3, gap: 1, delay: 0 },
@@ -789,7 +817,7 @@ export const MAPS: MapDef[] = [
     victory: {
       speaker: "Lumen Quill",
       role: "Scout",
-      line: "The glass is quiet. Emberford has a road through every dark now — and the dawn is finally ours.",
+      line: "The glass is quiet. The hollow still breathes ash beyond the fen — we are not done.",
     },
     asides: [
       "The marsh wakes. Read the waterline.",
@@ -798,6 +826,223 @@ export const MAPS: MapDef[] = [
       "Hounds and shell in the same reflection.",
       "The cloaks will hide in the glare.",
       "The Emberlord has found the water.",
+    ],
+  },
+  {
+    id: "ash-hollow",
+    name: "Ash Hollow",
+    place: "The split ravine",
+    theme: {
+      moss: "#2a2218",
+      lit: "#5a3a24",
+      bank: "#1a140e",
+      path: "#5a4030",
+      pathLit: "#8a5a38",
+      ink: "#120e0c",
+      water: "#2a2018",
+      waterLit: "#4a3020",
+    },
+    profile: {
+      label: "Cinder draw",
+      detail: "The ravine drinks fire. Coals last.",
+      ambient: "ash-draw",
+      marker: "ash",
+      rule: {
+        id: "ash-draw",
+        label: "Cinder draw",
+        detail: "Oil and cinder burns last longer. Cinder towers hit harder.",
+        objectiveTitle: "Feed the hollow",
+        objectiveDetail: "Plant a Cinder or Mortar beside the road.",
+        target: 1,
+        reward: 80,
+      },
+    },
+    water: [
+      [0, 8],
+      [1, 8],
+    ],
+    path: [
+      { c: 0, r: 2 },
+      { c: 4, r: 2 },
+      { c: 4, r: 6 },
+      { c: 8, r: 6 },
+      { c: 8, r: 1 },
+      { c: 12, r: 1 },
+    ],
+    props: [
+      { c: 0, r: 0, kind: "pine" },
+      { c: 1, r: 0, kind: "rock" },
+      { c: 2, r: 0, kind: "lamp" },
+      { c: 6, r: 0, kind: "pine" },
+      { c: 11, r: 0, kind: "oak" },
+      { c: 12, r: 0, kind: "pine" },
+      { c: 2, r: 4, kind: "stump" },
+      { c: 6, r: 3, kind: "rock" },
+      { c: 6, r: 4, kind: "oak" },
+      { c: 10, r: 4, kind: "lamp" },
+      { c: 3, r: 8, kind: "fence" },
+      { c: 9, r: 8, kind: "cart" },
+      { c: 12, r: 8, kind: "pine" },
+      { c: 1, r: 5, kind: "shroom" },
+    ],
+    waves: [
+      [
+        { kind: "moth", count: 10, gap: 0.26, delay: 0 },
+        { kind: "grub", count: 12, gap: 0.28, delay: 1.2 },
+      ],
+      [
+        { kind: "knave", count: 8, gap: 0.4, delay: 0 },
+        { kind: "shell", count: 6, gap: 0.5, delay: 1.8 },
+      ],
+      [
+        { kind: "moth", count: 14, gap: 0.22, delay: 0 },
+        { kind: "hound", count: 10, gap: 0.24, delay: 2 },
+      ],
+      [
+        { kind: "knave", count: 10, gap: 0.34, delay: 0 },
+        { kind: "shaman", count: 3, gap: 0.9, delay: 2 },
+        { kind: "moth", count: 8, gap: 0.24, delay: 3.5 },
+      ],
+      [
+        { kind: "shell", count: 10, gap: 0.4, delay: 0 },
+        { kind: "moth", count: 12, gap: 0.22, delay: 1.6 },
+        { kind: "knave", count: 8, gap: 0.3, delay: 3.2 },
+      ],
+      [
+        { kind: "moth", count: 16, gap: 0.2, delay: 0 },
+        { kind: "lord", count: 1, gap: 1, delay: 3.5 },
+        { kind: "knave", count: 10, gap: 0.26, delay: 5 },
+        { kind: "shell", count: 8, gap: 0.4, delay: 6 },
+      ],
+    ],
+    briefing: {
+      speaker: "Brother Ash",
+      role: "Keep steward",
+      line: "The hollow wants fire. Plant a brazier on the bank. Moths fly low — mortar and pike can still take them. Knaves dodge the first bite unless you chill or mark them.",
+    },
+    victory: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The ravine is quiet. One span left — the wicker does not hold still.",
+    },
+    asides: [
+      "Ash in the mouth. Feed the coals.",
+      "Knaves on the split. Mark the first.",
+      "Moths in the draw. Low enough to burn.",
+      "Do not sell the pike.",
+      "Plate and knives together.",
+      "He walks the hollow. Burn the road.",
+    ],
+  },
+  {
+    id: "wicker-span",
+    name: "Wicker Span",
+    place: "The last arch",
+    theme: {
+      moss: "#2c2818",
+      lit: "#6a5a30",
+      bank: "#1c1810",
+      path: "#6a5030",
+      pathLit: "#9a7040",
+      ink: "#14100c",
+      water: "#243438",
+      waterLit: "#3a5858",
+    },
+    profile: {
+      label: "Wicker draft",
+      detail: "The span pulls moths and knaves unless they are held.",
+      ambient: "wicker-draft",
+      marker: "wicker",
+      rule: {
+        id: "wicker-draft",
+        label: "Wicker draft",
+        detail: "Moths and knaves run faster unless chilled or rooted.",
+        objectiveTitle: "Pin the draft",
+        objectiveDetail: "Plant a Frost or Bramble beside the road.",
+        target: 1,
+        reward: 90,
+      },
+    },
+    water: [
+      [0, 0],
+      [1, 0],
+      [12, 5],
+      [12, 7],
+    ],
+    path: [
+      { c: 0, r: 7 },
+      { c: 3, r: 7 },
+      { c: 3, r: 1 },
+      { c: 7, r: 1 },
+      { c: 7, r: 8 },
+      { c: 11, r: 8 },
+      { c: 11, r: 3 },
+      { c: 12, r: 3 },
+    ],
+    props: [
+      { c: 0, r: 2, kind: "reed" },
+      { c: 1, r: 2, kind: "fence" },
+      { c: 5, r: 0, kind: "pine" },
+      { c: 6, r: 3, kind: "lamp" },
+      { c: 8, r: 0, kind: "oak" },
+      { c: 12, r: 0, kind: "pine" },
+      { c: 1, r: 5, kind: "stump" },
+      { c: 5, r: 5, kind: "rock" },
+      { c: 9, r: 5, kind: "lamp" },
+      { c: 4, r: 8, kind: "cart" },
+      { c: 0, r: 8, kind: "reed" },
+      { c: 12, r: 6, kind: "pine" },
+      { c: 8, r: 3, kind: "shroom" },
+    ],
+    waves: [
+      [
+        { kind: "moth", count: 12, gap: 0.24, delay: 0 },
+        { kind: "knave", count: 8, gap: 0.36, delay: 1.4 },
+      ],
+      [
+        { kind: "runner", count: 14, gap: 0.22, delay: 0 },
+        { kind: "moth", count: 10, gap: 0.22, delay: 1.8 },
+      ],
+      [
+        { kind: "knave", count: 12, gap: 0.3, delay: 0 },
+        { kind: "shell", count: 8, gap: 0.45, delay: 2 },
+        { kind: "wisp", count: 8, gap: 0.26, delay: 3.5 },
+      ],
+      [
+        { kind: "moth", count: 16, gap: 0.2, delay: 0 },
+        { kind: "shaman", count: 3, gap: 0.85, delay: 2.2 },
+        { kind: "hound", count: 10, gap: 0.24, delay: 3.6 },
+      ],
+      [
+        { kind: "knave", count: 12, gap: 0.28, delay: 0 },
+        { kind: "moth", count: 14, gap: 0.2, delay: 1.6 },
+        { kind: "shell", count: 8, gap: 0.4, delay: 3.4 },
+      ],
+      [
+        { kind: "wisp", count: 12, gap: 0.22, delay: 0 },
+        { kind: "knave", count: 10, gap: 0.26, delay: 1.8 },
+        { kind: "lord", count: 1, gap: 1, delay: 3.8 },
+        { kind: "moth", count: 14, gap: 0.18, delay: 5.2 },
+        { kind: "shell", count: 8, gap: 0.38, delay: 6.4 },
+      ],
+    ],
+    briefing: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "Last arch. The draft steals moths and knaves unless you pin them. Frost or bramble on the rail. If this span holds, Emberford keeps the dawn.",
+    },
+    victory: {
+      speaker: "Lumen Quill",
+      role: "Scout",
+      line: "The span is ours. Eight roads. Emberford has a watch through every dark — and the dawn is finally ours.",
+    },
+    asides: [
+      "The last arch. Pin the draft.",
+      "Knives on the wicker.",
+      "Moths in the pull. Burn low.",
+      "Do not sell the frost.",
+      "Plate and veil together.",
+      "He walks the span. Hold the dawn.",
     ],
   },
 ];
@@ -809,7 +1054,9 @@ export const BESTIARY = [
   { kind: "wisp" as const, weak: "Longbow and Spark only. Mortar and Bramble go blind. A leak costs one life." },
   { kind: "shaman" as const, weak: "Kill first. Salt halves the song. Spark the clump. Mark them. A leak costs two lives." },
   { kind: "hound" as const, weak: "Frost and Ash Ward. Three living hounds run as a pack. A leak costs one life." },
-  { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, and a mark. A leak costs three lives." },
+  { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, pike, and a mark. A leak costs three lives." },
+  { kind: "moth" as const, weak: "Low air. Mortar, pike, and cinder can reach them. Spark still bites. A leak costs one life." },
+  { kind: "knave" as const, weak: "The first shot misses unless Frost, Bramble, or a mark catches them. A leak costs one life." },
 ];
 
 export function describePlan(waves: WaveSpawn[][], index: number): string {

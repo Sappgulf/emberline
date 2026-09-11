@@ -22,10 +22,12 @@ function emptyGrass(e: EmberEngine): { c: number; r: number } {
 }
 
 describe("maps and shop", () => {
-  it("ships six maps ending at the glass marsh", () => {
-    assert.equal(MAPS.length, 6);
+  it("ships eight maps ending at the wicker span", () => {
+    assert.equal(MAPS.length, 8);
     assert.equal(MAPS[4].id, "ember-copse");
     assert.equal(MAPS[5].id, "glass-marsh");
+    assert.equal(MAPS[6].id, "ash-hollow");
+    assert.equal(MAPS[7].id, "wicker-span");
     assert.ok(shopFor(1, 0).some((s) => s.id === "cord"));
     assert.ok(shopFor(2, 0).some((s) => s.id === "flint"));
   });
@@ -34,8 +36,12 @@ describe("maps and shop", () => {
     for (const map of MAPS) {
       assert.ok(map.profile.label.length > 0);
       assert.ok(map.profile.detail.length > 0);
-      assert.ok(["lanterns", "pine-fog", "keep-ash", "river-rain", "emberfall", "glass-tide"].includes(map.profile.ambient));
-      assert.ok(["gate", "pine", "keep", "rock", "glass"].includes(map.profile.marker));
+      assert.ok(
+        ["lanterns", "pine-fog", "keep-ash", "river-rain", "emberfall", "glass-tide", "ash-draw", "wicker-draft"].includes(
+          map.profile.ambient,
+        ),
+      );
+      assert.ok(["gate", "pine", "keep", "rock", "glass", "ash", "wicker"].includes(map.profile.marker));
       assert.ok(map.profile.rule.label.length > 0);
       assert.ok(map.profile.rule.objectiveTitle.length > 0);
       assert.ok(map.profile.rule.target > 0);
@@ -94,7 +100,7 @@ describe("maps and shop", () => {
 
   it("makes the glass tide rule reward deliberate waterline placement", () => {
     const e = play();
-    e.loadMap(MAPS.length - 1);
+    e.loadMap(MAPS.findIndex((map) => map.id === "glass-marsh"));
     e.clearField();
     e.phase = "ready";
     e.gold = 400;
@@ -826,9 +832,10 @@ describe("EmberEngine", () => {
 });
 
 describe("creep stats", () => {
-  it("gives flying only to wisps", () => {
+  it("gives high air to wisps and low air to moths", () => {
     for (const [kind, stats] of Object.entries(CREEPS)) {
-      assert.equal(stats.flying, kind === "wisp");
+      assert.equal(stats.flying, kind === "wisp" || kind === "moth");
+      assert.equal(stats.low, kind === "moth");
       assert.ok(stats.hp > 0 && stats.speed > 0);
     }
   });
@@ -909,5 +916,47 @@ describe("watch depth", () => {
     e.fire(e.towers[0], grub);
     assert.ok(e.towers[0].cooldown < alone);
     assert.equal(e.hud().kindred, true);
+  });
+
+  it("keeps pike sealed until keep stair and lets mortar strike moths", () => {
+    const e = play();
+    e.chooseKind("pike");
+    assert.equal(e.selectedKind, "bow");
+    e.unlocked = 2;
+    e.loadMap(2);
+    e.chooseKind("pike");
+    assert.equal(e.selectedKind, "pike");
+    e.gold = 400;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.spawn("moth");
+    const moth = e.creeps[0];
+    moth.x = grass.c + 0.5;
+    moth.y = grass.r + 0.5;
+    e.chooseKind("mortar");
+    const near = [
+      { c: grass.c + 1, r: grass.r },
+      { c: grass.c - 1, r: grass.r },
+      { c: grass.c, r: grass.r + 1 },
+      { c: grass.c, r: grass.r - 1 },
+    ].find((p) => e.canBuild(p.c, p.r));
+    assert.ok(near);
+    e.tapCell(near.c, near.r);
+    const mortar = e.towers.find((t) => t.kind === "mortar")!;
+    assert.equal(e.canStrike(mortar, moth), true);
+    assert.equal(e.pickTarget(mortar)?.kind, "moth");
+  });
+
+  it("lets a knave dodge the first bite unless marked", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("knave");
+    const knave = e.creeps[0];
+    const hp = knave.hp;
+    e.damageCreep(knave, 40, 0, false);
+    assert.equal(knave.hp, hp);
+    assert.equal(knave.dodge, false);
+    e.damageCreep(knave, 40, 0, false);
+    assert.ok(knave.hp < hp);
   });
 });

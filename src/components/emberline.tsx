@@ -16,15 +16,17 @@ const AIM_LABEL: Record<Aim, string> = {
   close: "Near",
   strong: "Tough",
 };
-const COUNTER_ORDER: TowerKind[] = ["bow", "frost", "spark", "mortar", "bramble", "ward"];
+const COUNTER_ORDER: TowerKind[] = ["bow", "frost", "spark", "mortar", "bramble", "ward", "pike", "cinder"];
 const COUNTERS: Record<CreepKind, TowerKind[]> = {
-  grub: ["bow"],
+  grub: ["bow", "cinder"],
   runner: ["frost", "bramble"],
-  shell: ["mortar", "bramble", "spark"],
+  shell: ["mortar", "bramble", "pike"],
   wisp: ["bow", "frost", "spark"],
   shaman: ["spark", "mortar"],
   hound: ["frost", "ward", "bramble"],
-  lord: ["mortar", "spark", "bow"],
+  lord: ["mortar", "spark", "pike"],
+  moth: ["cinder", "pike", "mortar", "spark"],
+  knave: ["frost", "bramble", "pike"],
 };
 
 type HoverCell = { c: number; r: number };
@@ -170,6 +172,8 @@ export function Emberline() {
       if (e.key === "4") engine.chooseKind("spark");
       if (e.key === "5") engine.chooseKind("bramble");
       if (e.key === "6") engine.chooseKind("ward");
+      if (e.key === "7") engine.chooseKind("pike");
+      if (e.key === "8") engine.chooseKind("cinder");
       if (e.key === "h" || e.key === "H") engine.blowHorn();
       if (e.key === "m" || e.key === "M") engine.mendKeep();
       if (e.key === "q" || e.key === "Q") engine.upgradeDamage();
@@ -552,7 +556,7 @@ export function Emberline() {
                   <span className="intel-kicker">Next road</span>
                   {hud.route[hud.unlocked + 1]
                     ? `Hold ${hud.route[hud.unlocked]?.name ?? "the current route"} to reveal ${hud.route[hud.unlocked + 1].name}.`
-                    : "All six roads are open. Replay a held route to chase a cleaner watch."}
+                    : "All eight roads are open. Replay a held route to chase a cleaner watch."}
                 </p>
                 <div className="campaign-select" aria-label="Campaign route selection">
                   {hud.route.map((node, index) => {
@@ -598,12 +602,12 @@ export function Emberline() {
             <Overlay kicker="Orders" title="How to watch" close="Close" onClose={() => engine.toggleHelp()} wide>
               <div className="grid w-full grid-cols-1 gap-1.5 text-left sm:grid-cols-2">
                 {[
-                  ["1–6", "Pick a packet. Click grass to plant."],
-                  ["Click a creep", "Mark it. Towers focus and hit harder."],
+                  ["1–8", "Pick a packet. Pike and Cinder unseal on later roads."],
+                  ["Click a creep", "Mark it. Towers focus and hit harder. Beats a knave dodge."],
                   ["Q / E / R", "Upgrade damage, rate, or reach. X sell. Z undo."],
                   ["H / M / S", "Horn, Mend, stall after a wave."],
                   ["Space / P / F", "Send wave. Pause. Speed."],
-                  ["Line two", "Same kind +10% rate. Bow+Frost Windcut. Mortar+Ward Ashring. Spark+Bramble Stormroot."],
+                  ["Line two", "Same kind +10% rate. Bonds: Windcut, Ashring, Stormroot, Brand (Pike+Cinder)."],
                 ].map(([k, v]) => (
                   <div key={k} className="plaque px-3 py-2">
                     <p className="text-[10px] tracking-[0.16em] text-copper uppercase">{k}</p>
@@ -846,26 +850,35 @@ export function Emberline() {
             <div className="packet-row flex min-w-0 flex-1 flex-wrap gap-1">
               {packets.map((kind, i) => {
                 const def = TOWERS[kind];
+                const seal = hud.arsenal.find((item) => item.kind === kind);
+                const locked = seal ? !seal.unlocked : false;
                 return (
                   <button
                     key={kind}
                     type="button"
-                    disabled={!playing}
+                    disabled={!playing || locked}
                     data-on={hud.selectedKind === kind}
-                    data-counter={recommendedCounters.includes(kind)}
+                    data-counter={!locked && recommendedCounters.includes(kind)}
                     aria-pressed={hud.selectedKind === kind}
-                    aria-label={`${def.name} tower, costs ${def.cost} gold${recommendedCounters.includes(kind) ? ", recommended counter" : ""}${hud.selectedKind === kind ? ", selected" : ""}`}
+                    aria-label={
+                      locked
+                        ? `${def.name} sealed. ${seal?.hint ?? ""}`
+                        : `${def.name} tower, costs ${def.cost} gold${recommendedCounters.includes(kind) ? ", recommended counter" : ""}${hud.selectedKind === kind ? ", selected" : ""}`
+                    }
+                    title={locked ? seal?.hint : undefined}
                     onClick={() => {
                       unlockAudio();
                       engine.chooseKind(kind);
                     }}
-                    className={`pressable packet ${hud.gold < def.cost ? "opacity-40" : ""}`}
+                    className={`pressable packet ${locked || hud.gold < def.cost ? "opacity-40" : ""}`}
                   >
                     <span className="key">{i + 1}</span>
                     <img className="packet-sprite" src={spriteUrl(kind)} alt="" />
                     <span className="mt-1 block text-[12px] font-semibold">{def.short}</span>
-                    <span className="packet-role">{def.hitsAir ? "Air" : "Ground"}</span>
-                    <span className="block text-[10px] text-copper">{def.cost}g</span>
+                    <span className="packet-role">
+                      {locked ? "Sealed" : kind === "pike" || kind === "cinder" ? "Low air" : def.hitsAir ? "Air" : "Ground"}
+                    </span>
+                    <span className="block text-[10px] text-copper">{locked ? "—" : `${def.cost}g`}</span>
                   </button>
                 );
               })}
@@ -966,6 +979,8 @@ function formBlurb(kind: TowerKind, form: string, empowered = false) {
     if (kind === "frost") return "Emberlit. Chill splashes and pins a beat.";
     if (kind === "spark") return "Emberlit. The bolt jumps one extra time.";
     if (kind === "ward") return "Emberlit. The ring cracks plate.";
+    if (kind === "pike") return "Emberlit. The spear ignores plate.";
+    if (kind === "cinder") return "Emberlit. Coals cling and burn longer.";
     return "Emberlit. Thorns root from the first timber.";
   }
   if (form === "Bound") return "The ring holds. A little more bite and reach.";
@@ -975,6 +990,8 @@ function formBlurb(kind: TowerKind, form: string, empowered = false) {
     if (kind === "frost") return "Shots splash chill on a cluster.";
     if (kind === "spark") return "The bolt jumps once to a nearby creep.";
     if (kind === "ward") return "The ring chills harder.";
+    if (kind === "pike") return "The spear pins the target.";
+    if (kind === "cinder") return "The coal patch lasts.";
     return "Thorns root the target.";
   }
   if (form === "Crowned") {
@@ -983,6 +1000,8 @@ function formBlurb(kind: TowerKind, form: string, empowered = false) {
     if (kind === "frost") return "Deep freeze splash.";
     if (kind === "spark") return "The bolt jumps twice.";
     if (kind === "ward") return "The ring holds a long chill.";
+    if (kind === "pike") return "The spear cracks plate.";
+    if (kind === "cinder") return "Wide clinging coals.";
     return "Long root.";
   }
   return "Green timber. Upgrade damage, rate, or reach to change form.";

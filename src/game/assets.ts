@@ -5,7 +5,7 @@
  * without changing game code. Bumping the revision also avoids stale browser
  * cache when a sprite is refreshed in place.
  */
-export const ASSET_REVISION = "v4";
+export const ASSET_REVISION = "v5";
 
 export const SPRITE_KEYS = [
   "bow",
@@ -14,6 +14,8 @@ export const SPRITE_KEYS = [
   "spark",
   "bramble",
   "ward",
+  "pike",
+  "cinder",
   "grub",
   "runner",
   "shell",
@@ -21,6 +23,8 @@ export const SPRITE_KEYS = [
   "shaman",
   "hound",
   "lord",
+  "moth",
+  "knave",
   "keep",
   "gate",
   "pine",
@@ -35,7 +39,16 @@ export function spriteUrl(key: string) {
 
 export const ROUTE_MARKER_REVISION = "v1";
 
-export const ROUTE_MARKER_KEYS = ["low-road", "pine-cut", "keep-stair", "river-ford", "ember-copse", "glass-marsh"] as const;
+export const ROUTE_MARKER_KEYS = [
+  "low-road",
+  "pine-cut",
+  "keep-stair",
+  "river-ford",
+  "ember-copse",
+  "glass-marsh",
+  "ash-hollow",
+  "wicker-span",
+] as const;
 
 export type RouteMarkerAsset = (typeof ROUTE_MARKER_KEYS)[number];
 

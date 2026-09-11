@@ -446,7 +446,9 @@ function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
             ? EMBER
             : bond?.id === "stormroot"
               ? COPPER
-              : "rgba(212,160,84,0.35)";
+              : bond?.id === "brand"
+                ? EMBER
+                : "rgba(212,160,84,0.35)";
       ctx.strokeStyle = bond ? bondColor : "rgba(212,160,84,0.35)";
       ctx.globalAlpha = bond ? 0.82 : 1;
       ctx.lineWidth = bond ? Math.max(2.2, cell * 0.05) : Math.max(1.4, cell * 0.028);
@@ -882,9 +884,22 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
   const py = creep.y * cell;
   const fade = creep.alive ? 1 : Math.max(0, creep.death / 0.28);
   const size =
-    (creep.kind === "lord" ? 0.4 : creep.kind === "shell" ? 0.3 : creep.kind === "hound" ? 0.23 : creep.kind === "shaman" ? 0.24 : 0.2) *
+    (creep.kind === "lord"
+      ? 0.4
+      : creep.kind === "shell"
+        ? 0.3
+        : creep.kind === "hound"
+          ? 0.23
+          : creep.kind === "shaman" || creep.kind === "knave"
+            ? 0.24
+            : creep.kind === "moth"
+              ? 0.18
+              : 0.2) *
     cell;
-  const bob = creep.kind === "wisp" ? Math.sin(creep.progress * 6) * 3 : Math.sin(creep.progress * 10) * 1.2;
+  const bob =
+    creep.kind === "wisp" || creep.kind === "moth"
+      ? Math.sin(creep.progress * 6) * 3
+      : Math.sin(creep.progress * 10) * 1.2;
   const stretch = 1 + Math.sin(creep.progress * 10) * (creep.kind === "hound" ? 0.08 : 0.03);
   ctx.save();
   ctx.translate(px, py + bob);
@@ -997,7 +1012,7 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
 }
 
 function loftOf(shot: { x: number; y: number; ox?: number; oy?: number; tx?: number; ty?: number; kind: string }) {
-  if (shot.kind !== "mortar" || shot.ox == null || shot.oy == null || shot.tx == null || shot.ty == null) return 0;
+  if ((shot.kind !== "mortar" && shot.kind !== "cinder") || shot.ox == null || shot.oy == null || shot.tx == null || shot.ty == null) return 0;
   const tot = Math.hypot(shot.tx - shot.ox, shot.ty - shot.oy) || 1;
   const done = Math.min(1, Math.hypot(shot.x - shot.ox, shot.y - shot.oy) / tot);
   return Math.sin(done * Math.PI) * 0.55;
@@ -1024,9 +1039,9 @@ function drawShot(
   const y = (shot.y - loft) * cell;
   const ang = shot.angle ?? Math.atan2(shot.y - shot.py, shot.x - shot.px);
   const key =
-    shot.kind === "bow"
+    shot.kind === "bow" || shot.kind === "pike"
       ? "shot-bow"
-      : shot.kind === "mortar"
+      : shot.kind === "mortar" || shot.kind === "cinder"
         ? "shot-mortar"
         : shot.kind === "frost"
           ? "shot-frost"

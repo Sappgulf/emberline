@@ -31,8 +31,8 @@ export const PATH: ReadonlyArray<{ c: number; r: number }> = [
   { c: 12, r: 3 },
 ];
 
-export type TowerKind = "bow" | "mortar" | "frost" | "spark" | "bramble" | "ward";
-export type CreepKind = "grub" | "runner" | "shell" | "wisp" | "shaman" | "hound" | "lord";
+export type TowerKind = "bow" | "mortar" | "frost" | "spark" | "bramble" | "ward" | "pike" | "cinder";
+export type CreepKind = "grub" | "runner" | "shell" | "wisp" | "shaman" | "hound" | "lord" | "moth" | "knave";
 export type Aim = "first" | "last" | "close" | "strong";
 export type PropKind = "pine" | "oak" | "rock" | "stump" | "reed" | "lamp" | "shroom" | "cart" | "fence";
 
@@ -177,6 +177,58 @@ export const TOWERS: Record<
     hitsAir: true,
     beam: false,
   },
+  pike: {
+    id: "pike",
+    name: "Watch Pike",
+    short: "Pike",
+    blurb: "Close spear. Ground and low moths. Tempered pins. Crowned cracks plate. Emberlit ignores armor.",
+    cost: 95,
+    range: 1.85,
+    damage: 26,
+    fireRate: 1.05,
+    splash: 0,
+    slow: 0,
+    projectileSpeed: 9.4,
+    hitsAir: false,
+    beam: false,
+  },
+  cinder: {
+    id: "cinder",
+    name: "Cinder Brazier",
+    short: "Cinder",
+    blurb: "Lobs coals onto the dirt. Hits moths. Burns a patch. Tempered oil lasts. Emberlit the coals cling.",
+    cost: 110,
+    range: 2.05,
+    damage: 16,
+    fireRate: 0.68,
+    splash: 0.95,
+    slow: 0,
+    projectileSpeed: 6.4,
+    hitsAir: false,
+    beam: false,
+  },
+};
+
+export const TOWER_UNLOCK: Record<TowerKind, number> = {
+  bow: 0,
+  mortar: 0,
+  frost: 0,
+  spark: 0,
+  bramble: 0,
+  ward: 0,
+  pike: 2,
+  cinder: 3,
+};
+
+export const TOWER_UNLOCK_HINT: Record<TowerKind, string> = {
+  bow: "",
+  mortar: "",
+  frost: "",
+  spark: "",
+  bramble: "",
+  ward: "",
+  pike: "Hold Keep Stair to unseal the pike.",
+  cinder: "Hold River Ford to unseal the brazier.",
 };
 
 export const CREEPS: Record<
@@ -188,16 +240,19 @@ export const CREEPS: Record<
     armor: number;
     name: string;
     flying: boolean;
+    low: boolean;
     heal: number;
   }
 > = {
-  grub: { hp: 44, speed: 1.12, gold: 8, armor: 0, name: "Grubs", flying: false, heal: 0 },
-  runner: { hp: 26, speed: 2.05, gold: 10, armor: 0, name: "Runners", flying: false, heal: 0 },
-  shell: { hp: 120, speed: 0.76, gold: 16, armor: 5, name: "Shells", flying: false, heal: 0 },
-  wisp: { hp: 32, speed: 1.7, gold: 14, armor: 0, name: "Wisps", flying: true, heal: 0 },
-  shaman: { hp: 88, speed: 0.88, gold: 22, armor: 2, name: "Shamans", flying: false, heal: 10 },
-  hound: { hp: 38, speed: 2.28, gold: 12, armor: 1, name: "Hounds", flying: false, heal: 0 },
-  lord: { hp: 920, speed: 0.58, gold: 120, armor: 8, name: "Emberlord", flying: false, heal: 0 },
+  grub: { hp: 44, speed: 1.12, gold: 8, armor: 0, name: "Grubs", flying: false, low: false, heal: 0 },
+  runner: { hp: 26, speed: 2.05, gold: 10, armor: 0, name: "Runners", flying: false, low: false, heal: 0 },
+  shell: { hp: 120, speed: 0.76, gold: 16, armor: 5, name: "Shells", flying: false, low: false, heal: 0 },
+  wisp: { hp: 32, speed: 1.7, gold: 14, armor: 0, name: "Wisps", flying: true, low: false, heal: 0 },
+  shaman: { hp: 88, speed: 0.88, gold: 22, armor: 2, name: "Shamans", flying: false, low: false, heal: 10 },
+  hound: { hp: 38, speed: 2.28, gold: 12, armor: 1, name: "Hounds", flying: false, low: false, heal: 0 },
+  lord: { hp: 920, speed: 0.58, gold: 120, armor: 8, name: "Emberlord", flying: false, low: false, heal: 0 },
+  moth: { hp: 22, speed: 1.95, gold: 11, armor: 0, name: "Moths", flying: true, low: true, heal: 0 },
+  knave: { hp: 54, speed: 1.55, gold: 15, armor: 1, name: "Knaves", flying: false, low: false, heal: 0 },
 };
 
 export type WaveSpawn = { kind: CreepKind; count: number; gap: number; delay: number };
