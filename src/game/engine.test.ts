@@ -208,6 +208,7 @@ describe("EmberEngine", () => {
     assert.equal(initial.route[0].hasAir, false);
     assert.equal(initial.previewWave, 1);
     assert.deepEqual(initial.wavePreview, [{ kind: "grub", count: 8 }]);
+    assert.deepEqual(initial.thenPreview, [{ kind: "grub", count: 12 }]);
     assert.equal(initial.threatTier, "light");
     assert.equal(initial.waveTotal, 0);
     assert.equal(initial.waveProgress, 0);

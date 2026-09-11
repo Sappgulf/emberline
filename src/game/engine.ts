@@ -38,6 +38,7 @@ import {
   pathCellsOf,
   planHasAir,
   shopFor,
+  SHOP,
   type MapDef,
   type MapMarker,
   type RelicId,
@@ -325,6 +326,11 @@ export interface HudSnap {
   } | null;
   kindred: boolean;
   arsenal: Array<{ kind: TowerKind; unlocked: boolean; hint: string }>;
+  thenPreview: WavePreviewSnap[];
+  waveKills: number;
+  waveLeaks: number;
+  waveEarned: number;
+  relicNames: Array<{ id: RelicId; name: string }>;
 }
 
 export interface Burn {
@@ -812,6 +818,7 @@ export class EmberEngine {
       }),
       previewWave: previewIndex + 1,
       wavePreview: wavePreviewFor(previewPlan),
+      thenPreview: wavePreviewFor(map.waves[previewIndex + 1]),
       threatTier: threatTierFor(previewPlan),
       campaign: this.campaignOpen,
       hard: this.hard,
@@ -837,6 +844,10 @@ export class EmberEngine {
         unlocked: this.towerUnlocked(kind),
         hint: TOWER_UNLOCK_HINT[kind],
       })),
+      waveKills: this.waveKills,
+      waveLeaks: this.waveLeaks,
+      waveEarned: this.waveEarned,
+      relicNames: SHOP.filter((item) => this.relics.has(item.id)).map((item) => ({ id: item.id, name: item.name })),
     };
   }
 
@@ -2076,7 +2087,7 @@ export class EmberEngine {
       this.farmT += dt;
       if (this.farmT >= 3.2) {
         this.farmT = 0;
-        this.gold += 1;
+        this.gold += 1 + (this.towers.length >= 4 ? 1 : 0);
       }
     }
     if (this.phase === "wave") {

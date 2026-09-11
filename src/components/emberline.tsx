@@ -411,10 +411,13 @@ export function Emberline() {
 
       {!hud.codex && <CampaignRail route={hud.route} />}
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className={`playfield-shell ${playing ? "playfield-shell-live" : ""}`}>
+        {playing && (
+          <WatchDesk hud={hud} hint={placementMessageValue} tone={placementToneValue} />
+        )}
         <div
           ref={wrapRef}
-          className="playfield-wrap relative mx-3 mt-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+          className="board-col playfield-wrap relative flex min-h-0 items-center justify-center overflow-hidden"
         >
           <canvas
             ref={canvasRef}
@@ -457,21 +460,6 @@ export function Emberline() {
             </div>
           )}
 
-          {playing && hud.marked && (
-            <div className="inspect-card pointer-events-none absolute left-2 top-14 z-10 max-w-[14rem] px-3 py-2">
-              <p className="font-display text-base leading-none text-copper">{hud.marked.name}</p>
-              <p className="mt-1 text-[11px] text-dust">
-                {hud.marked.hp}/{hud.marked.maxHp} hp · leak {hud.marked.leak}
-                {hud.marked.low ? " · low air" : hud.marked.flying ? " · air" : ""}
-                {hud.marked.armor ? ` · plate ${hud.marked.armor}` : ""}
-                {hud.marked.dodge ? " · first dodge" : ""}
-              </p>
-              <div className="mt-1 h-1.5 overflow-hidden bg-ink">
-                <div className="h-full bg-ember" style={{ width: `${Math.max(4, (hud.marked.hp / hud.marked.maxHp) * 100)}%` }} />
-              </div>
-              <p className="mt-1 text-[10px] tracking-wide text-ember">Marked +18%</p>
-            </div>
-          )}
           {playing && hud.hero && (
             <p
               className="pointer-events-none absolute left-2 top-2 z-10 max-w-[70%] bg-ink/80 px-3 py-1.5 text-[12px] text-copper"
@@ -488,18 +476,19 @@ export function Emberline() {
               <span>Every pair pays +3g</span>
             </div>
           )}
-          {playing && (
-            <div className="intel-stack" aria-label="Watch intelligence">
-              <ThreatPanel
-                hud={hud}
-                onSelectCounter={(kind) => {
-                  unlockAudio();
-                  engine.chooseCounter(kind);
-                }}
-              />
-              {hud.selectedTower && !hud.lastResult && <TowerIntel hud={hud} />}
-            </div>
-          )}
+        </div>
+        {playing && (
+          <div className="intel-stack intel-stack-dock" aria-label="Watch intelligence">
+            <ThreatPanel
+              hud={hud}
+              onSelectCounter={(kind) => {
+                unlockAudio();
+                engine.chooseCounter(kind);
+              }}
+            />
+            {hud.selectedTower && !hud.lastResult && <TowerIntel hud={hud} />}
+          </div>
+        )}
           {hud.codex && (
             <Overlay wide kicker="Codex" title="Bestiary" onClose={closeCodex} close="Close">
               <div className="bestiary-grid w-full text-left">
@@ -969,7 +958,6 @@ export function Emberline() {
             </div>
           </div>
         </footer>
-      </div>
     </div>
   );
 }
@@ -1177,6 +1165,109 @@ const THREAT_NOTE: Record<HudSnap["threatTier"], string> = {
   severe: "Heavy pressure ahead. Keep the horn ready.",
 };
 
+function DeskWave({ items }: { items: HudSnap["wavePreview"] }) {
+  if (items.length === 0) return <p className="desk-empty">End of this road.</p>;
+  return (
+    <ul className="desk-wave">
+      {items.map((item) => (
+        <li key={item.kind}>
+          <img src={spriteUrl(item.kind)} alt="" />
+          <span>
+            {item.count} {CREEPS[item.kind].name}
+            {CREEPS[item.kind].low ? " · low" : CREEPS[item.kind].flying ? " · air" : ""}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: string }) {
+  const sealed = hud.arsenal.filter((item) => !item.unlocked);
+  const nextRoad = hud.route[hud.mapIndex + 1]?.name;
+  return (
+    <aside className="watch-desk" aria-label="Watch desk">
+      <section className="desk-card">
+        <span className="intel-kicker">This road</span>
+        <strong>{hud.field.label}</strong>
+        <p>{hud.field.detail}</p>
+        <p className="desk-meta">
+          {hud.objective.title} · {hud.objective.current}/{hud.objective.target}
+          {hud.objective.complete ? " · held" : ` · +${hud.objective.reward}g`}
+        </p>
+      </section>
+      <section className="desk-card">
+        <span className="intel-kicker">Now · wave {hud.previewWave}</span>
+        <DeskWave items={hud.wavePreview} />
+        {hud.thenPreview.length > 0 && (
+          <>
+            <span className="intel-kicker desk-then">Then · wave {hud.previewWave + 1}</span>
+            <DeskWave items={hud.thenPreview} />
+          </>
+        )}
+      </section>
+      <section className="desk-card" data-tone={tone}>
+        <span className="intel-kicker">Plant</span>
+        <p>{hint}</p>
+      </section>
+      {hud.marked && (
+        <section className="desk-card desk-mark">
+          <span className="intel-kicker">Marked</span>
+          <strong>{hud.marked.name}</strong>
+          <p>
+            {hud.marked.hp}/{hud.marked.maxHp} hp · leak {hud.marked.leak}
+            {hud.marked.low ? " · low air" : hud.marked.flying ? " · air" : ""}
+            {hud.marked.dodge ? " · first dodge" : ""}
+          </p>
+        </section>
+      )}
+      {hud.phase === "wave" && (
+        <section className="desk-card">
+          <span className="intel-kicker">This wave</span>
+          <div className="desk-stats">
+            <span>
+              <b>{hud.waveKills}</b> cut
+            </span>
+            <span>
+              <b>{hud.waveLeaks}</b> leaked
+            </span>
+            <span>
+              <b>+{hud.waveEarned}g</b>
+            </span>
+          </div>
+        </section>
+      )}
+      <section className="desk-card">
+        <span className="intel-kicker">Satchel</span>
+        {hud.relicNames.length === 0 ? (
+          <p>Empty. Buy at the stall after a wave.</p>
+        ) : (
+          <ul className="desk-relics">
+            {hud.relicNames.map((relic) => (
+              <li key={relic.id}>
+                <img src={relicUrl(relic.id)} alt="" />
+                {relic.name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {sealed.length > 0 && (
+        <section className="desk-card">
+          <span className="intel-kicker">Still sealed</span>
+          {sealed.map((item) => (
+            <p key={item.kind}>
+              <strong>{TOWERS[item.kind].short}</strong> · {item.hint}
+            </p>
+          ))}
+        </section>
+      )}
+      {hud.towerCount >= 4 && <p className="desk-next">Overwatch · four towers tithe +1g</p>}
+      {nextRoad && <p className="desk-next">Next road · {nextRoad}</p>}
+    </aside>
+  );
+}
+
 function CampaignRail({ route }: { route: HudSnap["route"] }) {
   return (
     <nav className="campaign-rail" aria-label="Campaign watch route">
@@ -1200,7 +1291,7 @@ function CampaignRail({ route }: { route: HudSnap["route"] }) {
 }
 
 function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: (kind: TowerKind) => void }) {
-  const uncoveredAir = hud.nextAir && !hud.airCovered;
+  const uncoveredAir = Boolean(hud.airHint);
   const counters = counterPlan(hud.wavePreview, hud.arsenal);
   const [intelOpen, setIntelOpen] = useState(true);
 
@@ -1267,7 +1358,9 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
                 <img src={spriteUrl(item.kind)} alt="" />
                 <span className="threat-count">{item.count}</span>
                 <span className="threat-name">{creep.name}</span>
-                {creep.flying && <span className="threat-tag">Air</span>}
+                {creep.low && <span className="threat-tag">Low</span>}
+                {creep.flying && !creep.low && <span className="threat-tag">Air</span>}
+                {item.kind === "knave" && <span className="threat-tag">Dodge</span>}
                 {!creep.flying && creep.armor > 0 && <span className="threat-tag">Armor</span>}
               </div>
             );
@@ -1275,10 +1368,14 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
         </div>
         <div className="threat-tactics">
           <span className="intel-kicker">Counter plan</span>
-          <CounterPills counters={counters} selectedKind={hud.selectedKind} onSelect={onSelectCounter} />
+          {counters.length === 0 ? (
+            <p className="threat-note">Any packet holds this wave.</p>
+          ) : (
+            <CounterPills counters={counters} selectedKind={hud.selectedKind} onSelect={onSelectCounter} />
+          )}
         </div>
         <p className={uncoveredAir ? "threat-note threat-note-alert" : "threat-note"}>
-          {uncoveredAir ? "Air sightline needed — choose Bow or Frost." : THREAT_NOTE[hud.threatTier]}
+          {uncoveredAir ? hud.airHint : THREAT_NOTE[hud.threatTier]}
         </p>
       </div>
     </section>
