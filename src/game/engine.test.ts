@@ -30,6 +30,7 @@ describe("maps and shop", () => {
     assert.equal(MAPS[7].id, "wicker-span");
     assert.ok(shopFor(1, 0).some((s) => s.id === "cord"));
     assert.ok(shopFor(2, 0).some((s) => s.id === "flint"));
+    assert.ok(shopFor(0, 0).some((s) => s.id === "wick"));
   });
 
   it("ships a visual field profile for every campaign map", () => {
@@ -240,7 +241,7 @@ describe("EmberEngine", () => {
     e.finishWaveIfClear();
 
     assert.match(e.hud().bannerText ?? "", /Order \+22g/);
-    assert.equal(e.hud().lastResult?.earned, 98);
+    assert.equal(e.hud().lastResult?.earned, 102);
     assert.equal(e.hud().lastResult?.hold, "clean");
     assert.equal(e.hud().lastResult?.orderHeld, true);
     assert.equal(e.hud().lastResult?.orderPayout, 22);
@@ -309,12 +310,12 @@ describe("EmberEngine", () => {
   it("starts a watch with gold, lives, and a buildable field", () => {
     const e = play();
     assert.equal(e.phase, "ready");
-    assert.equal(e.gold, START_GOLD);
+    assert.equal(e.gold, START_GOLD + 40);
     assert.equal(e.lives, START_LIVES);
     const grass = emptyGrass(e);
     e.tapCell(grass.c, grass.r);
     assert.equal(e.towers.length, 1);
-    assert.equal(e.gold, START_GOLD - TOWERS.bow.cost);
+    assert.equal(e.gold, START_GOLD + 40 - TOWERS.bow.cost);
     assert.equal(e.selectedKind, null);
     assert.equal(e.selectedId, e.towers[0].id);
   });
@@ -442,7 +443,7 @@ describe("EmberEngine", () => {
     const spent = e.towers[0].spent;
     e.sellSelected();
     assert.equal(e.towers.length, 0);
-    assert.equal(e.gold, START_GOLD - spent + Math.floor(spent * 0.7));
+    assert.equal(e.gold, START_GOLD + 40 - spent + Math.floor(spent * 0.7));
   });
 
   it("does not place or sell during shop or brief", () => {
@@ -619,7 +620,7 @@ describe("EmberEngine", () => {
     e.loadMap(1);
     e.retryMap();
     e.dismissBrief();
-    assert.equal(e.gold, e.startGold() + 40);
+    assert.equal(e.gold, e.startGold() + 80);
     assert.equal(e.mapIndex, 1);
   });
 
@@ -688,12 +689,13 @@ describe("EmberEngine", () => {
     assert.equal(e.canUndo(), true);
     e.undoLast();
     assert.equal(e.towers.length, 0);
-    assert.equal(e.gold, START_GOLD);
+    assert.equal(e.gold, START_GOLD + 40);
   });
 
   it("charges extra lives for a lord leak", () => {
     assert.equal(leakCost("grub"), 1);
     assert.equal(leakCost("shell"), 2);
+    assert.equal(leakCost("ashfang"), 2);
     assert.equal(leakCost("lord"), 3);
     const e = play();
     e.lives = 10;
@@ -984,5 +986,86 @@ describe("watch depth", () => {
     assert.equal(knave.dodge, false);
     e.damageCreep(knave, 40, 0, false);
     assert.ok(knave.hp < hp);
+  });
+
+  it("applies the chosen watch rite when the brief is taken", () => {
+    const heart = new EmberEngine();
+    heart.startFromTitle();
+    heart.chooseRite("heart");
+    heart.dismissBrief();
+    assert.equal(heart.lives, START_LIVES + 2);
+    assert.equal(heart.gold, START_GOLD);
+    assert.equal(heart.hud().rite, "heart");
+
+    const flame = new EmberEngine();
+    flame.startFromTitle();
+    flame.chooseRite("flame");
+    flame.dismissBrief();
+    flame.gold = 400;
+    const grass = emptyGrass(flame);
+    flame.tapCell(grass.c, grass.r);
+    flame.phase = "wave";
+    flame.wave = 1;
+    flame.spawn("grub");
+    const grub = flame.creeps[0];
+    grub.x = grass.c + 0.5;
+    grub.y = grass.r + 0.5;
+    const hp = grub.hp;
+    flame.fire(flame.towers[0], grub);
+    flame.shots.forEach((shot) => flame.impact(shot, grub.x, grub.y));
+    assert.ok(grub.hp < hp);
+  });
+
+  it("lets a scout mark the toughest body once per wave", () => {
+    const e = play();
+    e.phase = "wave";
+    e.scoutReady = true;
+    e.spawn("grub");
+    e.spawn("shell");
+    e.scoutMark();
+    assert.equal(e.hud().marked?.kind, "shell");
+    assert.equal(e.hud().scoutReady, false);
+    const marked = e.markedId;
+    e.scoutMark();
+    assert.equal(e.markedId, marked);
+  });
+
+  it("makes an ashfang howl and haste the pack", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("ashfang");
+    e.spawn("grub");
+    const fang = e.creeps[0];
+    const grub = e.creeps[1];
+    grub.x = fang.x;
+    grub.y = fang.y;
+    e.damageCreep(fang, 20, 0, false);
+    assert.equal(fang.howled, true);
+    assert.ok(grub.hasteT > 0);
+    assert.match(e.banner?.text ?? "", /howl/i);
+  });
+
+  it("lets lantern wick raise aura tempo on the low road", () => {
+    const e = play();
+    e.gold = 400;
+    const lamp = e.props.find((prop) => prop.kind === "lamp");
+    assert.ok(lamp);
+    const cell = [
+      { c: lamp.c + 1, r: lamp.r },
+      { c: lamp.c - 1, r: lamp.r },
+      { c: lamp.c, r: lamp.r + 1 },
+      { c: lamp.c, r: lamp.r - 1 },
+    ].find((pos) => e.canBuild(pos.c, pos.r));
+    assert.ok(cell);
+    e.tapCell(cell.c, cell.r);
+    const base = e.fieldRateMultiplier(e.towers[0]);
+    e.relics.add("wick");
+    assert.ok(e.fieldRateMultiplier(e.towers[0]) > base);
+  });
+
+  it("keeps a counter plan even on a grub-only wave", () => {
+    const e = play();
+    assert.ok(e.hud().opening.length > 0);
+    assert.equal(e.hud().riteName.includes("purse") || e.hud().rite === "coin", true);
   });
 });

@@ -904,19 +904,21 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
       ? 0.4
       : creep.kind === "shell"
         ? 0.3
-        : creep.kind === "hound"
-          ? 0.23
-          : creep.kind === "shaman" || creep.kind === "knave"
-            ? 0.24
-            : creep.kind === "moth"
-              ? 0.18
-              : 0.2) *
+        : creep.kind === "ashfang"
+          ? 0.27
+          : creep.kind === "hound"
+            ? 0.23
+            : creep.kind === "shaman" || creep.kind === "knave"
+              ? 0.24
+              : creep.kind === "moth"
+                ? 0.18
+                : 0.2) *
     cell;
   const bob =
     creep.kind === "wisp" || creep.kind === "moth"
       ? Math.sin(creep.progress * 6) * 3
       : Math.sin(creep.progress * 10) * 1.2;
-  const stretch = 1 + Math.sin(creep.progress * 10) * (creep.kind === "hound" ? 0.08 : 0.03);
+  const stretch = 1 + Math.sin(creep.progress * 10) * (creep.kind === "hound" || creep.kind === "ashfang" ? 0.08 : 0.03);
   ctx.save();
   ctx.translate(px, py + bob);
   ctx.rotate(creep.kind === "wisp" ? 0 : creep.facing);
@@ -972,6 +974,19 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
     ctx.arc(0, -size * 0.08, size * 1.45, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+  if (creep.hasteT > 0 && creep.alive) {
+    ctx.strokeStyle = "rgba(224,120,56,0.7)";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.06, size * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  if (creep.kind === "ashfang" && creep.alive) {
+    ctx.fillStyle = "rgba(224,120,56,0.18)";
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.12, size * 1.15, 0, Math.PI * 2);
+    ctx.fill();
   }
   if (marked && creep.alive) {
     ctx.strokeStyle = EMBER;

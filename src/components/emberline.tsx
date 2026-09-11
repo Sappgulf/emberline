@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { RotateCcw } from "lucide-react";
 import { COLS, CREEPS, FORM_NAME, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type TowerKind } from "@/game/config";
 import { relicUrl, routeMarkerUrl, spriteUrl } from "@/game/assets";
-import { BESTIARY, type RelicId } from "@/game/campaign";
+import { BESTIARY, RITES, type RelicId, type WatchRiteId } from "@/game/campaign";
 import { EmberEngine, type HudSnap, type TowerUpgradeBranch } from "@/game/engine";
 import { drawWorld } from "@/game/render";
 import { loadSprites } from "@/game/sprites";
@@ -27,6 +27,7 @@ const COUNTERS: Record<CreepKind, TowerKind[]> = {
   lord: ["mortar", "spark", "pike"],
   moth: ["cinder", "pike", "mortar", "spark"],
   knave: ["frost", "bramble", "pike"],
+  ashfang: ["frost", "ward", "bramble", "pike"],
 };
 
 type HoverCell = { c: number; r: number };
@@ -201,6 +202,7 @@ export function Emberline() {
       if (e.key === "f" || e.key === "F") engine.cycleSpeed();
       if (e.key === "u" || e.key === "U") engine.toggleMute();
       if (e.key === "s" || e.key === "S") engine.openStall();
+      if (e.key === "k" || e.key === "K") engine.scoutMark();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -409,7 +411,7 @@ export function Emberline() {
         </div>
       </header>
 
-      {!hud.codex && <CampaignRail route={hud.route} />}
+      {!menu && <CampaignRail route={hud.route} />}
 
       <div className={`playfield-shell ${playing ? "playfield-shell-live" : ""}`}>
         {playing && (
@@ -490,7 +492,7 @@ export function Emberline() {
           </div>
         )}
           {hud.codex && (
-            <Overlay wide kicker="Codex" title="Bestiary" onClose={closeCodex} close="Close">
+            <Overlay size="wide" kicker="Codex" title="Bestiary" onClose={closeCodex} close="Close">
               <div className="bestiary-grid w-full text-left">
                 {BESTIARY.map((b) => {
                   const creep = CREEPS[b.kind];
@@ -529,7 +531,7 @@ export function Emberline() {
 
           {hud.campaign && (
             <Overlay
-              wide
+              size="wide"
               surface="campaign"
               kicker="Campaign route"
               title="The ember watch"
@@ -589,15 +591,21 @@ export function Emberline() {
           )}
 
           {hud.help && (
-            <Overlay kicker="Orders" title="How to watch" close="Close" onClose={() => engine.toggleHelp()} wide>
-              <div className="grid w-full grid-cols-1 gap-1.5 text-left sm:grid-cols-2">
+            <Overlay kicker="Orders" title="How to watch" close="Close" onClose={() => engine.toggleHelp()} size="wide">
+              <div className="orders-grid w-full text-left">
                 {[
-                  ["1–8", "Pick a packet. Pike and Cinder unseal on later roads."],
-                  ["Click a creep", "Mark it. Towers focus and hit harder. Beats a knave dodge."],
-                  ["Q / E / R", "Upgrade damage, rate, or reach. X sell. Z undo."],
-                  ["H / M / S", "Horn, Mend, stall after a wave."],
-                  ["Space / P / F", "Send wave. Pause. Speed."],
-                  ["Line two", "Same kind +10% rate. Bonds: Windcut, Ashring, Stormroot, Brand (Pike+Cinder)."],
+                  ["1–8", "Pick a packet. Pike unseals after Keep Stair; Cinder after River Ford."],
+                  ["Click a creep", "Mark it. Towers focus and hit 18% harder. Beats a knave dodge."],
+                  ["K scout", "Once a wave, mark the toughest body on the road."],
+                  ["Q / E / R", "Forge damage, rate, or reach. Highest sets the form. X sell. Z undo."],
+                  ["H / M / S", "Horn burns the road. Mend the keep. Stall after a wave."],
+                  ["Space / P / F", "Send the wave. Pause. Cycle 1× / 2× / 3×."],
+                  ["Line two", "Same kind +10% rate. Bonds: Windcut, Ashring, Stormroot, Brand."],
+                  ["Rites", "At the brief: spare purse, spare timber, or first ember."],
+                  ["Ashfangs", "The first bite howls. Nearby creeps run. Frost and Ward catch them."],
+                  ["Lanterns", "Towers in the glow fire faster. Wick makes every road glow."],
+                  ["Hard watch", "14 lives, tougher creeps, richer bounties. Shells splinter."],
+                  ["Emberlit", "Crown a tower, then spend 70g. Each kind awakens once."],
                 ].map(([k, v]) => (
                   <div key={k} className="plaque px-3 py-2">
                     <p className="text-[10px] tracking-[0.16em] text-copper uppercase">{k}</p>
@@ -608,53 +616,85 @@ export function Emberline() {
             </Overlay>
           )}
           {hud.phase === "title" && !hud.codex && !hud.campaign && !hud.help && (
-            <Overlay kicker="Keep watch" title="Emberline" emblem>
-              <p className="max-w-sm text-sm leading-relaxed text-dust">
-                Plant on grass. Forge damage, rate, or reach. Tap a creep to mark it. Hold {hud.mapTotal} maps until dawn.
-              </p>
-              <label className="flex cursor-pointer items-center justify-center gap-2 text-xs text-dust">
-                <input type="checkbox" checked={hud.hard} onChange={(e) => engine.setHard(e.target.checked)} className="accent-ember" />
-                Hard watch — 14 lives, tougher creeps, richer bounties
-              </label>
-              <WatchLedger hud={hud} />
-              <div className="menu-actions">
-                <button
-                  type="button"
-                  className="pressable send-flag min-h-11 px-7 text-sm"
-                  onClick={() => {
-                    unlockAudio();
-                    engine.startFromTitle();
-                  }}
-                >
-                  Hold the line
-                </button>
-                {hud.unlocked > 0 && (
-                  <button
-                    type="button"
-                    className="pressable stamp min-h-11 px-5 text-sm text-copper"
-                    onClick={() => {
-                      unlockAudio();
-                      engine.continueWatch();
-                    }}
-                  >
-                    Continue
-                  </button>
-                )}
-                <button ref={campaignTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.toggleCampaign()}>
-                  Campaign
-                </button>
-                <button ref={codexTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleCodex()}>
-                  Bestiary
-                </button>
-                <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleHelp()}>
-                  Orders
-                </button>
+            <Overlay kicker="Keep watch" title="Emberline" emblem size="keep">
+              <div className="keep-book">
+                <div className="keep-main">
+                  <p className="keep-lead">
+                    Plant on grass. Forge damage, rate, or reach. Tap a creep to mark it. Hold {hud.mapTotal} roads until dawn.
+                  </p>
+                  <label className="keep-hard">
+                    <input type="checkbox" checked={hud.hard} onChange={(e) => engine.setHard(e.target.checked)} className="accent-ember" />
+                    Hard watch — 14 lives, tougher creeps, richer bounties
+                  </label>
+                  <WatchLedger hud={hud} />
+                  <div className="menu-actions">
+                    <button
+                      type="button"
+                      className="pressable send-flag min-h-11 px-7 text-sm"
+                      onClick={() => {
+                        unlockAudio();
+                        engine.startFromTitle();
+                      }}
+                    >
+                      Hold the line
+                    </button>
+                    {hud.unlocked > 0 && (
+                      <button
+                        type="button"
+                        className="pressable stamp min-h-11 px-5 text-sm text-copper"
+                        onClick={() => {
+                          unlockAudio();
+                          engine.continueWatch();
+                        }}
+                      >
+                        Continue
+                      </button>
+                    )}
+                    <button ref={campaignTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-copper" onClick={() => engine.toggleCampaign()}>
+                      Campaign
+                    </button>
+                    <button ref={codexTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleCodex()}>
+                      Bestiary
+                    </button>
+                    <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleHelp()}>
+                      Orders
+                    </button>
+                  </div>
+                </div>
+                <div className="keep-side">
+                  <KeepRouteBoard hud={hud} />
+                  <KeepArsenal arsenal={hud.arsenal} />
+                  <ol className="keep-steps" aria-label="How the watch works">
+                    <li>
+                      <b>1</b>
+                      <span>
+                        <strong>Choose a rite</strong>
+                        <small>Purse, timber, or first ember at the brief.</small>
+                      </span>
+                    </li>
+                    <li>
+                      <b>2</b>
+                      <span>
+                        <strong>Plant the bends</strong>
+                        <small>Packets on grass. Lanterns buy tempo.</small>
+                      </span>
+                    </li>
+                    <li>
+                      <b>3</b>
+                      <span>
+                        <strong>Send and mark</strong>
+                        <small>K scouts the toughest. Horn if it frays.</small>
+                      </span>
+                    </li>
+                  </ol>
+                </div>
               </div>
             </Overlay>
           )}
 
           {hud.phase === "brief" && hud.story && (
             <Overlay
+              size="wide"
               kicker={hud.story.role}
               title={hud.story.speaker}
               emblem
@@ -662,8 +702,10 @@ export function Emberline() {
               onAction={() => engine.dismissBrief()}
               dimmer
             >
-              <p className="max-w-md text-sm leading-relaxed text-parchment">{hud.story.line}</p>
+              <p className="max-w-2xl text-sm leading-relaxed text-parchment">{hud.story.line}</p>
               <FieldNote field={hud.field} markerId={hud.route[hud.mapIndex]?.id} />
+              <RitePicker rite={hud.rite} />
+              <BriefWave hud={hud} />
               {firstWatch && <BriefingSteps />}
               <p className="text-[11px] text-dust">Space also takes the watch.</p>
             </Overlay>
@@ -671,7 +713,7 @@ export function Emberline() {
 
           {(hud.phase === "shop" || hud.phase === "stall") && (
             <Overlay
-              wide
+              size="wide"
               kicker="Brother Ash"
               title={hud.phase === "shop" ? "Night market" : "Roadside stall"}
               action={hud.phase === "shop" ? "March on" : "Back to the road"}
@@ -679,7 +721,25 @@ export function Emberline() {
             >
               {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
               <p className="text-sm text-dust">{hud.story?.line ?? `${hud.gold}g in the purse.`}</p>
-              <ShopList items={hud.shopItems} relics={hud.relics} gold={hud.gold} />
+              <div className="shop-board">
+                <div className="shop-satchel" aria-label="Satchel">
+                  <span className="intel-kicker">Satchel</span>
+                  {hud.relicNames.length === 0 ? (
+                    <p>Empty. Buy what the next road needs.</p>
+                  ) : (
+                    <ul>
+                      {hud.relicNames.map((relic) => (
+                        <li key={relic.id}>
+                          <img src={relicUrl(relic.id)} alt="" />
+                          {relic.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <strong>{hud.gold}g</strong>
+                </div>
+                <ShopList items={hud.shopItems} relics={hud.relics} gold={hud.gold} />
+              </div>
             </Overlay>
           )}
 
@@ -837,7 +897,7 @@ export function Emberline() {
           )}
 
           <div className="flex flex-wrap items-end gap-2">
-            <div className="packet-row flex min-w-0 flex-1 flex-wrap gap-1">
+            <div className="packet-row">
               {packets.map((kind, i) => {
                 const def = TOWERS[kind];
                 const seal = hud.arsenal.find((item) => item.kind === kind);
@@ -896,6 +956,20 @@ export function Emberline() {
               >
                 <span className="command-label">Pace</span>
                 <span className="command-value">{hud.speed}×</span>
+              </button>
+              <button
+                type="button"
+                className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
+                aria-label={hud.phase !== "wave" ? "Scout available during a wave" : hud.scoutReady ? "Scout marks the toughest creep" : "Scout already used this wave"}
+                title={hud.phase !== "wave" ? "Scout during a wave" : hud.scoutReady ? "Scout the toughest" : "Scout spent"}
+                disabled={hud.phase !== "wave" || !hud.scoutReady}
+                onClick={() => {
+                  unlockAudio();
+                  engine.scoutMark();
+                }}
+              >
+                <span className="command-label">Scout</span>
+                <span className="command-value">{hud.phase !== "wave" ? "Wave only" : hud.scoutReady ? "Ready" : "Spent"}</span>
               </button>
               <button
                 type="button"
@@ -1086,6 +1160,71 @@ function upgradeAriaLabel(hud: HudSnap, branch: UpgradeBranch, cost: number) {
   return `Upgrade ${label.toLowerCase()} for ${cost} gold; ${effect}`;
 }
 
+function KeepRouteBoard({ hud }: { hud: HudSnap }) {
+  return (
+    <section className="keep-routes" aria-label="Campaign roads">
+      <span className="intel-kicker">Eight roads</span>
+      <ol>
+        {hud.route.map((node, index) => (
+          <li key={node.id} data-state={node.state}>
+            <img src={routeMarkerUrl(node.id)} alt="" />
+            <span>
+              <small>{index + 1} · {node.state === "current" ? "Here" : node.state === "held" ? "Held" : node.state === "available" ? "Open" : "Sealed"}</small>
+              <strong>{node.name}</strong>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function KeepArsenal({ arsenal }: { arsenal: HudSnap["arsenal"] }) {
+  return (
+    <section className="keep-arsenal" aria-label="Arsenal">
+      <span className="intel-kicker">Packets</span>
+      <ul>
+        {arsenal.map((item) => (
+          <li key={item.kind} data-sealed={!item.unlocked}>
+            <img src={spriteUrl(item.kind)} alt="" />
+            <span>{TOWERS[item.kind].short}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function RitePicker({ rite }: { rite: WatchRiteId }) {
+  return (
+    <div className="rite-grid" role="radiogroup" aria-label="Watch rite">
+      {RITES.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          className="pressable plaque rite-card"
+          aria-pressed={rite === item.id}
+          onClick={() => engine.chooseRite(item.id)}
+        >
+          <span className="intel-kicker">Rite</span>
+          <strong>{item.name}</strong>
+          <span>{item.blurb}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function BriefWave({ hud }: { hud: HudSnap }) {
+  return (
+    <div className="brief-wave" aria-label={`First wave on ${hud.mapName}`}>
+      <span className="intel-kicker">Wave {hud.previewWave}</span>
+      <DeskWave items={hud.wavePreview} />
+      <p>{hud.opening}</p>
+    </div>
+  );
+}
+
 function WatchLedger({ hud }: { hud: HudSnap }) {
   const nextRoute = hud.route[hud.unlocked]?.name;
   const relicLabel = hud.relics.length === 1 ? "relic" : "relics";
@@ -1187,6 +1326,14 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
   const nextRoad = hud.route[hud.mapIndex + 1]?.name;
   return (
     <aside className="watch-desk" aria-label="Watch desk">
+      <section className="desk-card" data-tone={tone}>
+        <span className="intel-kicker">Opening</span>
+        <p>{hud.opening || hint}</p>
+        {hint && hint !== hud.opening && <p className="desk-meta">{hint}</p>}
+        <p className="desk-meta">
+          Scout · {hud.phase === "wave" ? (hud.scoutReady ? "K marks the toughest" : "spent this wave") : "ready on send"}
+        </p>
+      </section>
       <section className="desk-card">
         <span className="intel-kicker">This road</span>
         <strong>{hud.field.label}</strong>
@@ -1195,6 +1342,7 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
           {hud.objective.title} · {hud.objective.current}/{hud.objective.target}
           {hud.objective.complete ? " · held" : ` · +${hud.objective.reward}g`}
         </p>
+        <p className="desk-meta">Rite · {hud.riteName}</p>
       </section>
       <section className="desk-card">
         <span className="intel-kicker">Now · wave {hud.previewWave}</span>
@@ -1205,10 +1353,6 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
             <DeskWave items={hud.thenPreview} />
           </>
         )}
-      </section>
-      <section className="desk-card" data-tone={tone}>
-        <span className="intel-kicker">Plant</span>
-        <p>{hint}</p>
       </section>
       {hud.marked && (
         <section className="desk-card desk-mark">
@@ -1251,17 +1395,12 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
             ))}
           </ul>
         )}
+        {sealed.length > 0 && (
+          <p className="desk-meta">
+            Sealed · {sealed.map((item) => TOWERS[item.kind].short).join(" · ")}
+          </p>
+        )}
       </section>
-      {sealed.length > 0 && (
-        <section className="desk-card">
-          <span className="intel-kicker">Still sealed</span>
-          {sealed.map((item) => (
-            <p key={item.kind}>
-              <strong>{TOWERS[item.kind].short}</strong> · {item.hint}
-            </p>
-          ))}
-        </section>
-      )}
       {hud.towerCount >= 4 && <p className="desk-next">Overwatch · four towers tithe +1g</p>}
       {nextRoad && <p className="desk-next">Next road · {nextRoad}</p>}
     </aside>
@@ -1361,6 +1500,7 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
                 {creep.low && <span className="threat-tag">Low</span>}
                 {creep.flying && !creep.low && <span className="threat-tag">Air</span>}
                 {item.kind === "knave" && <span className="threat-tag">Dodge</span>}
+                {item.kind === "ashfang" && <span className="threat-tag">Howl</span>}
                 {!creep.flying && creep.armor > 0 && <span className="threat-tag">Armor</span>}
               </div>
             );
@@ -1491,7 +1631,10 @@ function counterPlan(wave: HudSnap["wavePreview"], arsenal: HudSnap["arsenal"] =
     for (const kind of COUNTERS[item.kind]) needed.add(kind);
   }
   const open = new Set(arsenal.filter((item) => item.unlocked).map((item) => item.kind));
-  return COUNTER_ORDER.filter((kind) => needed.has(kind) && (open.size === 0 || open.has(kind))).slice(0, 4);
+  const list = COUNTER_ORDER.filter((kind) => needed.has(kind) && (open.size === 0 || open.has(kind)));
+  if (list.length > 0) return list.slice(0, 4);
+  const fallback = COUNTER_ORDER.find((kind) => open.size === 0 || open.has(kind));
+  return fallback ? [fallback] : ["bow"];
 }
 
 function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
@@ -1599,6 +1742,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
 function Overlay({
   children,
   wide,
+  size,
   kicker,
   title,
   action,
@@ -1611,6 +1755,7 @@ function Overlay({
 }: {
   children?: React.ReactNode;
   wide?: boolean;
+  size?: "card" | "wide" | "keep";
   kicker?: string;
   title?: string;
   action?: string;
@@ -1621,6 +1766,7 @@ function Overlay({
   emblem?: boolean;
   surface?: "campaign" | "dawn";
 }) {
+  const layout = size ?? (wide ? "wide" : "card");
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1665,7 +1811,7 @@ function Overlay({
       />
       <div
         ref={dialogRef}
-        className={`overlay-in dispatch ${surface === "campaign" ? "dispatch-campaign" : surface === "dawn" ? "dispatch-dawn" : ""} relative flex w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[90dvh] flex-col items-center gap-3 overflow-y-auto px-8 py-8 text-center`}
+        className={`overlay-in dispatch dispatch-${layout} ${surface === "campaign" ? "dispatch-campaign" : surface === "dawn" ? "dispatch-dawn" : ""} relative flex w-full max-h-[92dvh] flex-col ${layout === "keep" ? "items-stretch text-left" : "items-center text-center"} gap-3 overflow-y-auto`}
       >
         {close && onClose && (
           <button type="button" className="pressable stamp overlay-close min-h-9 px-3 text-[10px] text-dust" onClick={onClose}>

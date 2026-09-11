@@ -1,6 +1,13 @@
 import { CREEPS, type CreepKind, type PropKind, type WaveSpawn } from "./config.ts";
 
-export type RelicId = "purse" | "timber" | "whet" | "oil" | "cold" | "glass" | "salt" | "ember" | "adze" | "cord" | "flint";
+export type RelicId = "purse" | "timber" | "whet" | "oil" | "cold" | "glass" | "salt" | "ember" | "adze" | "cord" | "flint" | "wick";
+export type WatchRiteId = "coin" | "heart" | "flame";
+
+export const RITES: ReadonlyArray<{ id: WatchRiteId; name: string; blurb: string }> = [
+  { id: "coin", name: "Spare purse", blurb: "+40 gold on this road." },
+  { id: "heart", name: "Spare timber", blurb: "+2 keep lives on this road." },
+  { id: "flame", name: "First ember", blurb: "Towers hit 12% harder on the first wave." },
+];
 
 export interface ShopItem {
   id: RelicId;
@@ -29,7 +36,7 @@ export interface FieldRule {
   reward: number;
 }
 
-export type WatchOrderId = "clean" | "sky" | "song" | "crown" | "veil" | "knife";
+export type WatchOrderId = "clean" | "sky" | "song" | "crown" | "veil" | "knife" | "howl";
 
 export interface WatchOrder {
   id: WatchOrderId;
@@ -86,6 +93,7 @@ export const SHOP: ShopItem[] = [
   { id: "adze", name: "Keep adze", cost: 70, blurb: "Tower upgrades cost 18% less." },
   { id: "cord", name: "Watch cord", cost: 80, blurb: "Lined towers hit 15% per neighbor instead of 10%." },
   { id: "flint", name: "Gate flint", cost: 70, blurb: "Each tower's first shot of a wave hits 40% harder." },
+  { id: "wick", name: "Lantern wick", cost: 65, blurb: "Lanterns fire the line 8% faster, on every road." },
 ];
 
 const UNLOCK: Record<RelicId, number> = {
@@ -100,6 +108,7 @@ const UNLOCK: Record<RelicId, number> = {
   adze: 0,
   cord: 1,
   flint: 2,
+  wick: 0,
 };
 
 export const RELIC_IDS = SHOP.map((s) => s.id);
@@ -162,6 +171,19 @@ export function watchOrderFor(plan: WaveSpawn[] | undefined): WatchOrder | null 
       reward: 32,
       target,
       targetKind: "knave",
+    };
+  }
+
+  const fangCount = countFor("ashfang");
+  if (fangCount > 0) {
+    const target = Math.min(3, fangCount);
+    return {
+      id: "howl",
+      title: "Silence the howl",
+      detail: `Drop ${target} Ashfangs before they speed the pack.`,
+      reward: 34,
+      target,
+      targetKind: "ashfang",
     };
   }
 
@@ -465,6 +487,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "runner", count: 16, gap: 0.22, delay: 0 },
         { kind: "shell", count: 8, gap: 0.48, delay: 2 },
+        { kind: "ashfang", count: 4, gap: 0.42, delay: 3.2 },
       ],
       [
         { kind: "wisp", count: 16, gap: 0.22, delay: 0 },
@@ -576,6 +599,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "shell", count: 6, gap: 0.7, delay: 0 },
         { kind: "grub", count: 10, gap: 0.32, delay: 1 },
+        { kind: "ashfang", count: 4, gap: 0.4, delay: 2.4 },
       ],
       [
         { kind: "wisp", count: 14, gap: 0.24, delay: 0 },
@@ -681,6 +705,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "hound", count: 10, gap: 0.24, delay: 0 },
         { kind: "wisp", count: 10, gap: 0.22, delay: 1.8 },
+        { kind: "ashfang", count: 4, gap: 0.38, delay: 3.2 },
       ],
       [
         { kind: "runner", count: 12, gap: 0.22, delay: 0 },
@@ -796,6 +821,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "hound", count: 12, gap: 0.24, delay: 0 },
         { kind: "shell", count: 8, gap: 0.4, delay: 1.8 },
+        { kind: "ashfang", count: 4, gap: 0.36, delay: 3.2 },
       ],
       [
         { kind: "wisp", count: 14, gap: 0.2, delay: 0 },
@@ -897,6 +923,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "moth", count: 14, gap: 0.22, delay: 0 },
         { kind: "hound", count: 10, gap: 0.24, delay: 2 },
+        { kind: "ashfang", count: 5, gap: 0.36, delay: 3.4 },
       ],
       [
         { kind: "knave", count: 10, gap: 0.34, delay: 0 },
@@ -1012,6 +1039,7 @@ export const MAPS: MapDef[] = [
         { kind: "moth", count: 16, gap: 0.2, delay: 0 },
         { kind: "shaman", count: 3, gap: 0.85, delay: 2.2 },
         { kind: "hound", count: 10, gap: 0.24, delay: 3.6 },
+        { kind: "ashfang", count: 4, gap: 0.34, delay: 4.8 },
       ],
       [
         { kind: "knave", count: 12, gap: 0.28, delay: 0 },
@@ -1057,6 +1085,7 @@ export const BESTIARY = [
   { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, pike, and a mark. A leak costs three lives." },
   { kind: "moth" as const, weak: "Low air. Mortar, pike, and cinder can reach them. Spark still bites. A leak costs one life." },
   { kind: "knave" as const, weak: "The first shot misses unless Frost, Bramble, or a mark catches them. A leak costs one life." },
+  { kind: "ashfang" as const, weak: "The first bite makes it howl — nearby creeps run faster. Frost and Ward catch it. A leak costs two lives." },
 ];
 
 export function describePlan(waves: WaveSpawn[][], index: number): string {
@@ -1073,7 +1102,7 @@ export function planHasAir(waves: WaveSpawn[][], index: number): boolean {
 
 export function leakCost(kind: CreepKind): number {
   if (kind === "lord") return 3;
-  if (kind === "shaman" || kind === "shell") return 2;
+  if (kind === "shaman" || kind === "shell" || kind === "ashfang") return 2;
   return 1;
 }
 

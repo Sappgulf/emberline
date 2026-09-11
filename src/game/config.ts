@@ -32,7 +32,7 @@ export const PATH: ReadonlyArray<{ c: number; r: number }> = [
 ];
 
 export type TowerKind = "bow" | "mortar" | "frost" | "spark" | "bramble" | "ward" | "pike" | "cinder";
-export type CreepKind = "grub" | "runner" | "shell" | "wisp" | "shaman" | "hound" | "lord" | "moth" | "knave";
+export type CreepKind = "grub" | "runner" | "shell" | "wisp" | "shaman" | "hound" | "lord" | "moth" | "knave" | "ashfang";
 export type Aim = "first" | "last" | "close" | "strong";
 export type PropKind = "pine" | "oak" | "rock" | "stump" | "reed" | "lamp" | "shroom" | "cart" | "fence";
 
@@ -253,6 +253,7 @@ export const CREEPS: Record<
   lord: { hp: 920, speed: 0.58, gold: 120, armor: 8, name: "Emberlord", flying: false, low: false, heal: 0 },
   moth: { hp: 22, speed: 1.95, gold: 11, armor: 0, name: "Moths", flying: true, low: true, heal: 0 },
   knave: { hp: 54, speed: 1.55, gold: 15, armor: 1, name: "Knaves", flying: false, low: false, heal: 0 },
+  ashfang: { hp: 78, speed: 1.82, gold: 18, armor: 2, name: "Ashfangs", flying: false, low: false, heal: 0 },
 };
 
 export type WaveSpawn = { kind: CreepKind; count: number; gap: number; delay: number };

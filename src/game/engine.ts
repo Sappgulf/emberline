@@ -39,10 +39,12 @@ import {
   planHasAir,
   shopFor,
   SHOP,
+  RITES,
   type MapDef,
   type MapMarker,
   type RelicId,
   type WatchOrder,
+  type WatchRiteId,
   watchOrderFor,
 } from "./campaign.ts";
 import { sfx, setMuted } from "./audio.ts";
@@ -151,7 +153,12 @@ function threatTierFor(plan: MapDef["waves"][number] | undefined): ThreatTier {
   const severe = plan.some((entry) => entry.kind === "lord") || total >= 24;
   if (severe) return "severe";
   const mixed = plan.some(
-    (entry) => entry.kind === "shell" || entry.kind === "shaman" || entry.kind === "hound" || CREEPS[entry.kind].flying,
+    (entry) =>
+      entry.kind === "shell" ||
+      entry.kind === "shaman" ||
+      entry.kind === "hound" ||
+      entry.kind === "ashfang" ||
+      CREEPS[entry.kind].flying,
   );
   return total >= 12 || mixed ? "mixed" : "light";
 }
@@ -197,6 +204,8 @@ export interface Creep {
   healT: number;
   dodge: boolean;
   rootT: number;
+  howled: boolean;
+  hasteT: number;
 }
 
 export interface Beam {
@@ -331,6 +340,10 @@ export interface HudSnap {
   waveLeaks: number;
   waveEarned: number;
   relicNames: Array<{ id: RelicId; name: string }>;
+  rite: WatchRiteId;
+  riteName: string;
+  scoutReady: boolean;
+  opening: string;
 }
 
 export interface Burn {
@@ -408,6 +421,8 @@ export class EmberEngine {
   hard = false;
   help = false;
   markedId = -1;
+  rite: WatchRiteId = "coin";
+  scoutReady = true;
 
   private acc = 0;
   private listeners = new Set<() => void>();
@@ -596,6 +611,8 @@ export class EmberEngine {
       campaign: hud.campaign,
       hard: hud.hard,
       marked: hud.marked,
+      rite: hud.rite,
+      scoutReady: hud.scoutReady,
     });
   }
 
@@ -711,7 +728,9 @@ export class EmberEngine {
   }
 
   fieldRateMultiplier(tower: Tower) {
-    return this.map.profile.rule.id === "lantern-aura" && this.inLanternAura(tower) ? 1.18 : 1;
+    if (!this.inLanternAura(tower)) return 1;
+    if (this.map.profile.rule.id === "lantern-aura") return this.relics.has("wick") ? 1.26 : 1.18;
+    return this.relics.has("wick") ? 1.1 : 1;
   }
 
   fieldRangeMultiplier(tower: Tower) {
@@ -848,7 +867,24 @@ export class EmberEngine {
       waveLeaks: this.waveLeaks,
       waveEarned: this.waveEarned,
       relicNames: SHOP.filter((item) => this.relics.has(item.id)).map((item) => ({ id: item.id, name: item.name })),
+      rite: this.rite,
+      riteName: RITES.find((item) => item.id === this.rite)?.name ?? "Spare purse",
+      scoutReady: this.scoutReady,
+      opening: this.openingAdvice(),
     };
+  }
+
+  openingAdvice() {
+    const cover = this.coversPreview(this.map.waves[this.wave]);
+    if (cover.hint) return cover.hint;
+    const rule = this.map.profile.rule;
+    if (rule.id === "lantern-aura" && !this.objectiveProgress().complete) {
+      return "Plant a bow beside a lantern. The glow buys tempo.";
+    }
+    if (this.towers.length === 0) return "Pick a packet and plant on highlighted grass.";
+    if (this.phase === "ready" && this.wave === 0) return "Cover the first bend, then send.";
+    if (this.phase === "ready") return "Forge, mend, or send the next wave.";
+    return "Mark the threat. Horn if the line frays.";
   }
 
   toggleMute() {
@@ -1115,6 +1151,7 @@ export class EmberEngine {
     this.loadMap(0);
     this.clearField();
     this.hard = hard;
+    this.rite = "coin";
     this.gold = this.startGold();
     this.lives = this.maxLives();
     this.phase = "brief";
@@ -1147,11 +1184,46 @@ export class EmberEngine {
     this.notify();
   }
 
+  chooseRite(id: WatchRiteId) {
+    if (this.phase !== "brief" && this.phase !== "title") return;
+    if (!RITES.some((item) => item.id === id)) return;
+    this.rite = id;
+    this.notify();
+  }
+
+  applyRite() {
+    if (this.rite === "coin") this.gold += 40;
+    if (this.rite === "heart") this.lives += 2;
+  }
+
+  scoutMark() {
+    if (this.phase !== "wave" || !this.scoutReady) {
+      sfx.deny();
+      return;
+    }
+    let best: Creep | null = null;
+    for (const creep of this.creeps) {
+      if (!creep.alive) continue;
+      if (!best || creep.hp > best.hp || (creep.hp === best.hp && creep.progress > best.progress)) best = creep;
+    }
+    if (!best) {
+      sfx.deny();
+      return;
+    }
+    this.markedId = best.id;
+    this.scoutReady = false;
+    this.float(best.x, best.y - 0.45, "Scout", "#d4a054");
+    this.banner = { text: `Scout marked ${CREEPS[best.kind].name}`, life: 1.2, max: 1.2 };
+    sfx.place();
+    this.notify();
+  }
+
   dismissBrief() {
     if (this.phase !== "brief") return;
     this.clearField();
     this.gold = this.startGold() + (this.mapIndex > 0 ? 40 : 0);
     this.lives = this.maxLives();
+    this.applyRite();
     this.phase = "ready";
     const fresh = (Object.keys(TOWERS) as TowerKind[]).filter(
       (kind) => TOWER_UNLOCK[kind] > 0 && TOWER_UNLOCK[kind] === this.mapIndex,
@@ -1612,6 +1684,7 @@ export class EmberEngine {
     this.phase = "wave";
     this.paused = false;
     this.autoPaused = false;
+    this.scoutReady = true;
     for (const t of this.towers) t.volley = true;
     const tithe = Math.min(28, Math.floor(this.gold * 0.06));
     if (tithe > 0) {
@@ -1677,6 +1750,8 @@ export class EmberEngine {
       healT: 1.2,
       rootT: 0,
       dodge: kind === "knave",
+      howled: false,
+      hasteT: 0,
     });
     const boss = kind === "lord";
     this.burst(start.x, start.y, "#e07838", boss ? 14 : 3, "ember");
@@ -1745,6 +1820,18 @@ export class EmberEngine {
     creep.flash = 1;
     creep.squash = 0.78;
     if (slow > 0) creep.slowT = Math.max(creep.slowT, this.relics.has("cold") ? 2.1 : 1.35);
+    if (creep.kind === "ashfang" && !creep.howled) {
+      creep.howled = true;
+      for (const other of this.creeps) {
+        if (!other.alive) continue;
+        const dx = other.x - creep.x;
+        const dy = other.y - creep.y;
+        if (dx * dx + dy * dy <= 1.8 * 1.8) other.hasteT = Math.max(other.hasteT, 2.2);
+      }
+      this.ring(creep.x, creep.y, "#e07838");
+      this.float(creep.x, creep.y - 0.5, "Howl", "#e07838");
+      this.banner = { text: "Ashfang howls — the pack runs", life: 1.1, max: 1.1 };
+    }
     if (!quiet && (dealt >= 12 || slow > 0)) {
       this.float(creep.x, creep.y - 0.28, `${Math.round(dealt)}`, slow ? "#6aa8b4" : "#e8dcc4");
     }
@@ -1825,6 +1912,8 @@ export class EmberEngine {
       healT: 1.2,
       rootT: 0,
       dodge: false,
+      howled: false,
+      hasteT: from.hasteT * 0.4,
     });
     this.float(from.x, from.y - 0.2, "Splinter", "#7a9a58");
   }
@@ -1840,11 +1929,12 @@ export class EmberEngine {
       this.lineBonus(tower) *
       this.bondMultiplier(tower) *
       this.fieldDamageMultiplier(tower) *
-      (this.focusId === target.id ? 1.1 : 1);
+      (this.focusId === target.id ? 1.1 : 1) *
+      (this.rite === "flame" && this.wave === 1 ? 1.12 : 1);
     if (tower.kind !== "ward" && this.markedId === target.id) dmg *= MARK_BONUS;
     if (tower.kind === "mortar" && target.kind === "shell") dmg *= 1.28;
     if (tower.kind === "bramble" && target.kind === "shell") dmg *= 1.18;
-    if ((tower.kind === "frost" || tower.kind === "ward") && target.kind === "hound") dmg *= 1.22;
+    if ((tower.kind === "frost" || tower.kind === "ward") && (target.kind === "hound" || target.kind === "ashfang")) dmg *= 1.22;
     if (tower.kind === "frost" && target.kind === "runner") dmg *= 1.16;
     if ((tower.kind === "spark" || tower.kind === "bow") && target.kind === "wisp") dmg *= 1.18;
     if (tower.kind === "bramble" && target.kind === "runner") dmg *= 1.2;
@@ -2000,7 +2090,7 @@ export class EmberEngine {
         best = creep;
       } else if (tower.aim === "strong") {
         const threat =
-          creep.hp + (creep.kind === "lord" ? 400 : creep.kind === "shaman" ? 180 : 0);
+          creep.hp + (creep.kind === "lord" ? 400 : creep.kind === "shaman" ? 180 : creep.kind === "ashfang" ? 90 : 0);
         if (threat > score) {
           score = threat;
           best = creep;
@@ -2130,7 +2220,10 @@ export class EmberEngine {
       const dy = target.y - creep.y;
       const dist = Math.hypot(dx, dy);
       const pack =
-        creep.kind === "hound" && this.creeps.filter((c) => c.alive && c.kind === "hound").length >= 3 ? 1.12 : 1;
+        (creep.kind === "hound" || creep.kind === "ashfang") &&
+        this.creeps.filter((c) => c.alive && (c.kind === "hound" || c.kind === "ashfang")).length >= 3
+          ? 1.12
+          : 1;
       const draft =
         this.map.profile.rule.id === "wicker-draft" &&
         (creep.kind === "moth" || creep.kind === "knave") &&
@@ -2142,9 +2235,11 @@ export class EmberEngine {
         (creep.rootT > 0 ? 0.12 : creep.slowT > 0 ? 0.58 : 1) *
         (stats.flying ? 1 : this.fordSlow(creep.x, creep.y)) *
         pack *
-        draft;
+        draft *
+        (creep.hasteT > 0 ? 1.22 : 1);
       creep.slowT = Math.max(0, creep.slowT - dt);
       creep.rootT = Math.max(0, creep.rootT - dt);
+      creep.hasteT = Math.max(0, creep.hasteT - dt);
       creep.flash = Math.max(0, creep.flash - dt * 6);
       creep.spawn = Math.min(1, creep.spawn + dt * 4);
       creep.squash += (1 - creep.squash) * Math.min(1, dt * 10);

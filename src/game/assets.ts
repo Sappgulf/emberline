@@ -5,7 +5,7 @@
  * without changing game code. Bumping the revision also avoids stale browser
  * cache when a sprite is refreshed in place.
  */
-export const ASSET_REVISION = "v5";
+export const ASSET_REVISION = "v6";
 
 export const SPRITE_KEYS = [
   "bow",
@@ -25,6 +25,7 @@ export const SPRITE_KEYS = [
   "lord",
   "moth",
   "knave",
+  "ashfang",
   "keep",
   "gate",
   "pine",
@@ -58,7 +59,7 @@ export function routeMarkerUrl(key: string) {
 
 export const RELIC_ASSET_REVISION = "v1";
 
-export const RELIC_ASSET_KEYS = ["purse", "timber", "whet", "oil", "cold", "glass", "salt", "ember", "adze", "cord", "flint"] as const;
+export const RELIC_ASSET_KEYS = ["purse", "timber", "whet", "oil", "cold", "glass", "salt", "ember", "adze", "cord", "flint", "wick"] as const;
 
 export type RelicAsset = (typeof RELIC_ASSET_KEYS)[number];
 
