@@ -15,7 +15,73 @@ function nsin(t: number, seed: number) {
   return Math.sin(t * seed) * 0.55 + Math.sin(t * seed * 1.73 + seed) * 0.45;
 }
 
+interface ActorSlot {
+  y: number;
+  z: number;
+  type: 0 | 1 | 2;
+  prop: { c: number; r: number; kind: PropKind } | null;
+  tower: Tower | null;
+  creep: Creep | null;
+}
+
+const actorSlots: ActorSlot[] = [];
+const actorOrder: number[] = [];
+let actorCount = 0;
+
+function actor(y: number, z: number, type: 0 | 1 | 2) {
+  let slot = actorSlots[actorCount];
+  if (!slot) {
+    slot = { y: 0, z: 0, type: 0, prop: null, tower: null, creep: null };
+    actorSlots[actorCount] = slot;
+  }
+  slot.y = y;
+  slot.z = z;
+  slot.type = type;
+  slot.prop = null;
+  slot.tower = null;
+  slot.creep = null;
+  actorCount += 1;
+  return slot;
+}
+
+let backdropCache: { key: string; canvas: HTMLCanvasElement } | null = null;
+let overlayCache: { key: string; canvas: HTMLCanvasElement } | null = null;
+let lampGlowCache: HTMLCanvasElement | null = null;
+
+function makeCanvas(w: number, h: number) {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.floor(w));
+  canvas.height = Math.max(1, Math.floor(h));
+  return canvas;
+}
+
+function ctx2d(canvas: HTMLCanvasElement) {
+  const c = canvas.getContext("2d");
+  if (!c) throw new Error("2d context unavailable");
+  return c;
+}
+
+function currentDpr(ctx: CanvasRenderingContext2D) {
+  const t = ctx.getTransform();
+  return t.a > 0 ? t.a : 1;
+}
+
+function lampGlow() {
+  if (lampGlowCache) return lampGlowCache;
+  const size = 128;
+  const canvas = makeCanvas(size, size);
+  const c = ctx2d(canvas);
+  const g = c.createRadialGradient(size / 2, size / 2, 2, size / 2, size / 2, size / 2);
+  g.addColorStop(0, "rgba(224,120,56,0.24)");
+  g.addColorStop(1, "rgba(224,120,56,0)");
+  c.fillStyle = g;
+  c.fillRect(0, 0, size, size);
+  lampGlowCache = canvas;
+  return canvas;
+}
+
 export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number, w: number, h: number) {
+  const dpr = currentDpr(ctx);
   ctx.save();
   const shake = engine.reducedMotion ? 0 : engine.trauma * engine.trauma;
   if (shake > 0.002) {
@@ -23,59 +89,72 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     ctx.rotate(nsin(engine.time * 22, 1.7) * 0.012 * shake);
   }
 
-  ctx.fillStyle = engine.map.theme.ink;
-  ctx.fillRect(-20, -20, w + 40, h + 40);
-
-  drawGround(ctx, cell, engine.time, engine);
-  drawPath(ctx, cell, engine);
-  drawWater(ctx, cell, engine.time, engine);
+  const pad = 32;
+  const backdropKey = `${engine.map.id}|${cell}|${Math.round(w)}|${Math.round(h)}|${dpr}|${engine.phase}`;
+  if (!backdropCache || backdropCache.key !== backdropKey) {
+    const canvas = makeCanvas((w + pad * 2) * dpr, (h + pad * 2) * dpr);
+    const b = ctx2d(canvas);
+    b.setTransform(dpr, 0, 0, dpr, pad * dpr, pad * dpr);
+    b.fillStyle = engine.map.theme.ink;
+    b.fillRect(-pad, -pad, w + pad * 2, h + pad * 2);
+    drawGroundBase(b, cell, engine);
+    drawPathBase(b, cell, engine);
+    drawWaterBase(b, cell, engine);
+    drawRuleBase(b, cell, engine);
+    backdropCache = { key: backdropKey, canvas };
+  }
+  ctx.drawImage(backdropCache.canvas, -pad, -pad, w + pad * 2, h + pad * 2);
+  drawGroundTufts(ctx, cell, engine.time, engine);
+  drawPathMarquee(ctx, cell, engine);
+  drawWaterShimmer(ctx, cell, engine.time, engine);
   drawAmbient(ctx, cell, engine);
   drawFieldRule(ctx, cell, engine);
 
   const spawn = engine.path[0];
   const base = engine.path[engine.path.length - 1];
   drawPortal(ctx, (spawn.c + 0.5) * cell, (spawn.r + 0.5) * cell, cell, engine.time, engine.phase === "wave");
+  if (engine.phase === "ready" && (engine.wavePlan(engine.wave) ?? []).some((entry) => entry.kind === "lord")) {
+    const gx = (spawn.c + 0.5) * cell;
+    const gy = (spawn.r + 0.5) * cell;
+    const r = cell * (0.78 + Math.sin(engine.time * 2.6) * 0.12);
+    ctx.save();
+    ctx.strokeStyle = "rgba(224,120,56,0.6)";
+    ctx.lineWidth = Math.max(1.5, cell * 0.03);
+    ctx.beginPath();
+    ctx.arc(gx, gy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.42;
+    ctx.beginPath();
+    ctx.arc(gx, gy, r * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   drawKeep(ctx, (base.c + 0.5) * cell, (base.r + 0.5) * cell, cell, engine.time, engine.lives);
   drawRouteTags(ctx, cell, engine);
+  const glow = lampGlow();
   for (const prop of engine.props) {
     if (prop.kind !== "lamp") continue;
     const lx = (prop.c + 0.5) * cell;
     const ly = (prop.r + 0.45) * cell;
-    const g = ctx.createRadialGradient(lx, ly, 2, lx, ly, cell * 1.35);
-    g.addColorStop(0, "rgba(224,120,56,0.22)");
-    g.addColorStop(1, "rgba(224,120,56,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(lx, ly, cell * 1.35, 0, Math.PI * 2);
-    ctx.fill();
+    const r = cell * 1.35;
+    ctx.drawImage(glow, lx - r, ly - r, r * 2, r * 2);
   }
   drawLines(ctx, engine, cell);
   drawHover(ctx, engine, cell);
 
-  const actors: Array<{ y: number; z: number; draw: () => void }> = [];
-  for (const prop of engine.props) {
-    actors.push({
-      y: prop.r + 0.55,
-      z: -1,
-      draw: () => drawProp(ctx, prop.c, prop.r, prop.kind, cell, engine.time),
-    });
+  actorCount = 0;
+  for (const prop of engine.props) actor(prop.r + 0.55, -1, 0).prop = prop;
+  for (const t of engine.towers) actor(t.r + 0.5, 0, 1).tower = t;
+  for (const c of engine.creeps) actor(c.y, 1, 2).creep = c;
+  actorOrder.length = actorCount;
+  for (let i = 0; i < actorCount; i++) actorOrder[i] = i;
+  actorOrder.sort((a, b) => actorSlots[a].y - actorSlots[b].y || actorSlots[a].z - actorSlots[b].z);
+  for (let i = 0; i < actorCount; i++) {
+    const slot = actorSlots[actorOrder[i]];
+    if (slot.type === 0 && slot.prop) drawProp(ctx, slot.prop.c, slot.prop.r, slot.prop.kind, cell, engine.time);
+    else if (slot.type === 1 && slot.tower) drawTower(ctx, slot.tower, cell, slot.tower.id === engine.selectedId, engine.time, !engine.reducedMotion);
+    else if (slot.creep) drawCreep(ctx, slot.creep, cell, engine.path.length, slot.creep.id === engine.markedId, engine.time);
   }
-  for (const t of engine.towers) {
-    actors.push({
-      y: t.r + 0.5,
-      z: 0,
-      draw: () => drawTower(ctx, t, cell, t.id === engine.selectedId, engine.time, !engine.reducedMotion),
-    });
-  }
-  for (const c of engine.creeps) {
-    actors.push({
-      y: c.y,
-      z: 1,
-      draw: () => drawCreep(ctx, c, cell, engine.path.length, c.id === engine.markedId, engine.time),
-    });
-  }
-  actors.sort((a, b) => a.y - b.y || a.z - b.z);
-  for (const a of actors) a.draw();
 
   for (const burn of engine.burns) {
     const strength = Math.max(0.1, burn.life / 2.4);
@@ -156,31 +235,39 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
 
   const night = engine.phase === "wave" && engine.wave % 4 === 0;
   const lastStand = engine.lives <= 5;
-  const vg = ctx.createRadialGradient(w * 0.5, h * 0.45, cell * 2, w * 0.5, h * 0.5, Math.max(w, h) * 0.72);
-  vg.addColorStop(0, "rgba(0,0,0,0)");
-  vg.addColorStop(
-    1,
-    lastStand
-      ? "rgba(48,12,10,0.62)"
-      : night
-        ? "rgba(8,10,16,0.58)"
-        : engine.map.id === "keep-stair"
-          ? "rgba(22,14,12,0.55)"
-          : "rgba(18,22,15,0.42)",
-  );
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, w, h);
-  if (night && !engine.reducedMotion) {
-    ctx.fillStyle = "rgba(24, 28, 48, 0.12)";
-    ctx.fillRect(0, 0, w, h);
+  const overlayKey = `${w}|${h}|${dpr}|${cell}|${night ? 1 : 0}|${lastStand ? 1 : 0}|${engine.map.id}`;
+  if (!overlayCache || overlayCache.key !== overlayKey) {
+    const canvas = makeCanvas(w * dpr, h * dpr);
+    const o = ctx2d(canvas);
+    o.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const vg = o.createRadialGradient(w * 0.5, h * 0.45, cell * 2, w * 0.5, h * 0.5, Math.max(w, h) * 0.72);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(
+      1,
+      lastStand
+        ? "rgba(48,12,10,0.62)"
+        : night
+          ? "rgba(8,10,16,0.58)"
+          : engine.map.id === "keep-stair"
+            ? "rgba(22,14,12,0.55)"
+            : "rgba(18,22,15,0.42)",
+    );
+    o.fillStyle = vg;
+    o.fillRect(0, 0, w, h);
+    if (night) {
+      o.fillStyle = "rgba(24, 28, 48, 0.12)";
+      o.fillRect(0, 0, w, h);
+    }
+    o.strokeStyle = "rgba(58,68,50,0.9)";
+    o.lineWidth = 2;
+    o.strokeRect(1, 1, COLS * cell - 2, ROWS * cell - 2);
+    overlayCache = { key: overlayKey, canvas };
   }
+  ctx.drawImage(overlayCache.canvas, 0, 0, w, h);
   if (engine.hitstop > 0 && !engine.reducedMotion) {
     ctx.fillStyle = `rgba(255, 238, 196, ${Math.min(0.1, engine.hitstop * 1.6)})`;
     ctx.fillRect(0, 0, w, h);
   }
-  ctx.strokeStyle = "rgba(58,68,50,0.9)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(1, 1, COLS * cell - 2, ROWS * cell - 2);
   ctx.restore();
 }
 
@@ -193,7 +280,7 @@ function nearPath(c: number, r: number, engine: EmberEngine) {
   );
 }
 
-function drawGround(ctx: CanvasRenderingContext2D, cell: number, time: number, engine: EmberEngine) {
+function drawGroundBase(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
   ctx.fillStyle = engine.map.theme.moss;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
   const grass = spr("grass");
@@ -203,31 +290,41 @@ function drawGround(ctx: CanvasRenderingContext2D, cell: number, time: number, e
     ctx.drawImage(grass, 0, 0, COLS * cell, ROWS * cell);
     ctx.restore();
   }
+  ctx.fillStyle = engine.map.theme.bank;
+  ctx.globalAlpha = 0.32;
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (engine.pathSet.has(`${c},${r}`)) continue;
-      if (nearPath(c, r, engine)) {
-        ctx.fillStyle = engine.map.theme.bank;
-        ctx.globalAlpha = 0.32;
-        ctx.fillRect(c * cell, r * cell, cell + 0.6, cell + 0.6);
-        ctx.globalAlpha = 1;
-      }
+      if (nearPath(c, r, engine)) ctx.fillRect(c * cell, r * cell, cell + 0.6, cell + 0.6);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawGroundTufts(ctx: CanvasRenderingContext2D, cell: number, time: number, engine: EmberEngine) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(90,122,72,0.35)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  let drew = false;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (engine.pathSet.has(`${c},${r}`)) continue;
       const seed = (c * 17 + r * 31) % 7;
       if (engine.blockedSet.has(`${c},${r}`) || (seed !== 0 && seed !== 3)) continue;
       const gx = c * cell + cell * 0.35;
       const gy = r * cell + cell * 0.62;
       const sway = Math.sin(time * 1.6 + c) * 1.4;
-      ctx.strokeStyle = "rgba(90,122,72,0.35)";
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
       ctx.moveTo(gx, gy);
       ctx.quadraticCurveTo(gx + sway, gy - cell * 0.2, gx + 3 + sway, gy - cell * 0.28);
-      ctx.stroke();
+      drew = true;
     }
   }
+  if (drew) ctx.stroke();
+  ctx.restore();
 }
 
-function drawWater(ctx: CanvasRenderingContext2D, cell: number, time: number, engine: EmberEngine) {
+function drawWaterBase(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
   const wet = engine.waterSet;
   for (const [c, r] of engine.map.water) {
     const x = (c + 0.5) * cell;
@@ -242,13 +339,22 @@ function drawWater(ctx: CanvasRenderingContext2D, cell: number, time: number, en
     if (wet.has(`${c},${r + 1}`)) {
       ctx.fillRect(x - cell * 0.36, y, cell * 0.72, cell * 0.5);
     }
+  }
+}
+
+function drawWaterShimmer(ctx: CanvasRenderingContext2D, cell: number, time: number, engine: EmberEngine) {
+  if (engine.reducedMotion) return;
+  ctx.save();
+  ctx.fillStyle = engine.map.theme.waterLit;
+  for (const [c, r] of engine.map.water) {
+    const x = (c + 0.5) * cell;
+    const y = (r + 0.5) * cell;
     ctx.globalAlpha = 0.32 + Math.sin(time * 2 + c) * 0.1;
-    ctx.fillStyle = engine.map.theme.waterLit;
     ctx.beginPath();
     ctx.ellipse(x, y + 2, cell * 0.26, cell * 0.08, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha = 1;
   }
+  ctx.restore();
 }
 
 function drawAmbient(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
@@ -336,10 +442,10 @@ function drawAmbient(ctx: CanvasRenderingContext2D, cell: number, engine: EmberE
   ctx.restore();
 }
 
-function drawFieldRule(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
+function drawRuleBase(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
   const rule = engine.map.profile.rule.id;
-  ctx.save();
   if (rule === "lantern-aura") {
+    ctx.save();
     ctx.setLineDash([cell * 0.12, cell * 0.1]);
     ctx.lineWidth = Math.max(1, cell * 0.018);
     ctx.strokeStyle = "rgba(224,120,56,0.24)";
@@ -349,7 +455,9 @@ function drawFieldRule(ctx: CanvasRenderingContext2D, cell: number, engine: Embe
       ctx.arc((prop.c + 0.5) * cell, (prop.r + 0.5) * cell, cell * 2.02, 0, Math.PI * 2);
       ctx.stroke();
     }
+    ctx.restore();
   } else if (rule === "stone-latch" && (engine.phase === "ready" || engine.phase === "wave")) {
+    ctx.save();
     ctx.fillStyle = "rgba(212,160,84,0.055)";
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -358,7 +466,14 @@ function drawFieldRule(ctx: CanvasRenderingContext2D, cell: number, engine: Embe
         ctx.fillRect(c * cell + 2, r * cell + 2, cell - 4, cell - 4);
       }
     }
-  } else if (rule === "emberfall") {
+    ctx.restore();
+  }
+}
+
+function drawFieldRule(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
+  const rule = engine.map.profile.rule.id;
+  ctx.save();
+  if (rule === "emberfall") {
     for (const tower of engine.towers) {
       if (towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl) < 4) continue;
       const glow = ctx.createRadialGradient(
@@ -426,7 +541,7 @@ function strokeRoute(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: n
   ctx.lineTo(last.x, last.y);
 }
 
-function drawPath(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
+function drawPathBase(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.strokeStyle = PATH_EDGE;
@@ -453,6 +568,13 @@ function drawPath(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngi
   strokeRoute(ctx, engine, cell);
   ctx.stroke();
   ctx.globalAlpha = 1;
+}
+
+function drawPathMarquee(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
+  if (engine.reducedMotion) return;
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
   ctx.strokeStyle = engine.wave % 4 === 0 && engine.phase === "wave" ? "rgba(224,120,56,0.45)" : "rgba(212,160,84,0.3)";
   ctx.lineWidth = Math.max(1.4, cell * 0.04);
   ctx.setLineDash([cell * 0.26, cell * 0.2]);
@@ -460,6 +582,7 @@ function drawPath(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngi
   strokeRoute(ctx, engine, cell);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
 }
 
 function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
@@ -873,6 +996,22 @@ function drawFormKit(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, 
   }
 }
 
+function drawChargeAura(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, time: number) {
+  if (!tower.volt && !tower.siege && !tower.storm && !tower.brace) return;
+  const color = tower.volt ? COPPER : tower.siege ? EMBER : tower.storm ? "#e8c56a" : "#b67848";
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.45 + Math.sin(time * 6 + tower.id) * 0.22;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([cell * 0.1, cell * 0.08]);
+  ctx.lineDashOffset = -time * 24;
+  ctx.beginPath();
+  ctx.arc(0, -cell * 0.05, cell * 0.42, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 function drawMuzzleFlash(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, motion: boolean) {
   if (!motion || tower.recoil <= 0.32) return;
   const angle = tower.visAngle ?? tower.angle;
@@ -885,13 +1024,13 @@ function drawMuzzleFlash(ctx: CanvasRenderingContext2D, tower: Tower, cell: numb
   ctx.translate(mx, my);
   ctx.rotate(angle);
   ctx.globalAlpha = flash * 0.9;
-  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, cell * 0.34);
-  glow.addColorStop(0, "rgba(255,240,200,0.95)");
-  glow.addColorStop(0.4, `rgba(${warm},0.55)`);
-  glow.addColorStop(1, `rgba(${warm},0)`);
-  ctx.fillStyle = glow;
+  ctx.fillStyle = `rgba(${warm},0.3)`;
   ctx.beginPath();
-  ctx.arc(0, 0, cell * 0.34, 0, Math.PI * 2);
+  ctx.arc(0, 0, cell * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,242,205,0.82)";
+  ctx.beginPath();
+  ctx.arc(0, 0, cell * 0.13, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "rgba(255,244,210,0.85)";
   ctx.lineWidth = Math.max(1, cell * 0.03);
@@ -940,6 +1079,7 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
     ctx.globalAlpha = 1;
   }
   drawSprite(ctx, tower.kind, 0, cell * 0.12, size);
+  drawChargeAura(ctx, tower, cell, time);
   drawMuzzleFlash(ctx, tower, cell, motion);
   drawFormKit(ctx, tower, cell, form, time);
   drawUpgradeForge(ctx, tower, cell, time);
@@ -1200,20 +1340,23 @@ function drawShot(
   if (motion && shot.kind !== "mortar" && shot.kind !== "cinder") {
     const prevX = shot.px * cell;
     const prevY = shot.py * cell;
-    const trail = ctx.createLinearGradient(prevX, prevY, x, y);
     const tint = shot.kind === "frost" ? "106,168,180" : "232,197,106";
-    trail.addColorStop(0, `rgba(${tint},0)`);
-    trail.addColorStop(1, `rgba(${tint},0.72)`);
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = trail;
     ctx.lineCap = "round";
-    ctx.lineWidth = Math.max(1.5, cell * 0.055);
+    ctx.strokeStyle = `rgba(${tint},0.28)`;
+    ctx.lineWidth = Math.max(2.4, cell * 0.09);
     ctx.beginPath();
     ctx.moveTo(prevX, prevY);
     ctx.lineTo(x, y);
     ctx.stroke();
-    ctx.fillStyle = `rgba(${tint},0.6)`;
+    ctx.strokeStyle = `rgba(${tint},0.75)`;
+    ctx.lineWidth = Math.max(1.2, cell * 0.035);
+    ctx.beginPath();
+    ctx.moveTo(prevX, prevY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${tint},0.55)`;
     ctx.beginPath();
     ctx.arc(x, y, cell * 0.07, 0, Math.PI * 2);
     ctx.fill();
@@ -1288,13 +1431,22 @@ function drawShot(
 }
 
 function drawParticles(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
+  if (engine.particles.length === 0) return;
+  ctx.save();
+  let composite: GlobalCompositeOperation = "source-over";
+  const setComposite = (mode: GlobalCompositeOperation) => {
+    if (composite !== mode) {
+      ctx.globalCompositeOperation = mode;
+      composite = mode;
+    }
+  };
   for (const p of engine.particles) {
     const t = Math.max(0, p.life / p.max);
     const rad = Math.max(1, p.size * cell);
     const x = p.x * cell;
     const y = p.y * cell;
     if (p.kind === "ring") {
-      ctx.save();
+      setComposite("source-over");
       ctx.globalAlpha = t * 0.72;
       ctx.strokeStyle = p.color;
       ctx.lineWidth = Math.max(1.5, cell * 0.04);
@@ -1302,13 +1454,12 @@ function drawParticles(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell:
       ctx.arc(x, y, rad * (1.2 + (1 - t) * 1.7), 0, Math.PI * 2);
       ctx.stroke();
       if (!engine.reducedMotion && t > 0.45) {
+        setComposite("lighter");
         ctx.globalAlpha = (t - 0.45) * 1.6;
-        ctx.globalCompositeOperation = "lighter";
         ctx.strokeStyle = "#fff6dc";
         ctx.lineWidth = Math.max(1, cell * 0.02);
         ctx.stroke();
       }
-      ctx.restore();
       continue;
     }
     if (p.kind === "shard") {
@@ -1328,50 +1479,44 @@ function drawParticles(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell:
       continue;
     }
     if (p.kind === "smoke") {
-      ctx.save();
+      setComposite("source-over");
       ctx.globalAlpha = t * 0.4;
       ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.arc(x, y, rad * (1.4 + (1 - t) * 0.9), 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
       continue;
     }
-    if (p.kind === "spark" || p.kind === "ember" || p.kind === "mote") {
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = t * 0.85;
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(x, y, rad * 0.55, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = t * 0.55;
-      ctx.beginPath();
-      ctx.arc(x, y, rad * 1.35, 0, Math.PI * 2);
-      ctx.fill();
-      if (p.kind === "ember" && cell > 20) {
-        ctx.globalAlpha = t * 0.5;
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = Math.max(1, rad * 0.8);
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - p.vx * cell * 0.06, y - p.vy * cell * 0.06);
-        ctx.stroke();
-      }
-      ctx.restore();
-      continue;
-    }
-    ctx.save();
-    ctx.globalAlpha = t;
+    setComposite("lighter");
+    ctx.globalAlpha = t * 0.85;
     ctx.fillStyle = p.color;
     ctx.beginPath();
-    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.arc(x, y, rad * 0.55, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
+    ctx.globalAlpha = t * 0.55;
+    ctx.beginPath();
+    ctx.arc(x, y, rad * 1.35, 0, Math.PI * 2);
+    ctx.fill();
+    if (p.kind === "ember" && cell > 20) {
+      ctx.globalAlpha = t * 0.5;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = Math.max(1, rad * 0.8);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - p.vx * cell * 0.06, y - p.vy * cell * 0.06);
+      ctx.stroke();
+    }
   }
+  ctx.restore();
 }
 
 function drawFloaters(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
+  if (engine.floaters.length === 0) return;
+  ctx.save();
+  ctx.font = `700 ${Math.min(16, Math.max(11, cell * 0.14))}px Figtree, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(18,22,15,0.85)";
   for (const f of engine.floaters) {
     const t = f.life / f.max;
     const age = 1 - t;
@@ -1382,15 +1527,12 @@ function drawFloaters(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: 
     ctx.globalAlpha = Math.min(1, t * 1.6);
     ctx.translate(fx, fy);
     ctx.scale(pop, pop);
-    ctx.font = `700 ${Math.min(16, Math.max(11, cell * 0.14))}px Figtree, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(18,22,15,0.85)";
     ctx.strokeText(f.text, 0, 0);
     ctx.fillStyle = f.color;
     ctx.fillText(f.text, 0, 0);
     ctx.restore();
   }
+  ctx.restore();
 }
 
 function drawBanner(ctx: CanvasRenderingContext2D, engine: EmberEngine, w: number, cell: number) {
@@ -1402,14 +1544,16 @@ function drawBanner(ctx: CanvasRenderingContext2D, engine: EmberEngine, w: numbe
   ctx.globalAlpha = Math.min(1, t * 2);
   ctx.translate(w / 2, cell * 0.7);
   ctx.scale(pop, pop);
-  ctx.fillStyle = PARCHMENT;
   ctx.font = `700 ${Math.max(16, cell * 0.38)}px Fraunces, serif`;
   ctx.textAlign = "center";
   ctx.lineWidth = Math.max(3, cell * 0.09);
   ctx.strokeStyle = "rgba(18,22,15,0.85)";
   ctx.strokeText(engine.banner.text, 0, 0);
-  ctx.shadowColor = "rgba(224,120,56,0.55)";
-  ctx.shadowBlur = 12;
+  ctx.globalAlpha = Math.min(1, t * 2) * 0.45;
+  ctx.fillStyle = EMBER;
+  ctx.fillText(engine.banner.text, 1.5, 1.5);
+  ctx.globalAlpha = Math.min(1, t * 2);
+  ctx.fillStyle = PARCHMENT;
   ctx.fillText(engine.banner.text, 0, 0);
   ctx.restore();
 }

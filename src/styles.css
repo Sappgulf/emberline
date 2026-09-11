@@ -4562,3 +4562,106 @@
     font-size: 6px;
   }
 }
+
+/* Boss forecast chip and last-stand pulse. */
+.threat-boss {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0.32rem 0 0;
+  padding: 0.28rem 0.42rem;
+  border: 1px solid rgba(224, 120, 56, 0.42);
+  border-radius: 0.35rem;
+  background: rgba(224, 120, 56, 0.09);
+  color: var(--color-ember);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.threat-boss .intel-kicker {
+  color: var(--color-dust);
+  font-family: var(--font-sans);
+}
+
+.threat-boss small {
+  color: var(--color-dust);
+  font-family: var(--font-sans);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.watch-stat .n.hurt {
+  animation: hurt-pulse 1.15s ease-in-out infinite;
+}
+
+@keyframes hurt-pulse {
+  0%,
+  100% {
+    color: var(--color-blood);
+    text-shadow: 0 0 0 rgba(196, 92, 74, 0);
+  }
+  50% {
+    color: #ff8a70;
+    text-shadow: 0 0 12px rgba(196, 92, 74, 0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watch-stat .n.hurt {
+    animation: none;
+  }
+}
+
+/* Phone: keep the board band while a tower bar is open. */
+@media (max-width: 640px) {
+  .selected-tower-bar {
+    gap: 0.3rem;
+    padding: 0.34rem 0.4rem 0.38rem;
+  }
+
+  .selected-tower-heading > p {
+    font-size: 0.86rem;
+  }
+
+  .selected-tower-copy > p:nth-child(2) {
+    margin-top: 0.14rem;
+  }
+
+  .selected-tower-actions {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.22rem;
+  }
+
+  .selected-tower-actions > button {
+    min-height: 2.45rem;
+    padding-inline: 0.1rem !important;
+    font-size: 8px !important;
+  }
+
+  .selected-tower-actions .upgrade-preview {
+    font-size: 6px;
+    letter-spacing: 0.02em;
+  }
+
+  .selected-tower-actions .upgrade-main {
+    font-size: 8px;
+  }
+
+  .selected-tower-bar .emberlit-picker {
+    gap: 0.25rem;
+  }
+
+  .selected-tower-bar > .send-flag,
+  .selected-tower-bar > button:last-child {
+    min-height: 2.2rem;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .selected-tower-actions > button {
+    font-size: 7px !important;
+  }
+}

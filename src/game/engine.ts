@@ -526,6 +526,7 @@ export class EmberEngine {
   endless = false;
   campChoice: CampEffectId | null = null;
   campLabel: string | null = null;
+  campPaid = false;
   campDamage = 1;
   campOil = false;
   scoutsLeft = 1;
@@ -565,15 +566,17 @@ export class EmberEngine {
         perks?: Partial<Record<PerkId, number>>;
         bestEndless?: number;
       };
-      this.unlocked = Math.max(0, Math.min(MAPS.length, data.unlocked ?? 0));
+      const num = (value: unknown, fallback = 0) =>
+        typeof value === "number" && Number.isFinite(value) ? value : fallback;
+      this.unlocked = Math.max(0, Math.min(MAPS.length, Math.floor(num(data.unlocked))));
       const known = new Set<string>(RELIC_IDS);
-      for (const id of data.relics ?? []) {
+      for (const id of Array.isArray(data.relics) ? data.relics : []) {
         if (known.has(id)) this.relics.add(id);
       }
-      this.marks = Math.max(0, Math.floor(data.marks ?? 0));
-      this.bestEndless = Math.max(0, Math.floor(data.bestEndless ?? 0));
+      this.marks = Math.max(0, Math.floor(num(data.marks)));
+      this.bestEndless = Math.max(0, Math.floor(num(data.bestEndless)));
       for (const perk of PERKS) {
-        const tier = Math.max(0, Math.min(perk.max, Math.floor(data.perks?.[perk.id] ?? 0)));
+        const tier = Math.max(0, Math.min(perk.max, Math.floor(num(data.perks?.[perk.id]))));
         this.perks[perk.id] = tier;
       }
       if (data.muted) {
@@ -644,6 +647,14 @@ export class EmberEngine {
 
   formOf(tower: Tower) {
     return towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl);
+  }
+
+  crownedCount() {
+    let n = 0;
+    for (const tower of this.towers) {
+      if (this.formOf(tower) >= 4) n += 1;
+    }
+    return n;
   }
 
   sightRange(tower: Tower) {
@@ -1161,7 +1172,8 @@ export class EmberEngine {
     }
     this.campChoice = id;
     this.campLabel = CAMP_OPTIONS[id].name;
-    if (id === "mark") {
+    if (id === "mark" && !this.campPaid) {
+      this.campPaid = true;
       this.marks += 1;
       this.float(COLS / 2, 0.6, "+1 watch mark", "#d4a054");
     }
@@ -1217,6 +1229,7 @@ export class EmberEngine {
     if (this.unlocked < MAPS.length) return;
     this.readSave();
     this.endless = true;
+    this.campChoice = null;
     this.loadMap(Math.max(0, Math.min(MAPS.length - 1, this.mapIndex)));
     this.clearField();
     this.gold = this.startGold();
@@ -1541,6 +1554,7 @@ export class EmberEngine {
     this.campDamage = 1;
     this.campOil = false;
     this.campLabel = null;
+    this.campPaid = false;
     this.scoutsLeft = 1;
     this.spawnCount = 0;
   }
@@ -1578,6 +1592,8 @@ export class EmberEngine {
   }
 
   keepRelics() {
+    this.endless = false;
+    this.campChoice = null;
     this.loadMap(0);
     this.clearField();
     this.gold = this.startGold();
@@ -1829,14 +1845,23 @@ export class EmberEngine {
       const dy = creep.y - cy;
       return dx * dx + dy * dy <= range * range;
     };
+    const chargeFx = (color: string) => {
+      this.ring(cx, cy, color);
+      this.burst(cx, cy, color, 8, "spark");
+      this.float(cx, cy - 0.35, def.name, color);
+    };
     if (t.kind === "bow") {
       t.volt = 3;
+      chargeFx("#d4a054");
     } else if (t.kind === "mortar") {
       t.siege = true;
+      chargeFx("#e07838");
     } else if (t.kind === "spark") {
       t.storm = true;
+      chargeFx("#e8c56a");
     } else if (t.kind === "pike") {
       t.brace = true;
+      chargeFx("#b67848");
     } else if (t.kind === "cinder") {
       let best: Creep | null = null;
       for (const creep of this.creeps) {
@@ -1854,7 +1879,7 @@ export class EmberEngine {
       const root = t.kind === "frost" ? 0.7 : t.kind === "bramble" ? 1 : 0;
       for (const creep of this.creeps) {
         if (!creep.alive || !inRange(creep)) continue;
-        if (slow > 0) creep.slowT = Math.max(creep.slowT, t.kind === "frost" ? 1.6 : 1.2);
+        if (slow > 0 && !creep.slowResist) creep.slowT = Math.max(creep.slowT, t.kind === "frost" ? 1.6 : 1.2);
         if (root > 0) creep.rootT = Math.max(creep.rootT, root);
         this.damageCreep(creep, dmg, slow, t.emberlit === "a", true);
       }
@@ -2434,7 +2459,7 @@ export class EmberEngine {
       const gold = Math.round(
         (CREEPS[creep.kind].gold +
           (creep.elite ? AFFIXES[creep.elite].gold : 0) +
-          this.towers.filter((t) => this.formOf(t) >= 4).length +
+          this.crownedCount() +
           (this.wave % 4 === 0 ? 2 : 0)) *
           this.goldMult(),
       );
@@ -2481,6 +2506,8 @@ export class EmberEngine {
         this.ring(creep.x, creep.y, "#e07838");
         this.trauma = Math.min(1, this.trauma + 0.55);
         this.hitstop = Math.max(this.hitstop, 0.08);
+        this.earnMarks(1);
+        this.float(creep.x, creep.y - 0.75, "+1 watch mark", "#efbb65");
       }
       this.killCounts[creep.kind] = (this.killCounts[creep.kind] ?? 0) + 1;
       sfx.kill();
@@ -2591,7 +2618,7 @@ export class EmberEngine {
           : 0.7
         : tower.kind === "cinder"
           ? def.splash * (form >= 3 ? 1.18 : 1)
-          : def.splash * (siege ? 1.6 : 1);
+          : def.splash * (siege ? 1.6 : 1) * (tower.emberlit === "b" && tower.kind === "mortar" ? 1.25 : 1);
     if (def.beam) {
       this.beams.push({
         x1: sx,
@@ -2681,10 +2708,10 @@ export class EmberEngine {
     if (tower.kind === "pike" && (form >= 3 || tower.emberlit === "a" || brace)) {
       target.rootT = Math.max(target.rootT, brace ? 1.1 : tower.emberlit === "b" ? 0.8 : form >= 4 ? 0.7 : 0.4);
     }
-    if (tower.kind === "frost" && tower.emberlit === "a") {
+    if (tower.kind === "frost" && tower.emberlit === "a" && !target.slowResist) {
       target.rootT = Math.max(target.rootT, 0.28);
     }
-    if (tower.kind === "frost" && tower.emberlit === "b") {
+    if (tower.kind === "frost" && tower.emberlit === "b" && !target.slowResist) {
       target.rootT = Math.max(target.rootT, 0.4);
     }
   }
@@ -2748,7 +2775,7 @@ export class EmberEngine {
         const dy = creep.y - y;
         if (dx * dx + dy * dy <= r2) {
           this.damageCreep(creep, shot.damage, shot.slow, false, true);
-          if (shot.kind === "frost" && shot.empowered) creep.rootT = Math.max(creep.rootT, 0.28);
+          if (shot.kind === "frost" && shot.empowered && !creep.slowResist) creep.rootT = Math.max(creep.rootT, 0.28);
         }
       }
       this.trauma = Math.min(1, this.trauma + (shot.kind === "mortar" ? 0.05 : 0.1));
@@ -2820,7 +2847,7 @@ export class EmberEngine {
       this.farmT += dt;
       if (this.farmT >= 1.15) {
         this.farmT = 0;
-        const n = this.towers.filter((t) => this.formOf(t) >= 4).length;
+        const n = this.crownedCount();
         if (n > 0) {
           const pay = n * (this.lives <= 5 ? 2 : 1);
           this.gold += pay;
@@ -2845,6 +2872,10 @@ export class EmberEngine {
       this.spawnQ = still;
     }
 
+    let packCount = 0;
+    for (const c of this.creeps) {
+      if (c.alive && (c.kind === "hound" || c.kind === "ashfang")) packCount += 1;
+    }
     for (const creep of this.creeps) {
       if (!creep.alive) {
         creep.death -= dt;
@@ -2855,11 +2886,7 @@ export class EmberEngine {
       const dx = target.x - creep.x;
       const dy = target.y - creep.y;
       const dist = Math.hypot(dx, dy);
-      const pack =
-        (creep.kind === "hound" || creep.kind === "ashfang") &&
-        this.creeps.filter((c) => c.alive && (c.kind === "hound" || c.kind === "ashfang")).length >= 3
-          ? 1.12
-          : 1;
+      const pack = (creep.kind === "hound" || creep.kind === "ashfang") && packCount >= 3 ? 1.12 : 1;
       const draft =
         this.map.profile.rule.id === "wicker-draft" &&
         (creep.kind === "moth" || creep.kind === "knave") &&
@@ -3005,10 +3032,18 @@ export class EmberEngine {
         }
       }
     }
-    this.shots = this.shots.filter((s) => s.ttl > 0);
+    let shotsWrite = 0;
+    for (const s of this.shots) {
+      if (s.ttl > 0) this.shots[shotsWrite++] = s;
+    }
+    this.shots.length = shotsWrite;
     if (this.shots.length > 96) this.shots.splice(0, this.shots.length - 96);
     for (const b of this.beams) b.life -= dt;
-    this.beams = this.beams.filter((b) => b.life > 0);
+    let beamsWrite = 0;
+    for (const b of this.beams) {
+      if (b.life > 0) this.beams[beamsWrite++] = b;
+    }
+    this.beams.length = beamsWrite;
     for (const burn of this.burns) {
       burn.life -= dt;
       burn.tick += dt;
@@ -3024,9 +3059,17 @@ export class EmberEngine {
         }
       }
     }
-    this.burns = this.burns.filter((b) => b.life > 0);
+    let burnsWrite = 0;
+    for (const b of this.burns) {
+      if (b.life > 0) this.burns[burnsWrite++] = b;
+    }
+    this.burns.length = burnsWrite;
     if (this.burns.length > 28) this.burns.splice(0, this.burns.length - 28);
-    this.creeps = this.creeps.filter((c) => c.alive || c.death > 0);
+    let creepsWrite = 0;
+    for (const c of this.creeps) {
+      if (c.alive || c.death > 0) this.creeps[creepsWrite++] = c;
+    }
+    this.creeps.length = creepsWrite;
     this.finishWaveIfClear();
   }
 
@@ -3123,7 +3166,7 @@ export class EmberEngine {
   }
 
   scoreGrade() {
-    const crowned = this.towers.filter((t) => this.formOf(t) >= 4).length;
+    const crowned = this.crownedCount();
     const life = this.lives / Math.max(1, this.maxLives());
     const rank = life >= 0.75 && this.gold >= 50 ? "Dawn" : life >= 0.45 ? "Dusk" : "Ember";
     this.grade = `${rank} · ${this.lives} lives · ${this.gold}g · ${crowned} crowned`;
@@ -3172,12 +3215,18 @@ export class EmberEngine {
         p.vy += 1.4 * dt;
       }
     }
-    this.particles = this.particles.filter((p) => p.life > 0);
+    let particlesWrite = 0;
+    for (const p of this.particles) {
+      if (p.life > 0) this.particles[particlesWrite++] = p;
+    }
+    this.particles.length = particlesWrite;
+    let floatersWrite = 0;
     for (const f of this.floaters) {
       f.life -= dt;
       f.y -= dt * 0.55;
+      if (f.life > 0) this.floaters[floatersWrite++] = f;
     }
-    this.floaters = this.floaters.filter((f) => f.life > 0);
+    this.floaters.length = floatersWrite;
     this.maybeNotify();
   }
 

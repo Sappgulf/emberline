@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { RotateCcw } from "lucide-react";
 import { COLS, CREEPS, FORM_NAME, MAX_UPGRADE, ROWS, TOWERS, damageAt, rangeAt, rateAt, towerForm, type Aim, type CreepKind, type EmberlitBranch, type TowerKind } from "@/game/config";
 import { relicUrl, routeMarkerUrl, spriteUrl } from "@/game/assets";
-import { BESTIARY, RITES, type RelicId, type WatchRiteId } from "@/game/campaign";
+import { BESTIARY, MAPS, RITES, type RelicId, type WatchRiteId } from "@/game/campaign";
 import { EmberEngine, type HudSnap, type TowerUpgradeBranch } from "@/game/engine";
 import { drawWorld } from "@/game/render";
 import { loadSprites } from "@/game/sprites";
@@ -75,6 +75,7 @@ export function Emberline() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const readyActionRef = useRef<HTMLButtonElement>(null);
+  const qualityRef = useRef(1);
   const campaignTriggerRef = useRef<HTMLButtonElement>(null);
   const codexTriggerRef = useRef<HTMLButtonElement>(null);
   const hallTriggerRef = useRef<HTMLButtonElement>(null);
@@ -243,13 +244,34 @@ export function Emberline() {
     if (!ctx) return;
     let raf = 0;
     let last = performance.now();
+    let slowFrames = 0;
+    let fastFrames = 0;
+    let frameMs = 0;
+    let frameCount = 0;
     const loop = (now: number) => {
       const dt = (now - last) / 1000;
+      frameMs = frameMs === 0 ? dt * 1000 : frameMs * 0.9 + (dt * 1000) * 0.1;
       last = now;
       engine.tick(dt);
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = COLS * cell;
       const h = ROWS * cell;
+      frameCount += 1;
+      const adapting = frameCount > 150;
+      if (adapting && frameMs > 28 && frameMs < 200) slowFrames += 1;
+      else if (frameMs <= 28) slowFrames = Math.max(0, slowFrames - 1);
+      if (adapting && frameMs < 18 && frameMs > 0) fastFrames += 1;
+      else fastFrames = 0;
+      if (adapting && slowFrames > 60 && qualityRef.current > 0.6) {
+        qualityRef.current = qualityRef.current > 0.75 ? 0.75 : 0.6;
+        slowFrames = 0;
+        fastFrames = 0;
+      } else if (adapting && fastFrames > 300 && qualityRef.current < 1) {
+        qualityRef.current = Math.min(1, qualityRef.current + 0.15);
+        fastFrames = 0;
+      }
+      const rawDpr = Math.min(2, window.devicePixelRatio || 1);
+      const areaCap = w * h > 520000 ? 1.5 : 2;
+      const dpr = Math.min(rawDpr, areaCap) * qualityRef.current;
       if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
         canvas.width = Math.floor(w * dpr);
         canvas.height = Math.floor(h * dpr);
@@ -309,7 +331,17 @@ export function Emberline() {
   const stallHint = hud.wave < 1 ? "Stall opens after the first wave" : hud.phase !== "ready" ? "Stall opens between waves" : "Open roadside stall";
   const mendHint = hud.lives >= hud.maxLives ? "The keep is already at full strength" : hud.gold < hud.mendCost ? `Mend costs ${hud.mendCost} gold` : `Mend the keep for ${hud.mendCost} gold`;
   const mendValue = hud.lives >= hud.maxLives ? "Full" : `${hud.mendCost}g`;
-  const waveProgressLabel = hud.phase === "wave" ? `Wave ${hud.wave}` : hud.wave > 0 ? `Wave ${hud.wave} held` : "First watch";
+  const waveProgressLabel = hud.endless
+    ? hud.phase === "wave"
+      ? `Night ${hud.wave}`
+      : hud.wave > 0
+        ? `Night ${hud.wave} held`
+        : "First night"
+    : hud.phase === "wave"
+      ? `Wave ${hud.wave}`
+      : hud.wave > 0
+        ? `Wave ${hud.wave} held`
+        : "First watch";
   const waveProgressStatus = hud.phase === "wave" ? `${hud.remaining} left` : hud.wave > 0 ? holdLabel(hud.lastResult?.hold) : "Ready";
   const placementToneValue = placementTone(engine, hud, hoverCell);
   const placementMessageValue = placementMessage(engine, hud, hoverCell);
@@ -387,9 +419,9 @@ export function Emberline() {
             <div className="watch-stat" data-stat="wave" title="Wave">
               <img className="hud-ico" src="/ui/icon-wave.png" alt="" />
               <span className="n">
-                {hud.phase === "wave" ? hud.remaining : `${hud.wave}/${hud.totalWaves}`}
+                {hud.phase === "wave" ? hud.remaining : hud.endless ? hud.wave : `${hud.wave}/${hud.totalWaves}`}
               </span>
-              <span className="u">{hud.phase === "wave" ? "left" : "wave"}</span>
+              <span className="u">{hud.phase === "wave" ? "left" : hud.endless ? "night" : "wave"}</span>
             </div>
           </div>
         )}
@@ -1378,6 +1410,7 @@ function towerReach(hud: HudSnap, tower: NonNullable<HudSnap["selectedTower"]>, 
     rangeAt(tower.kind, rangeLevel) *
     (hud.relics.includes("glass") ? 1.12 : 1) *
     (tower.empowered ? 1.18 : 1) *
+    (tower.emberlit === "b" && tower.kind === "ward" ? 1.12 : 1) *
     (hud.fieldBoost?.range ?? 1)
   );
 }
@@ -1757,6 +1790,13 @@ function ThreatPanel({ hud, onSelectCounter }: { hud: HudSnap; onSelectCounter: 
         </h2>
         <span>{hud.phase === "wave" ? `${hud.remaining}/${hud.waveTotal} left` : "Ready to send"}</span>
       </div>
+      {hud.wavePreview.some((item) => item.kind === "lord") && (
+        <p className="threat-boss">
+          <span className="intel-kicker">Boss</span>
+          {MAPS[hud.mapIndex]?.boss?.name ?? "The Emberlord"}
+          <small>{MAPS[hud.mapIndex]?.boss?.title ?? "walker of roads"}</small>
+        </p>
+      )}
       {!intelOpen && hud.phase === "ready" && hud.lastResult && <CompactWaveRecap result={hud.lastResult} />}
       {!intelOpen && (
         <div className="intel-quick-actions" aria-label="Quick counter plan">

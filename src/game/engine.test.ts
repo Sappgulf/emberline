@@ -1273,4 +1273,87 @@ describe("season systems", () => {
     e.notify();
     assert.equal(e.hud().chronicle.find((entry) => entry.id === "cord")?.unlocked, true);
   });
+
+  it("survives a corrupted saved watch", () => {
+    const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    const stored = JSON.stringify({ relics: "nope", unlocked: "many", marks: "lots", perks: { purse: "x" }, bestEndless: null });
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => stored, setItem: () => undefined } satisfies Pick<Storage, "getItem" | "setItem">,
+    });
+    try {
+      const e = new EmberEngine();
+      e.readSave();
+      assert.equal(Number.isFinite(e.unlocked), true);
+      assert.equal(e.unlocked, 0);
+      assert.equal(Number.isFinite(e.marks), true);
+      assert.equal(e.marks, 0);
+      assert.equal(e.perks.purse, 0);
+      assert.equal(e.bestEndless, 0);
+    } finally {
+      if (previous) Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous });
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
+
+  it("pays the mark camp only once", () => {
+    const e = play();
+    e.loadMap(3);
+    e.phase = "shop";
+    const start = e.marks;
+    e.chooseCamp("mark");
+    assert.equal(e.marks, start + 1);
+    e.chooseCamp("gold");
+    e.chooseCamp("mark");
+    assert.equal(e.marks, start + 1, "re-picking the mark camp must not pay twice");
+  });
+
+  it("widens cluster shells when a mortar is Emberlit", () => {
+    const e = play();
+    e.gold = 900;
+    const grass = emptyGrass(e);
+    e.selectedKind = "mortar";
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    tower.dmgLvl = 4;
+    tower.empowered = true;
+    tower.emberlit = "b";
+    e.phase = "wave";
+    e.spawn("grub");
+    const grub = e.creeps[0];
+    grub.x = tower.c + 1.5;
+    grub.y = tower.r + 0.5;
+    e.fire(tower, grub);
+    const shot = e.shots.at(-1);
+    assert.ok(shot);
+    assert.ok(shot.splash > TOWERS.mortar.splash, "cluster shells should splash wider");
+  });
+
+  it("lets a warded elite shrug off a frost nova", () => {
+    const e = play();
+    e.gold = 900;
+    const grass = emptyGrass(e);
+    e.selectedKind = "frost";
+    e.tapCell(grass.c, grass.r);
+    e.phase = "wave";
+    e.spawn("grub");
+    const grub = e.creeps[0];
+    grub.elite = "warded";
+    grub.slowResist = true;
+    grub.x = grass.c + 0.5;
+    grub.y = grass.r + 0.5;
+    e.useAbility();
+    assert.equal(grub.slowT, 0, "warded elites ignore chill");
+  });
+
+  it("pays a watch mark for cutting a boss", () => {
+    const e = play();
+    e.phase = "wave";
+    const before = e.marks;
+    e.spawn("lord");
+    const lord = e.creeps[0];
+    e.damageCreep(lord, lord.maxHp + 999, 0, true);
+    assert.equal(e.marks, before + 1);
+    assert.equal(lord.alive, false);
+  });
 });
