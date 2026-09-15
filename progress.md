@@ -1,5 +1,14 @@
 Original prompt: ok keep working. more upgrades across the game
 
+## 2026-09-15 — full interaction, stability, and release audit
+
+- Improved: relic purchases now refresh the live grade summary so the stall’s purse, story copy, and HUD snapshot agree; exported workspaces now fall back to the tracked root `app-env.json` while `.grok/app-env.json` remains authoritative when present.
+- Improved: the shared OG/PWA head helper no longer reads the process directory implicitly. Filesystem identity and card discovery require an explicit workspace root, while baked deployment identity stays filesystem-free across static and streaming injection.
+- Audited in the live in-app browser: title controls, Campaign route selector, Bestiary and Chronicle tabs, Orders, Watch hall, hard watch, briefing rites, forecast details, packet selection, counter plan, aim, pace, mute, pause/resume, placement rejection/placement, upgrades, ability, sell, move, undo, wave launch, Scout, Horn, Flare, Stall, camp choices, Mend, keyboard shortcuts, lost/retry, and help. Local browser warnings/errors were empty.
+- Verified: 142/142 source tests, 97/97 engine tests, 14/14 app-env tests, typecheck, lint, auth invariant, production build, and `git diff --check`; the required web-game Playwright choreography passed two iterations and refreshed `output/web-game` evidence.
+- Verified with the responsive fallback at 1280×800 and 390×844: title → menus → brief → ready → active wave worked, no horizontal overflow, no console/page/request failures, and headless frame samples stayed about 58–61 FPS. This is browser evidence, not physical-device or battery proof.
+- Platform limitation: `npm run test:scripts` is 193/197 because four tests require the unavailable `.grok/skills/og/SKILL.md` and `.grok/skills/og/references` fixture; the bundled browser-smoke wrapper also cannot create its hard-coded `/workspace` output directory in this desktop checkout.
+
 ## 2026-09-06 — upgrade pass
 
 - Baseline: `main` is clean at `dc1321f`; the current shipped build already includes the campaign route rail, threat forecast, tower intel, and live wave progress HUD.

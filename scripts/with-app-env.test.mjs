@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import {
   APP_ENV_REL_PATH,
+  LEGACY_APP_ENV_REL_PATH,
   mergeAppEnv,
   parseAppEnv,
   projectRoot,
@@ -47,6 +48,18 @@ test("a missing app-env.json is a clean no-op", () => {
 
 test("reads the app env from a workspace", () => {
   const root = makeWorkspace('{"VITE_AUTH_ENABLED":"false"}');
+  assert.deepEqual(readAppEnv(root), { VITE_AUTH_ENABLED: "false" });
+});
+
+test("falls back to the tracked root app-env for exported workspaces", () => {
+  const root = mkdtempSync(join(tmpdir(), "app-env-root-"));
+  writeFileSync(join(root, LEGACY_APP_ENV_REL_PATH), '{"VITE_AUTH_ENABLED":"false"}');
+  assert.deepEqual(readAppEnv(root), { VITE_AUTH_ENABLED: "false" });
+});
+
+test("prefers the platform app-env over the root fallback", () => {
+  const root = makeWorkspace('{"VITE_AUTH_ENABLED":"false"}');
+  writeFileSync(join(root, LEGACY_APP_ENV_REL_PATH), '{"VITE_AUTH_ENABLED":"true"}');
   assert.deepEqual(readAppEnv(root), { VITE_AUTH_ENABLED: "false" });
 });
 

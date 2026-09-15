@@ -494,6 +494,7 @@ describe("EmberEngine", () => {
     e.gold = 200;
     e.buyRelic("purse");
     assert.equal(e.relics.has("purse"), true);
+    assert.match(e.grade ?? "", new RegExp(`${e.gold}g`));
     const gold = e.gold;
     e.buyRelic("purse");
     assert.equal(e.gold, gold);

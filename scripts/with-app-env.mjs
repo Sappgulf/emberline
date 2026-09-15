@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Run a command with `.grok/app-env.json` merged into its environment.
+ * Run a command with the workspace app-env merged into its environment.
+ * `.grok/app-env.json` is the platform path; the tracked root `app-env.json`
+ * remains a compatibility fallback for exported workspaces.
  *
  * `dev`, `build` and `preview` all route through this wrapper, so the dev
  * server, the built bundle and the preview server can never disagree about
@@ -26,6 +28,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const APP_ENV_REL_PATH = ".grok/app-env.json";
+export const LEGACY_APP_ENV_REL_PATH = "app-env.json";
 
 const VITE_PREFIX = "VITE_";
 
@@ -51,13 +54,16 @@ export function parseAppEnv(text) {
   return env;
 }
 
-/** The app env recorded under `root`, or `{}` when the file is absent. */
+/** The app env recorded under `root`, or `{}` when both supported paths are absent. */
 export function readAppEnv(root) {
-  try {
-    return parseAppEnv(readFileSync(join(root, APP_ENV_REL_PATH), "utf8"));
-  } catch {
-    return {};
+  for (const relativePath of [APP_ENV_REL_PATH, LEGACY_APP_ENV_REL_PATH]) {
+    try {
+      return parseAppEnv(readFileSync(join(root, relativePath), "utf8"));
+    } catch {
+      // Try the compatibility path only when the preferred path is absent.
+    }
   }
+  return {};
 }
 
 /** File values under the process environment: an explicit override wins. */

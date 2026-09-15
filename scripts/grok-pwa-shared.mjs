@@ -259,8 +259,8 @@ export function ogCardPublicPath(cwd = process.cwd()) {
   return "";
 }
 
-function detectCustomOgCard(cwd = process.cwd(), site = {}) {
-  if (ogCardPublicPath(cwd)) return true;
+function detectCustomOgCard(cwd = process.cwd(), site = {}, readWorkspace = true) {
+  if (readWorkspace && ogCardPublicPath(cwd)) return true;
   // Vercel runtime has no public/: trust a bake that already saw the file.
   return siteHasCustomCard(site) || Boolean(String(site.image ?? "").trim());
 }
@@ -322,8 +322,9 @@ export function siteHasCustomCard(site = {}) {
  * Vercel: the bake (`card=custom` / `image`) because the function cannot stat public/.
  * Otherwise empty — caller emits the og.grok.me placeholder.
  */
-export function resolveOgCardAsset(site = {}, cwd = process.cwd()) {
-  return ogCardPublicPath(cwd) || (detectCustomOgCard(cwd, site) ? String(site.image ?? "").trim() || "/og.jpg" : "");
+export function resolveOgCardAsset(site = {}, cwd = process.cwd(), readWorkspace = true) {
+  const disk = readWorkspace ? ogCardPublicPath(cwd) : "";
+  return disk || (detectCustomOgCard(cwd, site, readWorkspace) ? String(site.image ?? "").trim() || "/og.jpg" : "");
 }
 
 /** Stamp `card=custom` when public/og.jpg or public/og.png is on disk. */
@@ -339,6 +340,7 @@ export function grokOgHeadTags({
   site = {},
   documentTitle = "",
   cwd = process.cwd(),
+  readWorkspace = true,
 } = {}) {
   const title = resolveOgTitle(site, appName, host, documentTitle);
   const publicHost = resolvePublicHost(host);
@@ -354,7 +356,7 @@ export function grokOgHeadTags({
     tags.push(`<meta property="og:type" content="x:game">`);
   }
   if (publicHost) {
-    const asset = resolveOgCardAsset(site, cwd);
+    const asset = resolveOgCardAsset(site, cwd, readWorkspace);
     const custom = Boolean(asset);
     let image = custom
       ? `https://${publicHost}${asset.startsWith("/") ? asset : `/${asset}`}`
@@ -402,14 +404,21 @@ function insertBeforeHeadClose(html, snippet) {
 
 export function normalizeHeadContext(ctx = {}) {
   const cwd = ctx.cwd ?? process.cwd();
-  // Middleware passes a baked `site`. Still consult the workspace so a
+  // Only callers that provide a workspace root need filesystem discovery.
+  // Context-free helper calls stay deterministic instead of inheriting the
+  // process directory's app identity and share-card assets.
+  const siteContext = ctx.site !== undefined
+    ? ctx.site
+    : ctx.cwd !== undefined
+      ? snapshotOgIdentity(cwd).site
+      : {};
+  // Middleware passes a baked `site`. When a workspace root is explicit, a
   // public/og.jpg generated after that snapshot (or missed by a wrong cwd)
   // wins over the og.grok.me placeholder. Vercel has no public/ to read, so
   // a correct bake is unchanged.
-  const site = applyCustomCardFromFs(
-    ctx.site !== undefined ? ctx.site : snapshotOgIdentity(cwd).site,
-    cwd,
-  );
+  const site = ctx.cwd !== undefined
+    ? applyCustomCardFromFs(siteContext, cwd)
+    : siteContext;
   const appName = resolveOgTitle(site, ctx.appName ?? DEFAULT_APP_NAME, ctx.host ?? "");
   return {
     appName,
@@ -419,12 +428,13 @@ export function normalizeHeadContext(ctx = {}) {
     host: ctx.host ?? "",
     cwd,
     site,
+    hasWorkspace: ctx.cwd !== undefined,
   };
 }
 
 export function injectGrokPwaHead(html, ctx = {}) {
   if (typeof html !== "string") return html;
-  const { site, projectId, creator, creatorId, host, cwd } = normalizeHeadContext(ctx);
+  const { site, projectId, creator, creatorId, host, cwd, hasWorkspace } = normalizeHeadContext(ctx);
   const documentTitle = titleFromDocument(html);
   const appName = resolveOgTitle(
     site,
@@ -444,7 +454,7 @@ export function injectGrokPwaHead(html, ctx = {}) {
 
   next = insertAfterHeadOpen(
     next,
-    grokOgHeadTags({ host, appName, site, documentTitle, cwd }).join(""),
+    grokOgHeadTags({ host, appName, site, documentTitle, cwd, readWorkspace: hasWorkspace }).join(""),
   );
 
   if (!next.includes("/grok-app-builder/extensions.js")) {
@@ -496,8 +506,9 @@ export function createHeadInjector(ctx = {}) {
       creator: normalized.creator,
       creatorId: normalized.creatorId,
       host: normalized.host,
-      cwd: normalized.cwd,
       site: normalized.site,
+      ...(normalized.hasWorkspace ? { cwd: normalized.cwd } : {}),
+      readWorkspace: normalized.hasWorkspace,
     });
 
   return {

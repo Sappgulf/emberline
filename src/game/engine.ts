@@ -1743,6 +1743,7 @@ export class EmberEngine {
     } else {
       sfx.place();
     }
+    this.scoreGrade();
     this.persist();
     this.notify();
   }
