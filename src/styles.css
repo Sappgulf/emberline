@@ -5293,3 +5293,121 @@
     box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.38);
   }
 }
+
+/* Short portrait phones: preserve tower context and keep the wave command
+   surface in reach without scrolling the player away from the field. */
+@media (orientation: portrait) and (max-width: 640px) and (max-height: 720px) {
+  .tray {
+    padding-bottom: 3rem;
+  }
+
+  .tray .selected-tower-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.2rem;
+    margin-inline: 0.1rem;
+    padding: 0.25rem 0.35rem 0.3rem;
+  }
+
+  .tray .selected-tower-copy > p {
+    display: none;
+  }
+
+  .tray .selected-tower-heading > p {
+    font-size: 0.82rem;
+  }
+
+  .tray .selected-tower-tags {
+    gap: 0.12rem;
+  }
+
+  .tray .tower-form-chip,
+  .tray .tower-ascension-chip,
+  .tray .tower-upgrade-result {
+    min-height: 0.9rem;
+    padding: 0.1rem 0.2rem;
+    font-size: 6px;
+  }
+
+  .tray .selected-tower-actions {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.16rem;
+  }
+
+  .tray .selected-tower-actions > button {
+    min-height: 2.2rem;
+    padding: 0.12rem 0.04rem !important;
+    font-size: 7px !important;
+    line-height: 1.05;
+  }
+
+  .tray .selected-tower-actions .upgrade-preview {
+    display: none;
+  }
+
+  .tray .selected-tower-actions .upgrade-main {
+    font-size: 7px;
+  }
+
+  .tray .command-row {
+    position: fixed;
+    right: 0.5rem;
+    bottom: max(0.35rem, env(safe-area-inset-bottom));
+    left: 0.5rem;
+    z-index: 40;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    width: auto;
+    height: 40px;
+    min-height: 40px;
+    gap: 0.1rem;
+    padding: 0.12rem 0.16rem;
+    border-top: 1px solid rgba(212, 160, 84, 0.28);
+    background: rgba(8, 11, 10, 0.98);
+    box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.38);
+  }
+
+  .tray .command-row > button {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    height: 36px;
+    min-height: 36px;
+    padding: 0.08rem 0.04rem !important;
+  }
+
+  .tray .command-row .command-send {
+    flex: 1.8 1 0;
+    min-width: 0;
+    height: 36px;
+    min-height: 36px;
+    padding-inline: 0.15rem !important;
+  }
+
+  .tray .command-row .command-icon {
+    width: 0.68rem;
+    height: 0.68rem;
+    margin: -0.06rem auto 0;
+  }
+
+  .tray .command-row .command-glyph {
+    width: 0.68rem;
+    height: 0.68rem;
+    margin: -0.04rem auto 0.03rem;
+  }
+
+  .tray .command-row .command-label {
+    font-size: 6px;
+    letter-spacing: 0.04em;
+  }
+
+  .tray .command-row .command-value,
+  .tray .command-row .command-send .command-value {
+    font-size: 7px;
+  }
+
+  .tray .command-row .command-send .command-label {
+    font-size: 7px;
+  }
+}

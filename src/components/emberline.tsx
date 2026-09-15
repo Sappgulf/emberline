@@ -83,6 +83,34 @@ export function Emberline() {
   const [cell, setCell] = useState(40);
   const [hoverCell, setHoverCell] = useState<HoverCell | null>(null);
   const [codexTab, setCodexTab] = useState<"bestiary" | "chronicle">("bestiary");
+  const codexBestiaryRef = useRef<HTMLButtonElement>(null);
+  const codexChronicleRef = useRef<HTMLButtonElement>(null);
+
+  const selectCodexTab = useCallback((tab: "bestiary" | "chronicle") => {
+    setCodexTab(tab);
+    window.requestAnimationFrame(() => {
+      (tab === "bestiary" ? codexBestiaryRef : codexChronicleRef).current?.focus();
+    });
+  }, []);
+
+  const onCodexTabKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, current: "bestiary" | "chronicle") => {
+      const next =
+        event.key === "ArrowRight" || event.key === "ArrowDown"
+          ? current === "bestiary" ? "chronicle" : "bestiary"
+          : event.key === "ArrowLeft" || event.key === "ArrowUp"
+            ? current === "bestiary" ? "chronicle" : "bestiary"
+            : event.key === "Home"
+              ? "bestiary"
+              : event.key === "End"
+                ? "chronicle"
+                : null;
+      if (!next) return;
+      event.preventDefault();
+      selectCodexTab(next);
+    },
+    [selectCodexTab],
+  );
 
   const restoreOverlayTrigger = useCallback((target: { current: HTMLButtonElement | null }) => {
     window.requestAnimationFrame(() => target.current?.focus());
@@ -100,7 +128,7 @@ export function Emberline() {
     restoreOverlayTrigger(hallTriggerRef);
   }, [restoreOverlayTrigger]);
   useEffect(() => {
-    if (hud.phase === "ready") readyActionRef.current?.focus();
+    if (hud.phase === "ready") readyActionRef.current?.focus({ preventScroll: true });
   }, [hud.phase]);
 
   useEffect(() => {
@@ -579,27 +607,38 @@ export function Emberline() {
             >
               <div className="codex-tabs" role="tablist" aria-label="Codex sections">
                 <button
+                  ref={codexBestiaryRef}
                   type="button"
                   role="tab"
+                  id="codex-tab-bestiary"
                   className="pressable codex-tab"
                   aria-selected={codexTab === "bestiary"}
-                  onClick={() => setCodexTab("bestiary")}
+                  aria-controls="codex-panel-bestiary"
+                  tabIndex={codexTab === "bestiary" ? 0 : -1}
+                  onKeyDown={(event) => onCodexTabKeyDown(event, "bestiary")}
+                  onClick={() => selectCodexTab("bestiary")}
                 >
                   Bestiary
                 </button>
                 <button
+                  ref={codexChronicleRef}
                   type="button"
                   role="tab"
+                  id="codex-tab-chronicle"
                   className="pressable codex-tab"
                   aria-selected={codexTab === "chronicle"}
-                  onClick={() => setCodexTab("chronicle")}
+                  aria-label={`Chronicle, ${hud.chronicle.filter((entry) => entry.unlocked).length} of ${hud.chronicle.length} pages unlocked`}
+                  aria-controls="codex-panel-chronicle"
+                  tabIndex={codexTab === "chronicle" ? 0 : -1}
+                  onKeyDown={(event) => onCodexTabKeyDown(event, "chronicle")}
+                  onClick={() => selectCodexTab("chronicle")}
                 >
                   Chronicle
                   <span className="codex-tab-count">{hud.chronicle.filter((entry) => entry.unlocked).length}/{hud.chronicle.length}</span>
                 </button>
               </div>
               {codexTab === "bestiary" ? (
-                <div className="bestiary-grid w-full text-left">
+                <div id="codex-panel-bestiary" role="tabpanel" aria-labelledby="codex-tab-bestiary" tabIndex={0} className="bestiary-grid w-full text-left">
                   {BESTIARY.map((b) => {
                     const creep = CREEPS[b.kind];
                     return (
@@ -633,7 +672,7 @@ export function Emberline() {
                   })}
                 </div>
               ) : (
-                <div className="chronicle-grid w-full text-left">
+                <div id="codex-panel-chronicle" role="tabpanel" aria-labelledby="codex-tab-chronicle" tabIndex={0} className="chronicle-grid w-full text-left">
                   {hud.chronicle.map((entry) => (
                     <article key={entry.id} className="chronicle-card plaque" data-locked={!entry.unlocked}>
                       <span className="intel-kicker">{entry.kicker}</span>

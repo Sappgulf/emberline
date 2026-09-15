@@ -316,3 +316,12 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified in the live in-app browser through title → briefing → ready → `{c:4,r:1}` placement → active wave; selected-tower controls and the fixed landscape command surface rendered, and console error/warn diagnostics were empty.
 - Verified with the required `web_game_playwright_client.js` choreography after the responsive changes; title and Canvas artifacts were nonblank and `render_game_to_text()` completed without an error artifact.
 - Limitation: exact viewport validation used installed local Chrome because the in-app browser has no viewport override; this does not replace physical-device touch, Safari, battery, or hardware performance proof.
+
+## 2026-09-15 — Codex tab semantics and short-portrait command deck pass
+
+- Completed: Codex Bestiary and Chronicle now use stable tab/panel IDs, explicit accessible relationships, roving tab stops, and Arrow/Home/End keyboard navigation that returns focus to the active section.
+- Fixed: short portrait phones no longer lose the selected-tower context when the ready-state focus lands in the command tray; the tray preserves its scroll position, the six action buttons remain visible, and the command deck is fixed within the safe bottom edge.
+- Verified with the live in-app browser: title → briefing → ready → centered tower placement → upgrade → active wave, plus Codex Chronicle → Bestiary keyboard navigation; browser error and warning diagnostics were empty.
+- Verified with exact local Playwright fallback at 320×568, 390×844, 667×375, and 1440×900: real placement, six selected-tower actions, eight packet controls, active wave transition, no document overflow, and zero page error/warning captures. The 320×568 layout measured a visible selected-tower bar at `y=456.72` with `scrollTop=0`; the landscape briefing action remained visible and reached `ready` with a 247×171 canvas.
+- Verified: 142 source tests, typecheck, lint, auth invariant, production build, required web-game Playwright choreography, and `git diff --check` pass. `npm run test:scripts` remains 193/197 because four pre-existing assertions require the absent `.grok/skills/og` reference directory. The build skips the optional database migration because `DATABASE_URL` is unset.
+- Limitation: exact viewport validation uses installed local Chrome because the in-app browser has no viewport override; this does not replace physical-device touch, Safari, battery, or hardware performance proof.
