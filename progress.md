@@ -1,5 +1,14 @@
 Original prompt: ok keep working. more upgrades across the game
 
+## 2026-09-15 — title CTA focus polish
+
+- Found: the shared title overlay focused the optional Hard watch checkbox first, so keyboard and assistive-technology users entered the game on a setting instead of the primary action.
+- Fixed: `Overlay` now accepts an opt-in initial focus ref, and the title screen targets `Hold the line` while preserving the existing modal Tab loop and close-trigger restoration.
+- Verified at exact 320×568, 390×844, and 1280×800: fresh title focus is `Hold the line`, the first briefing focus is the selected rite, ready focus is `Send wave`, document overflow is false, and console/page errors are empty.
+- Interaction matrix verified Campaign, Bestiary/Chronicle, Orders, Watch hall, Hard watch, rite selection, help open/close, sound, pause/resume, Aim, Pace, and forecast details.
+- Required web-game Playwright choreography passed two iterations after the focus change; refreshed title/brief and board screenshots plus text-state artifacts are coherent.
+- Limitation: exact viewport coverage uses installed local Chrome because the in-app browser has no viewport override; physical touch, Safari, battery, and hardware GPU proof remain outside this pass.
+
 ## 2026-09-15 — narrow-phone command rail polish
 
 - Fixed: short portrait phones no longer compress Aim, Pace, Scout, Horn, Flare, Stall, and Mend into sub-44px controls; utility commands now scroll as a touch-sized rail while `Send wave` stays pinned at the trailing edge.

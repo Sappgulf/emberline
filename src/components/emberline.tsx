@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
 import { RotateCcw } from "lucide-react";
 import {
   COLS,
@@ -107,6 +114,7 @@ export function Emberline() {
   const campaignTriggerRef = useRef<HTMLButtonElement>(null);
   const codexTriggerRef = useRef<HTMLButtonElement>(null);
   const hallTriggerRef = useRef<HTMLButtonElement>(null);
+  const titleStartRef = useRef<HTMLButtonElement>(null);
   const titleHelpTriggerRef = useRef<HTMLButtonElement>(null);
   const headerHelpTriggerRef = useRef<HTMLButtonElement>(null);
   const helpRestoreRef = useRef<{ current: HTMLButtonElement | null }>(headerHelpTriggerRef);
@@ -1022,7 +1030,13 @@ export function Emberline() {
         )}
 
         {hud.phase === "title" && !hud.codex && !hud.campaign && !hud.help && !hud.hall && (
-          <Overlay kicker="Keep watch" title="Emberline" emblem size="keep">
+          <Overlay
+            kicker="Keep watch"
+            title="Emberline"
+            emblem
+            size="keep"
+            initialFocusRef={titleStartRef}
+          >
             <div className="keep-book">
               <div className="keep-main">
                 <p className="keep-lead">
@@ -1041,6 +1055,7 @@ export function Emberline() {
                 <WatchLedger hud={hud} />
                 <div className="menu-actions">
                   <button
+                    ref={titleStartRef}
                     type="button"
                     className="pressable send-flag min-h-11 px-7 text-sm"
                     onClick={() => {
@@ -2675,6 +2690,7 @@ function Overlay({
   onClose,
   dimmer,
   emblem,
+  initialFocusRef,
   surface,
   actionDock,
 }: {
@@ -2689,6 +2705,7 @@ function Overlay({
   onClose?: () => void;
   dimmer?: boolean;
   emblem?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   surface?: "campaign" | "dawn";
   actionDock?: boolean;
 }) {
@@ -2705,7 +2722,7 @@ function Overlay({
           'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
         ),
       );
-    focusables()[0]?.focus();
+    (initialFocusRef?.current ?? focusables()[0])?.focus({ preventScroll: true });
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
       const items = focusables();
@@ -2725,7 +2742,7 @@ function Overlay({
       dialog.removeEventListener("keydown", onKeyDown);
       previous?.focus();
     };
-  }, []);
+  }, [initialFocusRef]);
 
   return (
     <div
