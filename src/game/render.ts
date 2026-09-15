@@ -34,6 +34,8 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
 
   const spawn = engine.path[0];
   const base = engine.path[engine.path.length - 1];
+  const order = engine.watchOrderSnapshot();
+  const focus = engine.focusSnapshot();
   drawPortal(ctx, (spawn.c + 0.5) * cell, (spawn.r + 0.5) * cell, cell, engine.time, engine.phase === "wave");
   drawKeep(ctx, (base.c + 0.5) * cell, (base.r + 0.5) * cell, cell, engine.time, engine.lives);
   drawRouteTags(ctx, cell, engine);
@@ -71,7 +73,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     actors.push({
       y: c.y,
       z: 1,
-      draw: () => drawCreep(ctx, c, cell, engine.path.length),
+      draw: () => drawCreep(ctx, c, cell, engine.path.length, order?.targetKind, order?.complete ?? false, focus?.id ?? -1),
     });
   }
   actors.sort((a, b) => a.y - b.y || a.z - b.z);
@@ -875,7 +877,15 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
   ctx.restore();
 }
 
-function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pathLen: number) {
+function drawCreep(
+  ctx: CanvasRenderingContext2D,
+  creep: Creep,
+  cell: number,
+  pathLen: number,
+  orderKind?: Creep["kind"],
+  orderComplete = false,
+  focusId = -1,
+) {
   const px = creep.x * cell;
   const py = creep.y * cell;
   const fade = creep.alive ? 1 : Math.max(0, creep.death / 0.28);
@@ -888,6 +898,64 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
   ctx.translate(px, py + bob);
   ctx.rotate(creep.kind === "wisp" ? 0 : creep.facing);
   ctx.scale(creep.squash, creep.squash * stretch);
+  const marked = creep.alive && creep.markedT > 0;
+  const orderTarget = creep.alive && !orderComplete && orderKind === creep.kind;
+  const focusTarget = creep.alive && focusId === creep.id;
+  if (marked || orderTarget || focusTarget) {
+    const markerRadius = size * (marked && orderTarget ? 1.68 : focusTarget ? 1.58 : 1.45);
+    if (focusTarget) {
+      ctx.save();
+      ctx.globalAlpha = 0.88;
+      ctx.strokeStyle = PARCHMENT;
+      ctx.lineWidth = Math.max(1.3, cell * 0.028);
+      ctx.setLineDash([Math.max(2, size * 0.2), Math.max(2, size * 0.16)]);
+      ctx.beginPath();
+      ctx.arc(0, 0, markerRadius + cell * 0.13, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = PARCHMENT;
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(1.4, cell * 0.035), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    if (marked) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.9, 0.35 + creep.markedT * 0.12);
+      ctx.strokeStyle = "#f1d58a";
+      ctx.lineWidth = Math.max(1.2, cell * 0.025);
+      ctx.beginPath();
+      ctx.arc(0, 0, markerRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#f1d58a";
+      for (let i = 0; i < 4; i += 1) {
+        const a = i * Math.PI * 0.5 + Math.PI * 0.25;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * markerRadius, Math.sin(a) * markerRadius, Math.max(1.2, cell * 0.025), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    if (orderTarget) {
+      ctx.save();
+      ctx.globalAlpha = 0.88;
+      ctx.strokeStyle = EMBER;
+      ctx.lineWidth = Math.max(1.2, cell * 0.024);
+      ctx.setLineDash([Math.max(2, size * 0.35), Math.max(2, size * 0.22)]);
+      ctx.beginPath();
+      ctx.arc(0, 0, markerRadius + cell * 0.1, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = EMBER;
+      ctx.beginPath();
+      ctx.moveTo(0, -markerRadius - cell * 0.22);
+      ctx.lineTo(cell * 0.08, -markerRadius - cell * 0.08);
+      ctx.lineTo(-cell * 0.08, -markerRadius - cell * 0.08);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
   ctx.globalAlpha = fade * (creep.alive ? Math.max(0.4, creep.spawn) : 1);
   if (creep.kind === "lord" && creep.alive) {
     ctx.globalAlpha = 0.22 * fade;

@@ -162,6 +162,7 @@ export function Emberline() {
       if (e.key === "5") engine.chooseKind("bramble");
       if (e.key === "6") engine.chooseKind("ward");
       if (e.key === "h" || e.key === "H") engine.blowHorn();
+      if (e.key === "r" || e.key === "R") engine.scoutFlare();
       if (e.key === "m" || e.key === "M") engine.mendKeep();
       if (e.key === "q" || e.key === "Q") engine.upgradeDamage();
       if (e.key === "e" || e.key === "E") engine.upgradeRate();
@@ -279,6 +280,14 @@ export function Emberline() {
         ? "Use free horn"
         : `Use horn for ${hud.hornCost} gold`;
   const hornValue = hud.phase !== "wave" ? "Wave only" : hud.hornCd > 0 ? `${Math.ceil(hud.hornCd)}s` : hud.hornCost === 0 ? "Free" : `${hud.hornCost}g`;
+  const flareLabel = hud.phase !== "wave"
+    ? "Scout flare available during a wave"
+    : hud.flareCd > 0
+      ? `Scout flare cooling down for ${Math.ceil(hud.flareCd)} seconds`
+      : hud.gold < hud.flareCost
+        ? `Need ${hud.flareCost} gold for scout flare`
+        : `Mark enemies for ${hud.flareCost} gold`;
+  const flareValue = hud.phase !== "wave" ? "Wave only" : hud.flareCd > 0 ? `${Math.ceil(hud.flareCd)}s` : `${hud.flareCost}g`;
   const stallHint = hud.wave < 1 ? "Stall opens after the first wave" : hud.phase !== "ready" ? "Stall opens between waves" : "Open roadside stall";
   const stallValue = hud.wave < 1 ? "After wave 1" : hud.phase !== "ready" ? "Between waves" : "Open";
   const mendHint = hud.lives >= hud.maxLives ? "The keep is already at full strength" : hud.gold < hud.mendCost ? `Mend costs ${hud.mendCost} gold` : `Mend the keep for ${hud.mendCost} gold`;
@@ -287,6 +296,7 @@ export function Emberline() {
   const waveProgressStatus = hud.phase === "wave" ? `${hud.remaining} left` : hud.wave > 0 ? holdLabel(hud.lastResult?.hold) : "Ready";
   const placementToneValue = placementTone(engine, hud, hoverCell);
   const placementMessageValue = placementMessage(engine, hud, hoverCell);
+  const focusReadout = hud.focus ? `Focus fire · ${hud.focus.name} · +10% · ${Math.ceil(hud.focus.seconds)}s` : null;
   const firstWatch = hud.mapIndex === 0 && hud.wave === 0 && hud.relics.length === 0;
   const menu =
     hud.codex ||
@@ -397,7 +407,7 @@ export function Emberline() {
           <canvas
             ref={canvasRef}
             className={`stage-frame touch-none xl:max-h-full ${hud.selectedKind ? "cursor-crosshair" : "cursor-pointer"}`}
-            aria-label="Emberline tower defense board. Use number keys to choose a tower, then click grass beside the road to plant it."
+            aria-label="Emberline tower defense board. Use number keys to choose a tower, click grass beside the road to plant it, or tap an enemy during a wave to focus fire."
             tabIndex={0}
             onPointerMove={onMove}
             onPointerDown={(e) => {
@@ -763,8 +773,9 @@ export function Emberline() {
               ) : playing && hud.phase === "ready" ? (
                 `Next: ${hud.nextWave}`
               ) : (
-                "Pick a packet, plant on grass beside the road."
+                hud.phase === "wave" ? "Tap an enemy to focus fire." : "Pick a packet, plant on grass beside the road."
               )}
+              {focusReadout && <span className="focus-readout ml-2" role="status">{focusReadout}</span>}
             </p>
           )}
 
@@ -833,6 +844,22 @@ export function Emberline() {
                 <img className="command-icon" src="/ui/icon-horn.png" alt="" />
                 <span className="command-label">Horn</span>
                 <span className="command-value">{hornValue}</span>
+              </button>
+              <button
+                type="button"
+                className="pressable packet command-control command-flare min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
+                aria-label={flareLabel}
+                title={`${flareLabel}. Shortcut R.`}
+                disabled={hud.phase !== "wave" || hud.flareCd > 0 || hud.gold < hud.flareCost}
+                data-ready={hud.phase === "wave" && hud.flareCd <= 0 && hud.gold >= hud.flareCost}
+                onClick={() => {
+                  unlockAudio();
+                  engine.scoutFlare();
+                }}
+              >
+                <span className="command-glyph" aria-hidden="true" />
+                <span className="command-label">Flare</span>
+                <span className="command-value">{flareValue}</span>
               </button>
               <button
                 type="button"

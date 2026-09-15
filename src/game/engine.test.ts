@@ -1,6 +1,18 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { COLS, CREEPS, START_GOLD, START_LIVES, TOWERS, pathCells, blockedCells } from "./config.ts";
+import {
+  COLS,
+  CREEPS,
+  FLARE_BONUS,
+  FLARE_COST,
+  FOCUS_BONUS,
+  FOCUS_DURATION,
+  START_GOLD,
+  START_LIVES,
+  TOWERS,
+  pathCells,
+  blockedCells,
+} from "./config.ts";
 import { MAPS, leakCost, pathCellsOf, planHasAir, shopFor, watchOrderFor } from "./campaign.ts";
 import { EmberEngine } from "./engine.ts";
 
@@ -633,6 +645,133 @@ describe("EmberEngine", () => {
     const after = e.gold;
     e.blowHorn();
     assert.equal(e.gold, after);
+  });
+
+  it("marks the road with a scout flare and amplifies damage during the window", () => {
+    const e = play();
+    e.startWave();
+    e.spawn("grub");
+    const first = e.creeps[0];
+    const gold = e.gold;
+
+    e.scoutFlare();
+
+    assert.equal(e.gold, gold - FLARE_COST);
+    assert.ok(e.flareCd > 0);
+    assert.ok(first.markedT > 0);
+    assert.equal(JSON.parse(e.renderText()).flare.marked, 1);
+    const markedHp = first.hp;
+    e.damageCreep(first, 10, 0, true, true);
+    const markedDamage = markedHp - first.hp;
+    assert.ok(Math.abs(markedDamage - 10 * (1 + FLARE_BONUS)) < 1e-9);
+
+    e.spawn("runner");
+    const spawned = e.creeps.at(-1);
+    assert.ok(spawned);
+    assert.ok(spawned.markedT > 0);
+    e.scoutFlare();
+    assert.equal(e.gold, gold - FLARE_COST);
+
+    for (let i = 0; i < 240; i += 1) e.step(1 / 60);
+    assert.ok(first.markedT < 1e-6);
+  });
+
+  it("keeps scout flare reserved for live waves", () => {
+    const e = play();
+    const gold = e.gold;
+    e.scoutFlare();
+    assert.equal(e.gold, gold);
+    assert.equal(e.flareCd, 0);
+  });
+
+  it("does not carry scout flare marks into the next wave", () => {
+    const e = play();
+    e.startWave();
+    e.spawn("grub");
+    e.scoutFlare();
+    e.spawnQ = [];
+    e.creeps = [];
+    e.finishWaveIfClear();
+
+    assert.equal(e.phase, "ready");
+    assert.equal(e.flareT, 0);
+    e.startWave();
+    e.spawn("runner");
+    assert.equal(e.creeps[0].markedT, 0);
+  });
+
+  it("focuses a live creep, prioritizes it, and expires cleanly", () => {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [];
+    e.spawn("grub");
+    e.spawn("runner");
+    const first = e.creeps[0];
+    const second = e.creeps[1];
+    assert.ok(first);
+    assert.ok(second);
+    second.x = 1.3;
+
+    e.tapCell(0, 5);
+
+    assert.equal(e.focusId, first.id);
+    assert.equal(e.focusT, FOCUS_DURATION);
+    const snapshot = JSON.parse(e.renderText()) as {
+      focus: { id: number; kind: string; seconds: number } | null;
+      creeps: Array<{ id: number; focused: boolean }>;
+    };
+    assert.deepEqual(snapshot.focus, { id: first.id, kind: "grub", seconds: FOCUS_DURATION });
+    assert.equal(snapshot.creeps.find((creep) => creep.id === first.id)?.focused, true);
+
+    e.gold = 500;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    first.x = grass.c + 0.5;
+    first.y = grass.r + 0.5;
+    second.x = grass.c + 0.5;
+    second.y = grass.r + 0.5;
+    assert.equal(e.pickTarget(e.towers[0])?.id, first.id);
+
+    const focusedEngine = play();
+    focusedEngine.gold = 500;
+    const focusedGrass = emptyGrass(focusedEngine);
+    focusedEngine.tapCell(focusedGrass.c, focusedGrass.r);
+    focusedEngine.startWave();
+    focusedEngine.spawnQ = [];
+    focusedEngine.spawn("grub");
+    const focusedTarget = focusedEngine.creeps[0];
+    assert.ok(focusedTarget);
+    focusedEngine.focusId = focusedTarget.id;
+    focusedEngine.focusT = FOCUS_DURATION;
+    focusedEngine.lastTargetId = -1;
+    focusedEngine.fire(focusedEngine.towers[0], focusedTarget);
+    const focusedShot = focusedEngine.shots[0];
+    assert.ok(focusedShot);
+
+    const regularEngine = play();
+    regularEngine.gold = 500;
+    const regularGrass = emptyGrass(regularEngine);
+    regularEngine.tapCell(regularGrass.c, regularGrass.r);
+    regularEngine.startWave();
+    regularEngine.spawnQ = [];
+    regularEngine.spawn("grub");
+    const regularTarget = regularEngine.creeps[0];
+    assert.ok(regularTarget);
+    regularEngine.lastTargetId = -1;
+    regularEngine.fire(regularEngine.towers[0], regularTarget);
+    const regularShot = regularEngine.shots[0];
+    assert.ok(regularShot);
+    assert.ok(Math.abs(focusedShot.damage / regularShot.damage - (1 + FOCUS_BONUS)) < 1e-9);
+
+    let focusUpdates = 0;
+    focusedEngine.subscribe(() => {
+      focusUpdates += 1;
+    });
+    focusedEngine.focusT = 0.01;
+    focusedEngine.step(1 / 60);
+    assert.equal(focusedEngine.focusId, -1);
+    assert.equal(focusedEngine.focusSnapshot(), null);
+    assert.ok(focusUpdates > 0);
   });
 
   it("undoes a fresh plant and refunds the full cost", () => {

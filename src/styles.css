@@ -1320,6 +1320,13 @@
   line-height: 1.25;
 }
 
+.focus-readout {
+  color: var(--color-parchment);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .packet {
   position: relative;
   min-width: 3.6rem;
@@ -1433,6 +1440,39 @@
   margin: -0.18rem auto 0.02rem;
   object-fit: contain;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.46));
+}
+.command-glyph {
+  position: relative;
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.08rem auto 0.08rem;
+  border: 1px solid rgba(241, 213, 138, 0.72);
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(241, 213, 138, 0.22);
+}
+.command-glyph::before,
+.command-glyph::after {
+  position: absolute;
+  inset: 0.18rem;
+  border: 1px solid rgba(241, 213, 138, 0.68);
+  border-radius: 999px;
+  content: "";
+}
+.command-glyph::after {
+  inset: 0.37rem;
+  border: 0;
+  background: var(--color-ember);
+  box-shadow: 0 0 5px rgba(224, 120, 56, 0.68);
+}
+.command-flare[data-ready="true"] {
+  border-color: rgba(241, 213, 138, 0.82);
+  background:
+    linear-gradient(180deg, rgba(224, 120, 56, 0.18), rgba(12, 16, 13, 0.58) 78%),
+    rgba(18, 22, 15, 0.74);
+}
+.command-flare[data-ready="true"] .command-value {
+  color: #f1d58a;
 }
 .send-flag {
   min-width: 10.5rem;
@@ -2346,7 +2386,7 @@
   .command-row {
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(8.8rem, 1.8fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(8.8rem, 1.8fr);
     justify-content: stretch;
     gap: 0.35rem;
   }
@@ -2499,7 +2539,7 @@
   }
 
   .command-row {
-    grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(6.4rem, 1.5fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(6.4rem, 1.5fr);
     gap: 0.25rem;
   }
 
@@ -2832,7 +2872,7 @@
 
   .command-row {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.5fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(0, 1.5fr);
     width: 100%;
     gap: 0.25rem;
   }

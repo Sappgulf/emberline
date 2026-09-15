@@ -246,3 +246,21 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified with the required web-game Playwright client: local Vite ready-state canvas screenshot and deterministic text state completed without an error artifact.
 - Verified with regular Playwright fallback at exact 320×900, 390×900, and 1440×900 viewports: no horizontal overflow, no page errors, and the unlock/locked copy is accessible at every width.
 - Source gates: 98 tests, typecheck, lint, auth invariant, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-14 — scout flare tactical readability pass
+
+- Completed: added Scout flare, a wave-only 35g command with a 12-second cooldown and four-second mark window; marked creeps take +22% damage, including enemies spawned while the flare is active.
+- Completed: added a distinct flare glyph, ready/cooldown states, `R` keyboard shortcut, audio cue, accessible labels, and a gold reticle on marked enemies. The existing watch-order target now also receives a restrained orange order reticle so the two tactical signals remain distinguishable.
+- Completed: exposed aggregate and per-creep mark state through `render_game_to_text()`, reset the transient mark window at wave completion, and documented the new tool in the README.
+- Verified in the live in-app browser: title → briefing → ready → wave one, Flare activation by button and `R`, gold/cooldown/banner updates, visible board reticles, cooldown recovery, and a 689×814 command deck with all seven controls contained. The inspected watch was paused after QA.
+- Verified with the required `web_game_playwright_client.js`: final local Vite choreography completed with Canvas screenshots, deterministic `brief`/`ready` snapshots, and no `errors-*.json` artifact.
+- Source gates: 101 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-15 — player-directed focus fire pass
+
+- Completed: exposed the engine's existing same-target combat language as Focus fire; tapping a live enemy during a wave prioritizes it for four seconds and grants +10% shot power while the focus window is active.
+- Completed: added a distinct parchment focus reticle, center pin, banner, transient tray readout, Canvas accessibility guidance, and a lightweight audio cue so player intent remains readable beside Scout flare and watch-order markers.
+- Completed: exposed aggregate focus state and per-creep `focused` flags through `render_game_to_text()`, reset focus on expiry, kills, wave transitions, and field resets, and documented the mechanic in the README.
+- Verified with the required `web_game_playwright_client.js`: fresh local Vite brief/ready choreography completed with Canvas screenshots and deterministic state, with no `errors-*.json` artifact.
+- Verified in the live in-app browser: fresh title → briefing → ready → wave one, a real gate-spawn tap produced `Focus fire · Grubs`, the tray reported `+10% · 4s`, the canvas accessibility label described the action, and browser error/warn diagnostics were empty. The inspected watch was paused after QA.
+- Source gates: 102 tests, typecheck, lint, auth invariant, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.

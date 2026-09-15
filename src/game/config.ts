@@ -14,6 +14,12 @@ export const TICK = 1 / 60;
 export const HORN_COST = 45;
 export const HORN_CD = 14;
 export const MEND_COST = 70;
+export const FLARE_COST = 35;
+export const FLARE_CD = 12;
+export const FLARE_DURATION = 4;
+export const FLARE_BONUS = 0.22;
+export const FOCUS_DURATION = 4;
+export const FOCUS_BONUS = 0.1;
 
 export const PATH: ReadonlyArray<{ c: number; r: number }> = [
   { c: 0, r: 5 },
