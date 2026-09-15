@@ -5298,7 +5298,7 @@
    surface in reach without scrolling the player away from the field. */
 @media (orientation: portrait) and (max-width: 640px) and (max-height: 720px) {
   .tray {
-    padding-bottom: 3rem;
+    padding-bottom: 3.3rem;
   }
 
   .tray .selected-tower-bar {
@@ -5409,5 +5409,66 @@
 
   .tray .command-row .command-send .command-label {
     font-size: 7px;
+  }
+
+  /* Keep the packet rail above the fixed command bar when no tower is
+     selected; selected-tower actions keep the first view and the rail
+     becomes reachable just below the command surface by tray scroll. */
+  .tray .tray-hint {
+    height: 16px;
+    overflow: hidden;
+    padding: 0.1rem 0.25rem;
+    font-size: 7px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .tray .packet-row {
+    height: 42px;
+    gap: 0.22rem;
+    padding-block: 0;
+  }
+
+  .tray .packet-row .packet {
+    flex: 0 0 3.7rem;
+    width: 3.7rem;
+    height: 42px;
+    overflow: hidden;
+    padding: 0.1rem 0.08rem 0.12rem;
+  }
+
+  .tray .packet-sprite {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .tray .packet > span:nth-of-type(2) {
+    margin-top: 0.1rem;
+    font-size: 0.58rem;
+    line-height: 1;
+  }
+
+  .tray .packet-role {
+    display: none;
+  }
+
+  .tray .packet > span:last-child {
+    font-size: 7px;
+    line-height: 1;
+  }
+
+  .tray:has(.selected-tower-bar) .packet-row {
+    margin-top: 2.75rem;
+  }
+
+  .tray .command-row {
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .tray .command-row > button,
+  .tray .command-row .command-send {
+    height: 40px;
+    min-height: 40px;
   }
 }

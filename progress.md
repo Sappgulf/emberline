@@ -1,5 +1,15 @@
 Original prompt: ok keep working. more upgrades across the game
 
+## 2026-09-15 — mobile action reachability and short-portrait deck finish
+
+- Fixed: Campaign route selection and Night market/roadside-stall overlays now use the existing action dock, so long route and shop content scrolls independently while `Begin The Low Road`, `March on`, or `Back to the road` stays reachable at the bottom of the viewport.
+- Fixed: 320px portrait ready and selected-tower states no longer let the fixed command row cover packet cards; the compact packet rail is 42px high, labels remain readable, selected-tower actions keep priority, and the rail remains reachable by tray scroll.
+- Verified with exact local Chrome fallback at 320×568, 390×844, 667×375, and 1440×900: Campaign action remained inside the viewport, the board rendered, six selected-tower actions appeared, the command control stayed reachable, document overflow stayed false, and page error/warning arrays were empty in every run.
+- Verified in the live in-app browser: title → Campaign action dock → briefing → ready → placement → Bound upgrade → active Wave 1; accessibility state exposed the full command deck and browser error/warning logs were empty.
+- Verified the required web-game Playwright choreography for two iterations and refreshed `output/web-game/shot-0.png`, `shot-1.png`, `state-0.json`, and `state-1.json`; the title and board frames were nonblank and state artifacts had no error artifact.
+- Source gates: 142/142 tests, typecheck, lint, auth invariant, production build, and `git diff --check` passed. `npm run test:scripts` remains 193/197 because four fixture-contract tests require the unavailable `.grok/skills/og/SKILL.md` and `.grok/skills/og/references` paths.
+- Limitation: exact viewport coverage used installed local Chrome because the in-app browser does not expose a viewport override; this is browser proof, not physical touch, Safari, hardware GPU, battery, or device proof.
+
 ## 2026-09-15 — full interaction, stability, and release audit
 
 - Improved: relic purchases now refresh the live grade summary so the stall’s purse, story copy, and HUD snapshot agree; exported workspaces now fall back to the tracked root `app-env.json` while `.grok/app-env.json` remains authoritative when present.

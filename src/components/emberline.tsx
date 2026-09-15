@@ -695,6 +695,7 @@ export function Emberline() {
               onClose={closeCampaign}
               action={`Begin ${hud.mapName}`}
               onAction={() => engine.startSelectedMap()}
+              actionDock
             >
               <div className="campaign-map-surface">
                 <p className="max-w-md text-sm leading-relaxed text-dust">
@@ -972,6 +973,7 @@ export function Emberline() {
               title={hud.phase === "shop" ? "Night market" : "Roadside stall"}
               action={hud.phase === "shop" ? "March on" : "Back to the road"}
               onAction={() => (hud.phase === "shop" ? engine.leaveShop() : engine.closeStall())}
+              actionDock
             >
               {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
               <p className="text-sm text-dust">{hud.story?.line ?? `${hud.gold}g in the purse.`}</p>
