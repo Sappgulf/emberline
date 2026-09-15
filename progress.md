@@ -247,20 +247,39 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified with regular Playwright fallback at exact 320×900, 390×900, and 1440×900 viewports: no horizontal overflow, no page errors, and the unlock/locked copy is accessible at every width.
 - Source gates: 98 tests, typecheck, lint, auth invariant, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
 
-## 2026-09-14 — scout flare tactical readability pass
+## 2026-09-11 — named bosses, camps, Emberlit branches, elites, sets, marks, and the Long Night
 
-- Completed: added Scout flare, a wave-only 35g command with a 12-second cooldown and four-second mark window; marked creeps take +22% damage, including enemies spawned while the flare is active.
-- Completed: added a distinct flare glyph, ready/cooldown states, `R` keyboard shortcut, audio cue, accessible labels, and a gold reticle on marked enemies. The existing watch-order target now also receives a restrained orange order reticle so the two tactical signals remain distinguishable.
-- Completed: exposed aggregate and per-creep mark state through `render_game_to_text()`, reset the transient mark window at wave completion, and documented the new tool in the README.
-- Verified in the live in-app browser: title → briefing → ready → wave one, Flare activation by button and `R`, gold/cooldown/banner updates, visible board reticles, cooldown recovery, and a 689×814 command deck with all seven controls contained. The inspected watch was paused after QA.
-- Verified with the required `web_game_playwright_client.js`: final local Vite choreography completed with Canvas screenshots, deterministic `brief`/`ready` snapshots, and no `errors-*.json` artifact.
-- Source gates: 101 tests, typecheck, lint, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+- Completed: every lord road now names its boss (Mirefather, Cinderhide, Mirrorskin, Hollowjaw, Wicker Crown) with a taunt line, a half-health second phase, and a distinct ground effect (summon, burn, ward, frenzy); a live boss bar with phase state sits over the board.
+- Completed: between-road camps offer two preparations each (gold, lives, next-road damage, cheap horn oil, an extra scout, or a watch mark) chosen in the night market and applied on the next briefing.
+- Completed: Emberlit is now a choice of two awakenings per tower (Split shaft/Deadeye, Deep oil/Cluster shell, Deep freeze/Rimebind, Fork/Overcharge, Grasping root/Bloodthorn, Sunder/Sanctum, Pierce plate/Impale, Clung coals/Tarfire) and every tower has an active ability on a cooldown (Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm) bound to C.
+- Completed: four elite affixes (shielded, frenzied, warded, hollow) spawn deterministically from the second road with auras, tags, bonus bounty, chill immunity, and death splinters; five relic sets (Winter vigil, Forge fire, Watchlight, Keepfield, Bounty belt) fold bonuses into damage, rate, chill duration, mend price, and start gold with truthful HUD previews.
+- Completed: the Bestiary gained a Chronicle tab whose pages unlock by held roads and carried relics; the title gained a Watch hall (marks, four three-tier perks, Long Night entry and personal best) plus an endless mode with generated waves, scaling health, and a boss every fourth night.
+- Verified in the live browser at 1440x900 and 390x844: title → hall → chronicle → campaign → brief → ready → five-wave River Ford hold with named boss bar and both Emberlit branch buttons, camp choice and active relic-set chips in the night market, endless Night 1 ready state with `LONG NIGHT` header, and no document overflow or browser diagnostics.
+- Source gates: 129 tests (13 new season tests), typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
 
-## 2026-09-15 — player-directed focus fire pass
+## 2026-09-11 — performance, stability, and juice pass
 
-- Completed: exposed the engine's existing same-target combat language as Focus fire; tapping a live enemy during a wave prioritizes it for four seconds and grants +10% shot power while the focus window is active.
-- Completed: added a distinct parchment focus reticle, center pin, banner, transient tray readout, Canvas accessibility guidance, and a lightweight audio cue so player intent remains readable beside Scout flare and watch-order markers.
-- Completed: exposed aggregate focus state and per-creep `focused` flags through `render_game_to_text()`, reset focus on expiry, kills, wave transitions, and field resets, and documented the mechanic in the README.
-- Verified with the required `web_game_playwright_client.js`: fresh local Vite brief/ready choreography completed with Canvas screenshots and deterministic state, with no `errors-*.json` artifact.
-- Verified in the live in-app browser: fresh title → briefing → ready → wave one, a real gate-spawn tap produced `Focus fire · Grubs`, the tray reported `+10% · 4s`, the canvas accessibility label described the action, and browser error/warn diagnostics were empty. The inspected watch was paused after QA.
-- Source gates: 102 tests, typecheck, lint, auth invariant, production build, and `git diff --check` all pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+- Fixed: corrupted saves can no longer poison `unlocked`, `marks`, `bestEndless`, or perk tiers with `NaN`; the mark camp can no longer be re-picked for infinite marks; mortars with the Cluster shell awakening now actually splash 25% wider; warded elites now resist nova/briar chill and frost roots; endless no longer reads `3/0` in the header (night count and `LONG NIGHT` label instead).
+- Performance: added a cached static backdrop layer (ground, path, water, field-rule telegraphs), cached the vignette/border overlay, cached the lamp glow as a sprite, removed per-frame radial/linear gradients from muzzle flashes, shot trails, and floaters, pooled the actor list (no per-frame closures), batched particle state changes, and replaced per-tick `filter()` allocations with in-place compaction. Added an area-based DPR cap plus adaptive internal quality with warmup and recovery, so slow devices trade a little sharpness for smooth frames instead of dropping to 30fps.
+- Measured: headless desktop during a heavy 3× wave went from ~27fps to ~54fps with adaptive quality engaged; mobile stays locked at 60fps; JS work was already tiny (`ScriptDuration` 73ms over 3s), confirming the remaining cost was rasterization.
+- Gameplay/visual further: killing a boss now pays a watch mark, boss waves telegraph at the gate during the ready phase, the threat forecast names the incoming boss, towers show a rotating charge aura while Volley/Siege/Overcharge/Brace are loaded, and low lives pulse the header count.
+- Mobile: selecting a tower no longer shrinks the board band — the selected-tower bar collapsed to a single six-button row, growing the phone board from 208×144 to 273×189.
+- Verified: 134 tests (6 new), typecheck, lint, production build, and `git diff --check` pass; live browser checks covered Glass Marsh, Keep Stair, and The Low Road at 1440×900 and 390×844 with zero console errors.
+
+## 2026-09-11 — night omens, set hints, and forecast polish
+
+- Completed: added deterministic night omens from the third road on (and always in the Long Night) — Bitter wind, Blood tide, Hollow moon, and Ash fall — each with real stat effects on creep health/speed, bounties, tower damage/rate/reach, and burn life, plus a board tint and a forecast chip so the player can plan before sending.
+- Completed: wave recaps now name the omen that was weathered; the watch desk lists the active omen; the Orders guide explains them.
+- Completed: the night market hints when a relic completes a set (`Set · Winter vigil` under the card), and completing one fires a banner, ring, float, and objective sting.
+- Completed: abilities no longer waste a cast while a charge (Volley/Siege/Overcharge/Brace) is still loaded; the ability tooltip names the C hotkey.
+- Completed: boss bar animates in, the codex chronicle gained omen, elite, and named-boss pages, and charge auras respect reduced motion.
+- Fixed while wiring: the omen gate now keeps both opening roads clean instead of leaking omens onto waves 3+ of the first two maps.
+- Verified in the live browser at 1440x900 and 390x844: Glass Marsh forecast shows `Omen Bitter wind` with accurate copy and no overflow; a full River Ford hold reached the night market at 2048g, showed `Set · Winter vigil` on Witch salt, and activated the set chip after purchase; zero browser diagnostics.
+- Source gates: 139 tests (5 new), typecheck, lint, production build, and `git diff --check` pass. The build skips the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-15 — scout flare layered onto manual Mark
+
+- Completed: preserved the campaign's player-directed Mark system and added Scout Flare as a separate paid wave tool: 35g, 12-second cooldown, four-second coverage, and +22% damage against every live and newly spawned creep in the window.
+- Completed: Flare catches Knave dodge, applies at shared damage resolution across direct hits and projectiles, exposes cooldown/coverage in `render_game_to_text()`, and uses gold reticles, banner/float feedback, audio, accessible labeling, and the `R` shortcut.
+- Completed: kept the seven-control command row coherent at medium and phone widths after adding Flare, while retaining the remote campaign assets and all eight-road systems.
+- Verified: 142 tests, typecheck, lint, auth invariant, production build, required web-game Playwright choreography, and `git diff --check`; browser QA covers the merged title → brief → ready → wave flow, Flare control state, and zero console errors/warnings. The build skips the optional database migration because `DATABASE_URL` is unset.

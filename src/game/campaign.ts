@@ -1,6 +1,13 @@
 import { CREEPS, type CreepKind, type PropKind, type WaveSpawn } from "./config.ts";
 
-export type RelicId = "purse" | "timber" | "whet" | "oil" | "cold" | "glass" | "salt" | "ember" | "adze" | "cord" | "flint";
+export type RelicId = "purse" | "timber" | "whet" | "oil" | "cold" | "glass" | "salt" | "ember" | "adze" | "cord" | "flint" | "wick";
+export type WatchRiteId = "coin" | "heart" | "flame";
+
+export const RITES: ReadonlyArray<{ id: WatchRiteId; name: string; blurb: string }> = [
+  { id: "coin", name: "Spare purse", blurb: "+40 gold on this road." },
+  { id: "heart", name: "Spare timber", blurb: "+2 keep lives on this road." },
+  { id: "flame", name: "First ember", blurb: "Towers hit 12% harder on the first wave." },
+];
 
 export interface ShopItem {
   id: RelicId;
@@ -15,9 +22,53 @@ export interface StoryBeat {
   line: string;
 }
 
-export type MapAmbient = "lanterns" | "pine-fog" | "keep-ash" | "river-rain" | "emberfall" | "glass-tide";
-export type MapMarker = "gate" | "pine" | "keep" | "rock" | "glass";
-export type FieldRuleId = "lantern-aura" | "pine-fog" | "stone-latch" | "ford-banks" | "emberfall" | "glass-tide";
+export type CampEffectId = "gold" | "lives" | "damage" | "oil" | "scout" | "mark";
+
+export interface CampOption {
+  id: CampEffectId;
+  name: string;
+  blurb: string;
+}
+
+export interface CampDef {
+  title: string;
+  detail: string;
+  options: CampOption[];
+}
+
+export interface BossDef {
+  name: string;
+  title: string;
+  spawnLine: string;
+  phaseLine: string;
+  effect: "summon" | "burn" | "ward" | "frenzy";
+  color: string;
+}
+
+export type RelicSetEffect = "slow" | "damage" | "rate" | "mend" | "gold";
+
+export interface RelicSet {
+  id: string;
+  name: string;
+  detail: string;
+  relics: RelicId[];
+  effect: RelicSetEffect;
+  amount: number;
+}
+
+export type ChronicleUnlock = { type: "always" } | { type: "road"; index: number } | { type: "relic"; id: RelicId };
+
+export interface ChronicleEntry {
+  id: string;
+  kicker: string;
+  title: string;
+  body: string;
+  unlock: ChronicleUnlock;
+}
+
+export type MapAmbient = "lanterns" | "pine-fog" | "keep-ash" | "river-rain" | "emberfall" | "glass-tide" | "ash-draw" | "wicker-draft";
+export type MapMarker = "gate" | "pine" | "keep" | "rock" | "glass" | "ash" | "wicker";
+export type FieldRuleId = "lantern-aura" | "pine-fog" | "stone-latch" | "ford-banks" | "emberfall" | "glass-tide" | "ash-draw" | "wicker-draft";
 
 export interface FieldRule {
   id: FieldRuleId;
@@ -29,7 +80,7 @@ export interface FieldRule {
   reward: number;
 }
 
-export type WatchOrderId = "clean" | "sky" | "song" | "crown";
+export type WatchOrderId = "clean" | "sky" | "song" | "crown" | "veil" | "knife" | "howl";
 
 export interface WatchOrder {
   id: WatchOrderId;
@@ -69,6 +120,9 @@ export interface MapDef {
   waves: WaveSpawn[][];
   briefing: StoryBeat;
   victory: StoryBeat;
+  defeat: StoryBeat;
+  boss?: BossDef;
+  camp: CampDef;
   asides: string[];
   theme: MapTheme;
   profile: MapProfile;
@@ -86,6 +140,7 @@ export const SHOP: ShopItem[] = [
   { id: "adze", name: "Keep adze", cost: 70, blurb: "Tower upgrades cost 18% less." },
   { id: "cord", name: "Watch cord", cost: 80, blurb: "Lined towers hit 15% per neighbor instead of 10%." },
   { id: "flint", name: "Gate flint", cost: 70, blurb: "Each tower's first shot of a wave hits 40% harder." },
+  { id: "wick", name: "Lantern wick", cost: 65, blurb: "Lanterns fire the line 8% faster, on every road." },
 ];
 
 const UNLOCK: Record<RelicId, number> = {
@@ -100,9 +155,212 @@ const UNLOCK: Record<RelicId, number> = {
   adze: 0,
   cord: 1,
   flint: 2,
+  wick: 0,
 };
 
 export const RELIC_IDS = SHOP.map((s) => s.id);
+
+export const RELIC_SETS: RelicSet[] = [
+  {
+    id: "winter-vigil",
+    name: "Winter vigil",
+    detail: "Cold iron + Witch salt. Chill holds 15% longer.",
+    relics: ["cold", "salt"],
+    effect: "slow",
+    amount: 0.15,
+  },
+  {
+    id: "forge-fire",
+    name: "Forge fire",
+    detail: "Whetstone + Ember flask. Towers deal 8% more damage.",
+    relics: ["whet", "ember"],
+    effect: "damage",
+    amount: 0.08,
+  },
+  {
+    id: "watchlight",
+    name: "Watchlight",
+    detail: "Scout glass + Lantern wick. Towers fire 8% faster.",
+    relics: ["glass", "wick"],
+    effect: "rate",
+    amount: 0.08,
+  },
+  {
+    id: "keepfield",
+    name: "Keepfield",
+    detail: "Spare timber + Keep adze. Mends cost 20g less.",
+    relics: ["timber", "adze"],
+    effect: "mend",
+    amount: 20,
+  },
+  {
+    id: "bounty-belt",
+    name: "Bounty belt",
+    detail: "Copper purse + Watch cord. +40 gold at road start.",
+    relics: ["purse", "cord"],
+    effect: "gold",
+    amount: 40,
+  },
+];
+
+export const CAMP_OPTIONS: Record<CampEffectId, { name: string; blurb: string }> = {
+  gold: { name: "Bank the coals", blurb: "+60 gold when the next road opens." },
+  lives: { name: "Set the watch early", blurb: "+2 keep lives on the next road." },
+  damage: { name: "Sharpen the kits", blurb: "Towers hit 10% harder on the next road." },
+  oil: { name: "Pack lamp oil", blurb: "Horn costs 25g on the next road." },
+  scout: { name: "Send Lumen ahead", blurb: "Scout twice on the next road." },
+  mark: { name: "Carve a watch mark", blurb: "+1 mark for the watch hall, now." },
+};
+
+export const CHRONICLE: ChronicleEntry[] = [
+  {
+    id: "emberford",
+    kicker: "Place",
+    title: "Emberford",
+    body: "A keep at the end of eight roads, kept by a fire that is never allowed to go out. When the ember dims, the roads fill.",
+    unlock: { type: "always" },
+  },
+  {
+    id: "dusk-watch",
+    kicker: "Order",
+    title: "The dusk watch",
+    body: "Sera Venn's company plants towers on grass, never on the road itself. The rule is older than the keep, and every road has taught it again.",
+    unlock: { type: "always" },
+  },
+  {
+    id: "low-road",
+    kicker: "Road I",
+    title: "The Low Road",
+    body: "The easy cut out of Emberford, and the one every grub finds first. Lanterns on the bends buy the watch its tempo.",
+    unlock: { type: "road", index: 0 },
+  },
+  {
+    id: "pine-cut",
+    kicker: "Road II",
+    title: "Pine Cut",
+    body: "A switchback in the high timber. Fog hangs in the cut, and only spark-struck iron sees through it cleanly.",
+    unlock: { type: "road", index: 1 },
+  },
+  {
+    id: "keep-stair",
+    kicker: "Road III",
+    title: "Keep Stair",
+    body: "The last latch before the low country. Towers beside the stone strike harder, as if the stair remembers the hands that built it.",
+    unlock: { type: "road", index: 2 },
+  },
+  {
+    id: "river-ford",
+    kicker: "Road IV",
+    title: "River Ford",
+    body: "Dawn water. The current drags at anything on four legs, and the Emberlord walks the wet without hurrying.",
+    unlock: { type: "road", index: 3 },
+  },
+  {
+    id: "ember-copse",
+    kicker: "Road V",
+    title: "Ember Copse",
+    body: "The last fire outside the keep. Crowned towers burn hotter this close to the old blaze.",
+    unlock: { type: "road", index: 4 },
+  },
+  {
+    id: "glass-marsh",
+    kicker: "Road VI",
+    title: "Glass Marsh",
+    body: "A moonlit fen with a mirror surface. Towers set beside the water see farther; the reflection gives back what it is given.",
+    unlock: { type: "road", index: 5 },
+  },
+  {
+    id: "ash-hollow",
+    kicker: "Road VII",
+    title: "Ash Hollow",
+    body: "A split ravine where old burns never fully cooled. Oil and cinder linger in the draw.",
+    unlock: { type: "road", index: 6 },
+  },
+  {
+    id: "wicker-span",
+    kicker: "Road VIII",
+    title: "Wicker Span",
+    body: "The last arch. A draft runs under the wicker that hurries moths and knaves unless the road is chilled or rooted.",
+    unlock: { type: "road", index: 7 },
+  },
+  {
+    id: "grubs",
+    kicker: "Prey",
+    title: "Grubs and runners",
+    body: "The first bodies on any road. Fast, cheap, and endless. Shells hatch one when they die.",
+    unlock: { type: "always" },
+  },
+  {
+    id: "flight",
+    kicker: "Prey",
+    title: "The flying kind",
+    body: "Wisps over the trees, moths low over the dirt. Mortar and bramble go blind to high air; pike and cinder can still reach the low.",
+    unlock: { type: "road", index: 1 },
+  },
+  {
+    id: "shamans",
+    kicker: "Prey",
+    title: "Shamans and hounds",
+    body: "Shamans sing the pack whole again; hounds run in threes. Witch salt halves the song, and frost catches the pack.",
+    unlock: { type: "road", index: 2 },
+  },
+  {
+    id: "emberlord",
+    kicker: "Prey",
+    title: "The Emberlord",
+    body: "It walks the roads the way a fire walks a field. Burn the road under it, mark it, and do not let it reach the gate.",
+    unlock: { type: "road", index: 3 },
+  },
+  {
+    id: "whet",
+    kicker: "Relic",
+    title: "Whetstone and ember flask",
+    body: "Small weights carried from road to road. The watch does not discuss where the ember flask came from.",
+    unlock: { type: "relic", id: "ember" },
+  },
+  {
+    id: "cord",
+    kicker: "Relic",
+    title: "The watch cord",
+    body: "A braided cord that ties neighboring towers into one line. Every watch keeps its own knot.",
+    unlock: { type: "relic", id: "cord" },
+  },
+  {
+    id: "omens",
+    kicker: "Weather",
+    title: "Night omens",
+    body: "From the third road on, some waves carry an omen — bitter wind, blood tide, hollow moon, or ash fall. Read the forecast and send accordingly.",
+    unlock: { type: "road", index: 2 },
+  },
+  {
+    id: "elite-prey",
+    kicker: "Prey",
+    title: "Elite prey",
+    body: "Shielded, frenzied, warded, hollow. One in a handful of bodies is born wrong and pays better for it.",
+    unlock: { type: "road", index: 1 },
+  },
+  {
+    id: "mirefather",
+    kicker: "Boss",
+    title: "Mirefather",
+    body: "The ford's drowned warden. At half strength it calls the pack up out of the water.",
+    unlock: { type: "road", index: 3 },
+  },
+  {
+    id: "cinderhide",
+    kicker: "Boss",
+    title: "Cinderhide",
+    body: "The last blaze given legs. Its second wind spills coals along the whole road.",
+    unlock: { type: "road", index: 4 },
+  },
+  {
+    id: "wicker-crown",
+    kicker: "Boss",
+    title: "The Wicker Crown",
+    body: "Emberlord ascendant, walking the last arch. It sets the draft alight and the pack sprints.",
+    unlock: { type: "road", index: 7 },
+  },
+];
 
 export function shopFor(mapIndex: number, wave: number): ShopItem[] {
   return SHOP.filter((s) => UNLOCK[s.id] <= mapIndex).map((s) => ({
@@ -136,6 +394,45 @@ export function watchOrderFor(plan: WaveSpawn[] | undefined): WatchOrder | null 
       reward: 34,
       target,
       targetKind: "shaman",
+    };
+  }
+
+  const mothCount = countFor("moth");
+  if (mothCount > 0) {
+    const target = Math.min(4, mothCount);
+    return {
+      id: "veil",
+      title: "Clip the veil",
+      detail: `Burn ${target} Moths. Mortar, pike, and cinder can reach the low ones.`,
+      reward: 30,
+      target,
+      targetKind: "moth",
+    };
+  }
+
+  const knaveCount = countFor("knave");
+  if (knaveCount > 0) {
+    const target = Math.min(3, knaveCount);
+    return {
+      id: "knife",
+      title: "Catch the knave",
+      detail: `Drop ${target} Knaves. Frost, bramble, or a mark beats the first dodge.`,
+      reward: 32,
+      target,
+      targetKind: "knave",
+    };
+  }
+
+  const fangCount = countFor("ashfang");
+  if (fangCount > 0) {
+    const target = Math.min(3, fangCount);
+    return {
+      id: "howl",
+      title: "Silence the howl",
+      detail: `Drop ${target} Ashfangs before they speed the pack.`,
+      reward: 34,
+      target,
+      targetKind: "ashfang",
     };
   }
 
@@ -250,6 +547,19 @@ export const MAPS: MapDef[] = [
       role: "Scout",
       line: "The pines ahead are singing. Wisps. Brother Ash has a stall if you still have coin.",
     },
+    defeat: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The gate is open and the Low Road is theirs. Set the packets again — the bend is still our best friend.",
+    },
+    camp: {
+      title: "Camp on the cut",
+      detail: "The first road is behind you. Sera splits what the wagons can spare.",
+      options: [
+        { id: "gold", ...CAMP_OPTIONS.gold },
+        { id: "lives", ...CAMP_OPTIONS.lives },
+      ],
+    },
     asides: [
       "First blood on the Low Road.",
       "Hold the two bends.",
@@ -341,6 +651,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "wisp", count: 10, gap: 0.24, delay: 0 },
         { kind: "hound", count: 8, gap: 0.26, delay: 1.8 },
+        { kind: "moth", count: 8, gap: 0.22, delay: 2.6 },
         { kind: "shell", count: 4, gap: 0.55, delay: 3.2 },
       ],
     ],
@@ -353,6 +664,19 @@ export const MAPS: MapDef[] = [
       speaker: "Brother Ash",
       role: "Keep steward",
       line: "The stair is next. Buy glass if the bends feel short. Buy salt — the cloaks keep singing, but he does not walk yet.",
+    },
+    defeat: {
+      speaker: "Lumen Quill",
+      role: "Scout",
+      line: "Fog ate the arrows. Next time spark the skyline before they reach the switch.",
+    },
+    camp: {
+      title: "Smoke in the pines",
+      detail: "A fire under the switchback, out of the fog line.",
+      options: [
+        { id: "damage", ...CAMP_OPTIONS.damage },
+        { id: "oil", ...CAMP_OPTIONS.oil },
+      ],
     },
     asides: [
       "The high switch. Runners and wisps together.",
@@ -429,6 +753,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "shell", count: 8, gap: 0.55, delay: 0 },
         { kind: "runner", count: 12, gap: 0.24, delay: 1.6 },
+        { kind: "knave", count: 6, gap: 0.38, delay: 2.8 },
       ],
       [
         { kind: "shaman", count: 3, gap: 1, delay: 0 },
@@ -437,6 +762,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "runner", count: 16, gap: 0.22, delay: 0 },
         { kind: "shell", count: 8, gap: 0.48, delay: 2 },
+        { kind: "ashfang", count: 4, gap: 0.42, delay: 3.2 },
       ],
       [
         { kind: "wisp", count: 16, gap: 0.22, delay: 0 },
@@ -462,6 +788,19 @@ export const MAPS: MapDef[] = [
       speaker: "Lumen Quill",
       role: "Scout",
       line: "The keep stands. The river is waking. Buy salt and glass. The ford does not forgive clumps.",
+    },
+    defeat: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The latch gave. Link the line at the stair and they cannot climb two abreast.",
+    },
+    camp: {
+      title: "Beneath the stair",
+      detail: "Cold rations behind the latch while the wounded are carried down.",
+      options: [
+        { id: "lives", ...CAMP_OPTIONS.lives },
+        { id: "scout", ...CAMP_OPTIONS.scout },
+      ],
     },
     asides: [
       "The stair begins.",
@@ -548,6 +887,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "shell", count: 6, gap: 0.7, delay: 0 },
         { kind: "grub", count: 10, gap: 0.32, delay: 1 },
+        { kind: "ashfang", count: 4, gap: 0.4, delay: 2.4 },
       ],
       [
         { kind: "wisp", count: 14, gap: 0.24, delay: 0 },
@@ -574,6 +914,27 @@ export const MAPS: MapDef[] = [
       speaker: "Captain Sera Venn",
       role: "Watch-captain",
       line: "The ford holds. The copse still burns. One more latch — then dawn.",
+    },
+    defeat: {
+      speaker: "Brother Ash",
+      role: "Keep steward",
+      line: "The ford ran red. Keep the banks choked and the wet ones never finish the crossing.",
+    },
+    boss: {
+      name: "Mirefather",
+      title: "the drowned warden",
+      spawnLine: "Mirefather rises from the ford — the water will send its hounds.",
+      phaseLine: "Mirefather calls the pack!",
+      effect: "summon",
+      color: "#4d7a74",
+    },
+    camp: {
+      title: "Cold camp on the bank",
+      detail: "Wet boots by the fire. The ford is behind; the copse is ahead.",
+      options: [
+        { id: "gold", ...CAMP_OPTIONS.gold },
+        { id: "mark", ...CAMP_OPTIONS.mark },
+      ],
     },
     asides: [
       "The water takes tiles. Banks drag the pack.",
@@ -653,6 +1014,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "hound", count: 10, gap: 0.24, delay: 0 },
         { kind: "wisp", count: 10, gap: 0.22, delay: 1.8 },
+        { kind: "ashfang", count: 4, gap: 0.38, delay: 3.2 },
       ],
       [
         { kind: "runner", count: 12, gap: 0.22, delay: 0 },
@@ -676,6 +1038,27 @@ export const MAPS: MapDef[] = [
       speaker: "Captain Sera Venn",
       role: "Watch-captain",
       line: "Dawn. Emberford keeps the watch. Take the relics and walk it again if the night still itches.",
+    },
+    defeat: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The last fire scattered. Crown a tower on the turn and burn the road twice.",
+    },
+    boss: {
+      name: "Cinderhide",
+      title: "the last blaze",
+      spawnLine: "Cinderhide walks out of the copse, and the road catches behind it.",
+      phaseLine: "Cinderhide splits open — the coals spill!",
+      effect: "burn",
+      color: "#e07838",
+    },
+    camp: {
+      title: "By the last fire",
+      detail: "The ember warms the kits while the maps are read again.",
+      options: [
+        { id: "damage", ...CAMP_OPTIONS.damage },
+        { id: "oil", ...CAMP_OPTIONS.oil },
+      ],
     },
     asides: [
       "The last fire. Air first.",
@@ -768,6 +1151,7 @@ export const MAPS: MapDef[] = [
       [
         { kind: "hound", count: 12, gap: 0.24, delay: 0 },
         { kind: "shell", count: 8, gap: 0.4, delay: 1.8 },
+        { kind: "ashfang", count: 4, gap: 0.36, delay: 3.2 },
       ],
       [
         { kind: "wisp", count: 14, gap: 0.2, delay: 0 },
@@ -789,7 +1173,28 @@ export const MAPS: MapDef[] = [
     victory: {
       speaker: "Lumen Quill",
       role: "Scout",
-      line: "The glass is quiet. Emberford has a road through every dark now — and the dawn is finally ours.",
+      line: "The glass is quiet. The hollow still breathes ash beyond the fen — we are not done.",
+    },
+    defeat: {
+      speaker: "Lumen Quill",
+      role: "Scout",
+      line: "The tide drank the line. Set your towers on the glass and let the reflection do the work.",
+    },
+    boss: {
+      name: "Mirrorskin",
+      title: "reflection with teeth",
+      spawnLine: "Mirrorskin steps onto the glass — every tower sees it twice.",
+      phaseLine: "Mirrorskin hardens its reflection!",
+      effect: "ward",
+      color: "#6aa8b4",
+    },
+    camp: {
+      title: "Dry ground on the fen",
+      detail: "Reeds for the fire and a clear read of the water ahead.",
+      options: [
+        { id: "scout", ...CAMP_OPTIONS.scout },
+        { id: "lives", ...CAMP_OPTIONS.lives },
+      ],
     },
     asides: [
       "The marsh wakes. Read the waterline.",
@@ -800,16 +1205,280 @@ export const MAPS: MapDef[] = [
       "The Emberlord has found the water.",
     ],
   },
+  {
+    id: "ash-hollow",
+    name: "Ash Hollow",
+    place: "The split ravine",
+    theme: {
+      moss: "#2a2218",
+      lit: "#5a3a24",
+      bank: "#1a140e",
+      path: "#5a4030",
+      pathLit: "#8a5a38",
+      ink: "#120e0c",
+      water: "#2a2018",
+      waterLit: "#4a3020",
+    },
+    profile: {
+      label: "Cinder draw",
+      detail: "The ravine drinks fire. Coals last.",
+      ambient: "ash-draw",
+      marker: "ash",
+      rule: {
+        id: "ash-draw",
+        label: "Cinder draw",
+        detail: "Oil and cinder burns last longer. Cinder towers hit harder.",
+        objectiveTitle: "Feed the hollow",
+        objectiveDetail: "Plant a Cinder or Mortar beside the road.",
+        target: 1,
+        reward: 80,
+      },
+    },
+    water: [
+      [0, 8],
+      [1, 8],
+    ],
+    path: [
+      { c: 0, r: 2 },
+      { c: 4, r: 2 },
+      { c: 4, r: 6 },
+      { c: 8, r: 6 },
+      { c: 8, r: 1 },
+      { c: 12, r: 1 },
+    ],
+    props: [
+      { c: 0, r: 0, kind: "pine" },
+      { c: 1, r: 0, kind: "rock" },
+      { c: 2, r: 0, kind: "lamp" },
+      { c: 6, r: 0, kind: "pine" },
+      { c: 11, r: 0, kind: "oak" },
+      { c: 12, r: 0, kind: "pine" },
+      { c: 2, r: 4, kind: "stump" },
+      { c: 6, r: 3, kind: "rock" },
+      { c: 6, r: 4, kind: "oak" },
+      { c: 10, r: 4, kind: "lamp" },
+      { c: 3, r: 8, kind: "fence" },
+      { c: 9, r: 8, kind: "cart" },
+      { c: 12, r: 8, kind: "pine" },
+      { c: 1, r: 5, kind: "shroom" },
+    ],
+    waves: [
+      [
+        { kind: "moth", count: 10, gap: 0.26, delay: 0 },
+        { kind: "grub", count: 12, gap: 0.28, delay: 1.2 },
+      ],
+      [
+        { kind: "knave", count: 8, gap: 0.4, delay: 0 },
+        { kind: "shell", count: 6, gap: 0.5, delay: 1.8 },
+      ],
+      [
+        { kind: "moth", count: 14, gap: 0.22, delay: 0 },
+        { kind: "hound", count: 10, gap: 0.24, delay: 2 },
+        { kind: "ashfang", count: 5, gap: 0.36, delay: 3.4 },
+      ],
+      [
+        { kind: "knave", count: 10, gap: 0.34, delay: 0 },
+        { kind: "shaman", count: 3, gap: 0.9, delay: 2 },
+        { kind: "moth", count: 8, gap: 0.24, delay: 3.5 },
+      ],
+      [
+        { kind: "shell", count: 10, gap: 0.4, delay: 0 },
+        { kind: "moth", count: 12, gap: 0.22, delay: 1.6 },
+        { kind: "knave", count: 8, gap: 0.3, delay: 3.2 },
+      ],
+      [
+        { kind: "moth", count: 16, gap: 0.2, delay: 0 },
+        { kind: "lord", count: 1, gap: 1, delay: 3.5 },
+        { kind: "knave", count: 10, gap: 0.26, delay: 5 },
+        { kind: "shell", count: 8, gap: 0.4, delay: 6 },
+      ],
+    ],
+    briefing: {
+      speaker: "Brother Ash",
+      role: "Keep steward",
+      line: "The hollow wants fire. Plant a brazier on the bank. Moths fly low — mortar and pike can still take them. Knaves dodge the first bite unless you chill or mark them.",
+    },
+    victory: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The ravine is quiet. One span left — the wicker does not hold still.",
+    },
+    defeat: {
+      speaker: "Brother Ash",
+      role: "Keep steward",
+      line: "The hollow ate the coals. Feed it cinder and oil — the draw rewards a patient fire.",
+    },
+    boss: {
+      name: "Hollowjaw",
+      title: "the ash-eater",
+      spawnLine: "Hollowjaw opens in the draw — it has been eating the old burns.",
+      phaseLine: "Hollowjaw splits and sheds its brood!",
+      effect: "summon",
+      color: "#7a6a4a",
+    },
+    camp: {
+      title: "In the cinder draw",
+      detail: "Shelter from the draft, and time to carve the watch rolls.",
+      options: [
+        { id: "mark", ...CAMP_OPTIONS.mark },
+        { id: "damage", ...CAMP_OPTIONS.damage },
+      ],
+    },
+    asides: [
+      "Ash in the mouth. Feed the coals.",
+      "Knaves on the split. Mark the first.",
+      "Moths in the draw. Low enough to burn.",
+      "Do not sell the pike.",
+      "Plate and knives together.",
+      "He walks the hollow. Burn the road.",
+    ],
+  },
+  {
+    id: "wicker-span",
+    name: "Wicker Span",
+    place: "The last arch",
+    theme: {
+      moss: "#2c2818",
+      lit: "#6a5a30",
+      bank: "#1c1810",
+      path: "#6a5030",
+      pathLit: "#9a7040",
+      ink: "#14100c",
+      water: "#243438",
+      waterLit: "#3a5858",
+    },
+    profile: {
+      label: "Wicker draft",
+      detail: "The span pulls moths and knaves unless they are held.",
+      ambient: "wicker-draft",
+      marker: "wicker",
+      rule: {
+        id: "wicker-draft",
+        label: "Wicker draft",
+        detail: "Moths and knaves run faster unless chilled or rooted.",
+        objectiveTitle: "Pin the draft",
+        objectiveDetail: "Plant a Frost or Bramble beside the road.",
+        target: 1,
+        reward: 90,
+      },
+    },
+    water: [
+      [0, 0],
+      [1, 0],
+      [12, 5],
+      [12, 7],
+    ],
+    path: [
+      { c: 0, r: 7 },
+      { c: 3, r: 7 },
+      { c: 3, r: 1 },
+      { c: 7, r: 1 },
+      { c: 7, r: 8 },
+      { c: 11, r: 8 },
+      { c: 11, r: 3 },
+      { c: 12, r: 3 },
+    ],
+    props: [
+      { c: 0, r: 2, kind: "reed" },
+      { c: 1, r: 2, kind: "fence" },
+      { c: 5, r: 0, kind: "pine" },
+      { c: 6, r: 3, kind: "lamp" },
+      { c: 8, r: 0, kind: "oak" },
+      { c: 12, r: 0, kind: "pine" },
+      { c: 1, r: 5, kind: "stump" },
+      { c: 5, r: 5, kind: "rock" },
+      { c: 9, r: 5, kind: "lamp" },
+      { c: 4, r: 8, kind: "cart" },
+      { c: 0, r: 8, kind: "reed" },
+      { c: 12, r: 6, kind: "pine" },
+      { c: 8, r: 3, kind: "shroom" },
+    ],
+    waves: [
+      [
+        { kind: "moth", count: 12, gap: 0.24, delay: 0 },
+        { kind: "knave", count: 8, gap: 0.36, delay: 1.4 },
+      ],
+      [
+        { kind: "runner", count: 14, gap: 0.22, delay: 0 },
+        { kind: "moth", count: 10, gap: 0.22, delay: 1.8 },
+      ],
+      [
+        { kind: "knave", count: 12, gap: 0.3, delay: 0 },
+        { kind: "shell", count: 8, gap: 0.45, delay: 2 },
+        { kind: "wisp", count: 8, gap: 0.26, delay: 3.5 },
+      ],
+      [
+        { kind: "moth", count: 16, gap: 0.2, delay: 0 },
+        { kind: "shaman", count: 3, gap: 0.85, delay: 2.2 },
+        { kind: "hound", count: 10, gap: 0.24, delay: 3.6 },
+        { kind: "ashfang", count: 4, gap: 0.34, delay: 4.8 },
+      ],
+      [
+        { kind: "knave", count: 12, gap: 0.28, delay: 0 },
+        { kind: "moth", count: 14, gap: 0.2, delay: 1.6 },
+        { kind: "shell", count: 8, gap: 0.4, delay: 3.4 },
+      ],
+      [
+        { kind: "wisp", count: 12, gap: 0.22, delay: 0 },
+        { kind: "knave", count: 10, gap: 0.26, delay: 1.8 },
+        { kind: "lord", count: 1, gap: 1, delay: 3.8 },
+        { kind: "moth", count: 14, gap: 0.18, delay: 5.2 },
+        { kind: "shell", count: 8, gap: 0.38, delay: 6.4 },
+      ],
+    ],
+    briefing: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "Last arch. The draft steals moths and knaves unless you pin them. Frost or bramble on the rail. If this span holds, Emberford keeps the dawn.",
+    },
+    victory: {
+      speaker: "Lumen Quill",
+      role: "Scout",
+      line: "The span is ours. Eight roads. Emberford has a watch through every dark — and the dawn is finally ours.",
+    },
+    defeat: {
+      speaker: "Captain Sera Venn",
+      role: "Watch-captain",
+      line: "The span tore. Pin the draft with frost and thorns, and the dawn is one hold away.",
+    },
+    boss: {
+      name: "Wicker Crown",
+      title: "emberlord ascendant",
+      spawnLine: "The Wicker Crown comes down the span — the draft runs before it.",
+      phaseLine: "The Crown sets the road alight — the pack sprints!",
+      effect: "frenzy",
+      color: "#efbb65",
+    },
+    camp: {
+      title: "Under the span",
+      detail: "The last fire before the last arch. Every kit is counted twice.",
+      options: [
+        { id: "gold", ...CAMP_OPTIONS.gold },
+        { id: "mark", ...CAMP_OPTIONS.mark },
+      ],
+    },
+    asides: [
+      "The last arch. Pin the draft.",
+      "Knives on the wicker.",
+      "Moths in the pull. Burn low.",
+      "Do not sell the frost.",
+      "Plate and veil together.",
+      "He walks the span. Hold the dawn.",
+    ],
+  },
 ];
 
 export const BESTIARY = [
-  { kind: "grub" as const, weak: "Anything. Bows on the bends are enough. A leak costs one life." },
+  { kind: "grub" as const, weak: "Anything. Bows on the bends are enough. A leak costs one life. Shells hatch one when they die." },
   { kind: "runner" as const, weak: "Aim First. Frost and Bramble catch them. A leak costs one life." },
-  { kind: "shell" as const, weak: "Mortar and Bramble. Arrows tickle plate. A leak costs two lives." },
+  { kind: "shell" as const, weak: "Mortar and Bramble. Arrows tickle plate. Dies into a grub unless it is already at the gate. A leak costs two lives." },
   { kind: "wisp" as const, weak: "Longbow and Spark only. Mortar and Bramble go blind. A leak costs one life." },
-  { kind: "shaman" as const, weak: "Kill first. Salt halves the song. Spark the clump. A leak costs two lives." },
-  { kind: "hound" as const, weak: "Frost and Ash Ward. Aim First. A leak costs one life." },
-  { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, and time. A leak costs three lives." },
+  { kind: "shaman" as const, weak: "Kill first. Salt halves the song. Spark the clump. Mark them. A leak costs two lives." },
+  { kind: "hound" as const, weak: "Frost and Ash Ward. Three living hounds run as a pack. A leak costs one life." },
+  { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, pike, and a mark. A leak costs three lives." },
+  { kind: "moth" as const, weak: "Low air. Mortar, pike, and cinder can reach them. Spark still bites. A leak costs one life." },
+  { kind: "knave" as const, weak: "The first shot misses unless Frost, Bramble, or a mark catches them. A leak costs one life." },
+  { kind: "ashfang" as const, weak: "The first bite makes it howl — nearby creeps run faster. Frost and Ward catch it. A leak costs two lives." },
 ];
 
 export function describePlan(waves: WaveSpawn[][], index: number): string {
@@ -824,9 +1493,30 @@ export function planHasAir(waves: WaveSpawn[][], index: number): boolean {
   return plan.some((p) => CREEPS[p.kind].flying);
 }
 
+/** Deterministic wave generator for the endless Long Night. */
+export function endlessWave(n: number): WaveSpawn[] {
+  const tier = Math.floor((n - 1) / 4);
+  const mixes: CreepKind[][] = [
+    ["grub", "runner"],
+    ["hound", "wisp"],
+    ["shell", "knave"],
+    ["shaman", "ashfang"],
+    ["moth", "runner"],
+  ];
+  const pick = mixes[(n - 1) % mixes.length];
+  const plan: WaveSpawn[] = pick.map((kind, i) => ({
+    kind,
+    count: 5 + tier * 2 + i * 2,
+    gap: Math.max(0.18, 0.42 - tier * 0.015),
+    delay: i * 1.4,
+  }));
+  if (n % 4 === 0) plan.push({ kind: "lord", count: 1 + Math.floor(tier / 3), gap: 1.4, delay: 2.8 });
+  return plan;
+}
+
 export function leakCost(kind: CreepKind): number {
   if (kind === "lord") return 3;
-  if (kind === "shaman" || kind === "shell") return 2;
+  if (kind === "shaman" || kind === "shell" || kind === "ashfang") return 2;
   return 1;
 }
 

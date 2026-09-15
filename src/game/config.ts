@@ -2,13 +2,18 @@ export const COLS = 13;
 export const ROWS = 9;
 export const START_GOLD = 280;
 export const START_LIVES = 20;
+export const HARD_LIVES = 14;
+export const HARD_HP = 1.22;
+export const HARD_GOLD = 1.2;
+export const MARK_BONUS = 1.18;
+export const KINDRED_RATE = 1.1;
 export const TOTAL_WAVES = 16;
 export const REFUND_RATE = 0.55;
 export const MAX_UPGRADE = 4;
 export const FORM_NAME = ["", "Timber", "Bound", "Tempered", "Crowned"] as const;
 
-export function towerForm(dmgLvl: number, rateLvl: number) {
-  return Math.max(1, Math.min(MAX_UPGRADE, Math.max(dmgLvl, rateLvl))) as 1 | 2 | 3 | 4;
+export function towerForm(dmgLvl: number, rateLvl: number, rangeLvl = 1) {
+  return Math.max(1, Math.min(MAX_UPGRADE, Math.max(dmgLvl, rateLvl, rangeLvl))) as 1 | 2 | 3 | 4;
 }
 export const TICK = 1 / 60;
 export const HORN_COST = 45;
@@ -18,8 +23,6 @@ export const FLARE_COST = 35;
 export const FLARE_CD = 12;
 export const FLARE_DURATION = 4;
 export const FLARE_BONUS = 0.22;
-export const FOCUS_DURATION = 4;
-export const FOCUS_BONUS = 0.1;
 
 export const PATH: ReadonlyArray<{ c: number; r: number }> = [
   { c: 0, r: 5 },
@@ -32,10 +35,200 @@ export const PATH: ReadonlyArray<{ c: number; r: number }> = [
   { c: 12, r: 3 },
 ];
 
-export type TowerKind = "bow" | "mortar" | "frost" | "spark" | "bramble" | "ward";
-export type CreepKind = "grub" | "runner" | "shell" | "wisp" | "shaman" | "hound" | "lord";
+export type TowerKind = "bow" | "mortar" | "frost" | "spark" | "bramble" | "ward" | "pike" | "cinder";
+export type CreepKind = "grub" | "runner" | "shell" | "wisp" | "shaman" | "hound" | "lord" | "moth" | "knave" | "ashfang";
 export type Aim = "first" | "last" | "close" | "strong";
 export type PropKind = "pine" | "oak" | "rock" | "stump" | "reed" | "lamp" | "shroom" | "cart" | "fence";
+export type AffixId = "shielded" | "frenzied" | "warded" | "hollow";
+export type EmberlitBranch = "a" | "b";
+export type PerkId = "purse" | "wall" | "whet" | "rest";
+export type OmenId = "bitter-wind" | "blood-tide" | "hollow-moon" | "ash-fall";
+
+export interface OmenDef {
+  id: OmenId;
+  name: string;
+  detail: string;
+  color: string;
+  rgb: string;
+  creepHp: number;
+  creepSpeed: number;
+  gold: number;
+  towerDamage: number;
+  towerRate: number;
+  towerRange: number;
+  burnLife: number;
+}
+
+export const OMENS: Record<OmenId, OmenDef> = {
+  "bitter-wind": {
+    id: "bitter-wind",
+    name: "Bitter wind",
+    detail: "The pack runs 8% slower and towers fire 6% slower.",
+    color: "#6aa8b4",
+    rgb: "106,168,180",
+    creepHp: 1,
+    creepSpeed: 0.92,
+    gold: 1,
+    towerDamage: 1,
+    towerRate: 0.94,
+    towerRange: 1,
+    burnLife: 1,
+  },
+  "blood-tide": {
+    id: "blood-tide",
+    name: "Blood tide",
+    detail: "Bounties pay 15% more and prey arrive 10% tougher.",
+    color: "#c45c4a",
+    rgb: "196,92,74",
+    creepHp: 1.1,
+    creepSpeed: 1,
+    gold: 1.15,
+    towerDamage: 1,
+    towerRate: 1,
+    towerRange: 1,
+    burnLife: 1,
+  },
+  "hollow-moon": {
+    id: "hollow-moon",
+    name: "Hollow moon",
+    detail: "Towers hit 10% harder and prey arrive 8% tougher.",
+    color: "#b78ad4",
+    rgb: "183,138,212",
+    creepHp: 1.08,
+    creepSpeed: 1,
+    gold: 1.02,
+    towerDamage: 1.1,
+    towerRate: 1,
+    towerRange: 1,
+    burnLife: 1,
+  },
+  "ash-fall": {
+    id: "ash-fall",
+    name: "Ash fall",
+    detail: "Burns last longer and pay a little more; towers see 6% less far.",
+    color: "#b7ab90",
+    rgb: "183,171,144",
+    creepHp: 1,
+    creepSpeed: 1,
+    gold: 1.05,
+    towerDamage: 1,
+    towerRate: 1,
+    towerRange: 0.94,
+    burnLife: 1.35,
+  },
+};
+
+const OMEN_ORDER: OmenId[] = ["bitter-wind", "blood-tide", "hollow-moon", "ash-fall"];
+
+export function omenFor(mapIndex: number, wave: number, endless = false): OmenDef | null {
+  if (!endless && mapIndex < 2) return null;
+  const index = Math.abs(mapIndex * 5 + wave * 3) % OMEN_ORDER.length;
+  return OMENS[OMEN_ORDER[index]];
+}
+
+export const PERKS: ReadonlyArray<{ id: PerkId; name: string; detail: string; max: number; costs: number[] }> = [
+  { id: "purse", name: "Keep purse", detail: "+20 starting gold per mark spent.", max: 3, costs: [2, 4, 6] },
+  { id: "wall", name: "Stone wall", detail: "+1 keep life per mark spent.", max: 3, costs: [2, 4, 6] },
+  { id: "whet", name: "Grindstone", detail: "+4% tower damage per mark spent.", max: 3, costs: [2, 4, 6] },
+  { id: "rest", name: "Mend stone", detail: "Mends cost 10g less per mark spent.", max: 3, costs: [2, 4, 6] },
+];
+
+export const AFFIXES: Record<
+  AffixId,
+  { id: AffixId; name: string; tag: string; detail: string; color: string; hpMult: number; speedMult: number; gold: number; armor: number; slowResist?: boolean }
+> = {
+  shielded: {
+    id: "shielded",
+    name: "Shielded",
+    tag: "Shield",
+    detail: "Plated elite. More hp, more armor, richer bounty.",
+    color: "#b7ab90",
+    hpMult: 1.35,
+    speedMult: 1,
+    gold: 3,
+    armor: 3,
+  },
+  frenzied: {
+    id: "frenzied",
+    name: "Frenzied",
+    tag: "Frenzy",
+    detail: "Runs a fifth faster with a richer bounty.",
+    color: "#e07838",
+    hpMult: 1,
+    speedMult: 1.2,
+    gold: 3,
+    armor: 0,
+  },
+  warded: {
+    id: "warded",
+    name: "Warded",
+    tag: "Ward",
+    detail: "Chill cannot hold it. Tougher and plated.",
+    color: "#6aa8b4",
+    hpMult: 1.15,
+    speedMult: 1,
+    gold: 3,
+    armor: 2,
+    slowResist: true,
+  },
+  hollow: {
+    id: "hollow",
+    name: "Hollow",
+    tag: "Hollow",
+    detail: "Bursts into two grubs when it falls.",
+    color: "#7a8470",
+    hpMult: 1.1,
+    speedMult: 1,
+    gold: 2,
+    armor: 0,
+  },
+};
+
+export const EMBERLIT: Record<TowerKind, { a: { name: string; detail: string }; b: { name: string; detail: string } }> = {
+  bow: {
+    a: { name: "Split shaft", detail: "Arrows pierce one extra creep." },
+    b: { name: "Deadeye", detail: "Arrows deal 30% more damage." },
+  },
+  mortar: {
+    a: { name: "Deep oil", detail: "Oil spreads wider and burns longer." },
+    b: { name: "Cluster shell", detail: "Shots splash wider and hit 25% harder." },
+  },
+  frost: {
+    a: { name: "Deep freeze", detail: "Chill splashes and pins a beat." },
+    b: { name: "Rimebind", detail: "Chill holds 50% longer and roots on hit." },
+  },
+  spark: {
+    a: { name: "Fork", detail: "The bolt jumps one extra time." },
+    b: { name: "Overcharge", detail: "Bolts deal 30% more damage." },
+  },
+  bramble: {
+    a: { name: "Grasping root", detail: "Thorns root from the first timber." },
+    b: { name: "Bloodthorn", detail: "Hits bleed the target for 3 seconds." },
+  },
+  ward: {
+    a: { name: "Sunder", detail: "The ring cracks plate." },
+    b: { name: "Sanctum", detail: "The ring hits 20% harder and reaches wider." },
+  },
+  pike: {
+    a: { name: "Pierce plate", detail: "The spear ignores armor." },
+    b: { name: "Impale", detail: "Spears hit 35% harder and pin longer." },
+  },
+  cinder: {
+    a: { name: "Clung coals", detail: "Coals cling and burn longer." },
+    b: { name: "Tarfire", detail: "Coals slow everything they burn." },
+  },
+};
+
+export const ABILITIES: Record<TowerKind, { name: string; detail: string; cd: number }> = {
+  bow: { name: "Volley", detail: "Next three shots fire at double tempo.", cd: 12 },
+  mortar: { name: "Siege shell", detail: "Next shot splashes wider and hits 50% harder.", cd: 14 },
+  frost: { name: "Nova", detail: "Freeze every creep in reach for a beat.", cd: 15 },
+  spark: { name: "Overcharge", detail: "Next bolt forks through every creep in reach.", cd: 14 },
+  bramble: { name: "Briar", detail: "Root every creep in reach.", cd: 13 },
+  ward: { name: "Sanctum", detail: "Blast and chill every creep in reach.", cd: 15 },
+  pike: { name: "Brace", detail: "Next spear ignores plate and pins.", cd: 12 },
+  cinder: { name: "Firestorm", detail: "Set a wide burn on the road ahead.", cd: 14 },
+};
 
 export const PROPS: ReadonlyArray<{ c: number; r: number; kind: PropKind }> = [
   { c: 0, r: 0, kind: "pine" },
@@ -92,7 +285,7 @@ export const TOWERS: Record<
     id: "bow",
     name: "Longbow",
     short: "Bow",
-    blurb: "Fast arrows. Hits wisps. Tempered pierces one; Crowned pierces two.",
+    blurb: "Fast arrows. Hits wisps. Tempered pierces one; Crowned pierces two. Emberlit adds a pierce.",
     cost: 60,
     range: 2.45,
     damage: 14,
@@ -107,7 +300,7 @@ export const TOWERS: Record<
     id: "mortar",
     name: "Mortar",
     short: "Mortar",
-    blurb: "Lobs splash on the dirt. Burns oil. Blind to wisps. Cracks shells.",
+    blurb: "Lobs splash on the dirt. Burns oil. Blind to wisps. Cracks shells. Emberlit fattens the oil.",
     cost: 115,
     range: 2.2,
     damage: 34,
@@ -122,7 +315,7 @@ export const TOWERS: Record<
     id: "frost",
     name: "Frost Spire",
     short: "Frost",
-    blurb: "Chills. Hits air. Tempered splashes cold. Hurts hounds and runners.",
+    blurb: "Chills. Hits air. Tempered splashes cold. Hurts hounds and runners. Emberlit pins a beat.",
     cost: 90,
     range: 2.7,
     damage: 7,
@@ -137,7 +330,7 @@ export const TOWERS: Record<
     id: "spark",
     name: "Spark Coil",
     short: "Spark",
-    blurb: "Instant bolt. Ignores armor. Tempered chains. Best on wisps and shamans.",
+    blurb: "Instant bolt. Ignores armor. Tempered chains. Best on wisps and shamans. Emberlit jumps once more.",
     cost: 125,
     range: 3.05,
     damage: 38,
@@ -152,7 +345,7 @@ export const TOWERS: Record<
     id: "bramble",
     name: "Bramble",
     short: "Thorn",
-    blurb: "Close thorns. Ground only. Tempered roots. Hurts runners and shells.",
+    blurb: "Close thorns. Ground only. Tempered roots. Hurts runners and shells. Emberlit roots from timber.",
     cost: 70,
     range: 1.55,
     damage: 9,
@@ -167,7 +360,7 @@ export const TOWERS: Record<
     id: "ward",
     name: "Ash Ward",
     short: "Ward",
-    blurb: "Pulse in a ring. Hits air. Slows everyone it covers. Hurts hounds.",
+    blurb: "Pulse in a ring. Hits air. Slows everyone it covers. Hurts hounds. Emberlit cracks plate.",
     cost: 85,
     range: 2.15,
     damage: 6,
@@ -178,6 +371,58 @@ export const TOWERS: Record<
     hitsAir: true,
     beam: false,
   },
+  pike: {
+    id: "pike",
+    name: "Watch Pike",
+    short: "Pike",
+    blurb: "Close spear. Ground and low moths. Tempered pins. Crowned cracks plate. Emberlit ignores armor.",
+    cost: 95,
+    range: 1.85,
+    damage: 26,
+    fireRate: 1.05,
+    splash: 0,
+    slow: 0,
+    projectileSpeed: 9.4,
+    hitsAir: false,
+    beam: false,
+  },
+  cinder: {
+    id: "cinder",
+    name: "Cinder Brazier",
+    short: "Cinder",
+    blurb: "Lobs coals onto the dirt. Hits moths. Burns a patch. Tempered oil lasts. Emberlit the coals cling.",
+    cost: 110,
+    range: 2.05,
+    damage: 16,
+    fireRate: 0.68,
+    splash: 0.95,
+    slow: 0,
+    projectileSpeed: 6.4,
+    hitsAir: false,
+    beam: false,
+  },
+};
+
+export const TOWER_UNLOCK: Record<TowerKind, number> = {
+  bow: 0,
+  mortar: 0,
+  frost: 0,
+  spark: 0,
+  bramble: 0,
+  ward: 0,
+  pike: 2,
+  cinder: 3,
+};
+
+export const TOWER_UNLOCK_HINT: Record<TowerKind, string> = {
+  bow: "",
+  mortar: "",
+  frost: "",
+  spark: "",
+  bramble: "",
+  ward: "",
+  pike: "Hold Keep Stair to unseal the pike.",
+  cinder: "Hold River Ford to unseal the brazier.",
 };
 
 export const CREEPS: Record<
@@ -189,16 +434,20 @@ export const CREEPS: Record<
     armor: number;
     name: string;
     flying: boolean;
+    low: boolean;
     heal: number;
   }
 > = {
-  grub: { hp: 44, speed: 1.12, gold: 8, armor: 0, name: "Grubs", flying: false, heal: 0 },
-  runner: { hp: 26, speed: 2.05, gold: 10, armor: 0, name: "Runners", flying: false, heal: 0 },
-  shell: { hp: 120, speed: 0.76, gold: 16, armor: 5, name: "Shells", flying: false, heal: 0 },
-  wisp: { hp: 32, speed: 1.7, gold: 14, armor: 0, name: "Wisps", flying: true, heal: 0 },
-  shaman: { hp: 88, speed: 0.88, gold: 22, armor: 2, name: "Shamans", flying: false, heal: 10 },
-  hound: { hp: 38, speed: 2.28, gold: 12, armor: 1, name: "Hounds", flying: false, heal: 0 },
-  lord: { hp: 920, speed: 0.58, gold: 120, armor: 8, name: "Emberlord", flying: false, heal: 0 },
+  grub: { hp: 44, speed: 1.12, gold: 8, armor: 0, name: "Grubs", flying: false, low: false, heal: 0 },
+  runner: { hp: 26, speed: 2.05, gold: 10, armor: 0, name: "Runners", flying: false, low: false, heal: 0 },
+  shell: { hp: 120, speed: 0.76, gold: 16, armor: 5, name: "Shells", flying: false, low: false, heal: 0 },
+  wisp: { hp: 32, speed: 1.7, gold: 14, armor: 0, name: "Wisps", flying: true, low: false, heal: 0 },
+  shaman: { hp: 88, speed: 0.88, gold: 22, armor: 2, name: "Shamans", flying: false, low: false, heal: 10 },
+  hound: { hp: 38, speed: 2.28, gold: 12, armor: 1, name: "Hounds", flying: false, low: false, heal: 0 },
+  lord: { hp: 920, speed: 0.58, gold: 120, armor: 8, name: "Emberlord", flying: false, low: false, heal: 0 },
+  moth: { hp: 22, speed: 1.95, gold: 11, armor: 0, name: "Moths", flying: true, low: true, heal: 0 },
+  knave: { hp: 54, speed: 1.55, gold: 15, armor: 1, name: "Knaves", flying: false, low: false, heal: 0 },
+  ashfang: { hp: 78, speed: 1.82, gold: 18, armor: 2, name: "Ashfangs", flying: false, low: false, heal: 0 },
 };
 
 export type WaveSpawn = { kind: CreepKind; count: number; gap: number; delay: number };
@@ -278,6 +527,10 @@ export function upgradeRateCost(kind: TowerKind, level: number): number {
   return Math.round(TOWERS[kind].cost * 0.4 * level);
 }
 
+export function upgradeRangeCost(kind: TowerKind, level: number): number {
+  return Math.round(TOWERS[kind].cost * 0.38 * level);
+}
+
 export function damageAt(kind: TowerKind, level: number): number {
   return TOWERS[kind].damage * (1 + 0.38 * (level - 1));
 }
@@ -286,8 +539,8 @@ export function rateAt(kind: TowerKind, level: number): number {
   return TOWERS[kind].fireRate * (1 + 0.22 * (level - 1));
 }
 
-export function rangeAt(kind: TowerKind, dmgLvl: number): number {
-  return TOWERS[kind].range * (1 + 0.09 * (dmgLvl - 1));
+export function rangeAt(kind: TowerKind, rangeLvl: number): number {
+  return TOWERS[kind].range * (1 + 0.11 * (rangeLvl - 1));
 }
 
 export function pathCells(): Set<string> {
