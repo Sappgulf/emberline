@@ -107,9 +107,10 @@
   background:
     linear-gradient(180deg, rgba(9, 13, 16, 0.46), rgba(9, 12, 11, 0.82)),
     image-set(
-      url("/ui/menu-backdrop-v3.webp") type("image/webp"),
-      url("/ui/menu-backdrop-v3.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/menu-backdrop-v3.webp") type("image/webp"),
+        url("/ui/menu-backdrop-v3.png") type("image/png")
+      )
+      center / cover no-repeat;
 }
 
 .game-shell[data-phase="title"] .playfield-wrap,
@@ -254,9 +255,10 @@
   background:
     linear-gradient(180deg, rgba(14, 18, 17, 0.22), rgba(8, 11, 10, 0.78)),
     image-set(
-      url("/ui/hud-bar-v2.webp") type("image/webp"),
-      url("/ui/hud-bar-v2.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/hud-bar-v2.webp") type("image/webp"),
+        url("/ui/hud-bar-v2.png") type("image/png")
+      )
+      center / cover no-repeat;
   border-bottom: 1px solid rgba(212, 160, 84, 0.62);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.26);
 }
@@ -271,7 +273,9 @@
   pointer-events: none;
 }
 .watch-bar p {
-  text-shadow: 0 1px 2px #000, 0 0 10px rgba(0, 0, 0, 0.85);
+  text-shadow:
+    0 1px 2px #000,
+    0 0 10px rgba(0, 0, 0, 0.85);
 }
 .watch-title {
   position: relative;
@@ -386,9 +390,10 @@
   background:
     linear-gradient(180deg, rgba(10, 13, 13, 0.56), rgba(10, 13, 11, 0.82)),
     image-set(
-      url("/ui/route-rail-v1.webp") type("image/webp"),
-      url("/ui/route-rail-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/route-rail-v1.webp") type("image/webp"),
+        url("/ui/route-rail-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
   box-shadow:
     inset 0 1px 0 rgba(232, 220, 196, 0.1),
     0 8px 20px rgba(0, 0, 0, 0.22);
@@ -571,9 +576,10 @@
   background:
     linear-gradient(180deg, rgba(18, 22, 15, 0.78), rgba(8, 11, 10, 0.94)),
     image-set(
-      url("/ui/intel-card-v1.webp") type("image/webp"),
-      url("/ui/intel-card-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/intel-card-v1.webp") type("image/webp"),
+        url("/ui/intel-card-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
   box-shadow:
     inset 0 1px 0 rgba(232, 220, 196, 0.1),
     0 12px 24px rgba(0, 0, 0, 0.32);
@@ -829,11 +835,15 @@
 }
 .watch-order[data-chain="true"] {
   border-color: rgba(143, 196, 199, 0.62);
-  box-shadow: inset 0 0 0 1px rgba(143, 196, 199, 0.08), 0 0 12px rgba(106, 168, 180, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(143, 196, 199, 0.08),
+    0 0 12px rgba(106, 168, 180, 0.08);
 }
 .watch-order[data-complete="true"][data-chain="true"] {
   border-color: rgba(224, 120, 56, 0.78);
-  box-shadow: inset 0 0 0 1px rgba(255, 240, 197, 0.06), 0 0 14px rgba(224, 120, 56, 0.12);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 240, 197, 0.06),
+    0 0 14px rgba(224, 120, 56, 0.12);
 }
 .watch-order-heading {
   display: flex;
@@ -1252,9 +1262,10 @@
   background:
     linear-gradient(180deg, rgba(74, 48, 32, 0.88), rgba(8, 11, 10, 0.82)),
     image-set(
-      url("/ui/ledger-surface-v1.webp") type("image/webp"),
-      url("/ui/ledger-surface-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/ledger-surface-v1.webp") type("image/webp"),
+        url("/ui/ledger-surface-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
   box-shadow:
     inset 0 1px 0 rgba(255, 240, 197, 0.12),
     0 8px 18px rgba(0, 0, 0, 0.26),
@@ -1288,15 +1299,17 @@
   background:
     linear-gradient(180deg, rgba(8, 11, 10, 0.88), rgba(14, 18, 17, 0.58)),
     image-set(
-      url("/ui/ledger-surface-v1.webp") type("image/webp"),
-      url("/ui/ledger-surface-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/ledger-surface-v1.webp") type("image/webp"),
+        url("/ui/ledger-surface-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
   background:
     linear-gradient(180deg, rgba(8, 11, 10, 0.88), rgba(14, 18, 17, 0.58)),
     image-set(
-      url("/ui/ledger-surface-v1.webp") type("image/webp"),
-      url("/ui/ledger-surface-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/ledger-surface-v1.webp") type("image/webp"),
+        url("/ui/ledger-surface-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
   border-top: 1px solid rgba(212, 160, 84, 0.62);
   box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.28);
 }
@@ -1416,17 +1429,23 @@
 
 .selected-tower-bar[data-upgrade="damage"] .upgrade-action-damage {
   border-color: rgba(224, 120, 56, 0.78);
-  box-shadow: 0 0 0 1px rgba(224, 120, 56, 0.14), 0 0 14px rgba(224, 120, 56, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(224, 120, 56, 0.14),
+    0 0 14px rgba(224, 120, 56, 0.14);
 }
 
 .selected-tower-bar[data-upgrade="rate"] .upgrade-action-rate {
   border-color: rgba(212, 160, 84, 0.78);
-  box-shadow: 0 0 0 1px rgba(212, 160, 84, 0.14), 0 0 14px rgba(212, 160, 84, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(212, 160, 84, 0.14),
+    0 0 14px rgba(212, 160, 84, 0.12);
 }
 
 .selected-tower-bar[data-upgrade="range"] .upgrade-action-range {
   border-color: rgba(106, 168, 180, 0.78);
-  box-shadow: 0 0 0 1px rgba(106, 168, 180, 0.14), 0 0 14px rgba(106, 168, 180, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(106, 168, 180, 0.14),
+    0 0 14px rgba(106, 168, 180, 0.12);
 }
 
 .selected-tower-actions {
@@ -1463,9 +1482,10 @@
   background:
     linear-gradient(180deg, rgba(232, 220, 196, 0.11), rgba(12, 16, 13, 0.78) 78%),
     image-set(
-      url("/ui/ledger-surface-v1.webp") type("image/webp"),
-      url("/ui/ledger-surface-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/ledger-surface-v1.webp") type("image/webp"),
+        url("/ui/ledger-surface-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
   box-shadow:
     inset 0 1px 0 rgba(232, 220, 196, 0.08),
     0 4px 12px rgba(0, 0, 0, 0.18);
@@ -1610,8 +1630,7 @@
   border: 1px solid rgba(239, 187, 101, 0.82);
   border-radius: 0.5rem;
   background:
-    linear-gradient(180deg, rgba(224, 120, 56, 0.84), rgba(139, 61, 34, 0.92)),
-    var(--color-ember);
+    linear-gradient(180deg, rgba(224, 120, 56, 0.84), rgba(139, 61, 34, 0.92)), var(--color-ember);
   color: #f4e4c4;
   font-weight: 700;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
@@ -1637,8 +1656,7 @@
 }
 .send-flag:hover:not(:disabled) {
   background:
-    linear-gradient(180deg, rgba(242, 151, 71, 0.92), rgba(158, 68, 37, 0.96)),
-    var(--color-ember);
+    linear-gradient(180deg, rgba(242, 151, 71, 0.92), rgba(158, 68, 37, 0.96)), var(--color-ember);
   box-shadow:
     inset 0 1px 0 rgba(255, 240, 197, 0.34),
     0 8px 20px rgba(224, 120, 56, 0.22);
@@ -1647,15 +1665,13 @@
   border: 1px solid rgba(212, 160, 84, 0.32);
   border-radius: 0.42rem;
   background:
-    linear-gradient(180deg, rgba(90, 122, 72, 0.46), rgba(30, 47, 28, 0.8)),
-    var(--color-moss);
+    linear-gradient(180deg, rgba(90, 122, 72, 0.46), rgba(30, 47, 28, 0.8)), var(--color-moss);
   color: var(--color-parchment);
 }
 .btn-wood:hover:not(:disabled) {
   border-color: rgba(212, 160, 84, 0.82);
   background:
-    linear-gradient(180deg, rgba(111, 146, 86, 0.58), rgba(36, 59, 34, 0.88)),
-    var(--color-moss);
+    linear-gradient(180deg, rgba(111, 146, 86, 0.58), rgba(36, 59, 34, 0.88)), var(--color-moss);
 }
 .upgrade-main,
 .upgrade-preview {
@@ -1714,9 +1730,10 @@
     radial-gradient(circle at 50% 0%, rgba(212, 160, 84, 0.16), transparent 45%),
     linear-gradient(180deg, rgba(28, 36, 27, 0.9), rgba(9, 13, 11, 0.96)),
     image-set(
-      url("/ui/ledger-surface-v1.webp") type("image/webp"),
-      url("/ui/ledger-surface-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/ledger-surface-v1.webp") type("image/webp"),
+        url("/ui/ledger-surface-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
   padding: 3.4rem 3.6rem 3.2rem;
   box-shadow:
     inset 0 1px 0 rgba(232, 220, 196, 0.12),
@@ -1739,18 +1756,20 @@
     radial-gradient(circle at 50% 0%, rgba(212, 160, 84, 0.16), transparent 44%),
     linear-gradient(180deg, rgba(14, 18, 17, 0.74), rgba(9, 13, 11, 0.96)),
     image-set(
-      url("/ui/campaign-atlas-v1.webp") type("image/webp"),
-      url("/ui/campaign-atlas-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/campaign-atlas-v1.webp") type("image/webp"),
+        url("/ui/campaign-atlas-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
 }
 .dispatch-dawn {
   background:
     radial-gradient(circle at 50% 0%, rgba(239, 187, 101, 0.16), transparent 44%),
     linear-gradient(180deg, rgba(18, 22, 15, 0.55), rgba(8, 11, 10, 0.82)),
     image-set(
-      url("/ui/dawn-watch-v1.webp") type("image/webp"),
-      url("/ui/dawn-watch-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/dawn-watch-v1.webp") type("image/webp"),
+        url("/ui/dawn-watch-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
 }
 .campaign-map-surface {
   width: 100%;
@@ -2029,7 +2048,7 @@
   gap: 0.18rem;
   padding: 0.55rem 0.6rem;
 }
-.rite-card[aria-pressed="true"] {
+.rite-card[aria-checked="true"] {
   border-color: var(--color-copper);
   box-shadow: 0 0 0 1px rgba(212, 160, 84, 0.28);
 }
@@ -2137,9 +2156,10 @@
   background:
     linear-gradient(180deg, rgba(232, 220, 196, 0.07), rgba(18, 22, 15, 0.72) 62%),
     image-set(
-      url("/ui/ledger-surface-v1.webp") type("image/webp"),
-      url("/ui/ledger-surface-v1.png") type("image/png")
-    ) center / cover no-repeat;
+        url("/ui/ledger-surface-v1.webp") type("image/webp"),
+        url("/ui/ledger-surface-v1.png") type("image/png")
+      )
+      center / cover no-repeat;
   border: 1px solid var(--color-line);
   box-shadow:
     inset 0 1px 0 rgba(232, 220, 196, 0.08),
@@ -2365,9 +2385,7 @@
 }
 
 .stat-chip {
-  background:
-    linear-gradient(180deg, rgba(232, 220, 196, 0.07), transparent),
-    var(--color-ink);
+  background: linear-gradient(180deg, rgba(232, 220, 196, 0.07), transparent), var(--color-ink);
   border: 1px solid var(--color-line);
   box-shadow: inset 0 1px 0 rgba(232, 220, 196, 0.06);
 }
@@ -2772,9 +2790,10 @@
     background:
       linear-gradient(180deg, rgba(8, 13, 15, 0.5), rgba(8, 11, 10, 0.72)),
       image-set(
-        url("/ui/menu-backdrop-v3.webp") type("image/webp"),
-        url("/ui/menu-backdrop-v3.png") type("image/png")
-      ) center / cover no-repeat;
+          url("/ui/menu-backdrop-v3.webp") type("image/webp"),
+          url("/ui/menu-backdrop-v3.png") type("image/png")
+        )
+        center / cover no-repeat;
   }
 
   .tray {
@@ -3472,7 +3491,9 @@
   height: 0.36rem;
   border-radius: 999px;
   background: var(--color-ember);
-  box-shadow: 0 0 0 2px rgba(224, 120, 56, 0.12), 0 0 8px rgba(224, 120, 56, 0.72);
+  box-shadow:
+    0 0 0 2px rgba(224, 120, 56, 0.12),
+    0 0 8px rgba(224, 120, 56, 0.72);
   animation: live-pulse 1.25s ease-in-out infinite;
 }
 
@@ -3485,8 +3506,7 @@
   opacity: 1;
   border-color: rgba(224, 120, 56, 0.72);
   background:
-    linear-gradient(180deg, rgba(139, 61, 34, 0.86), rgba(65, 35, 26, 0.94)),
-    var(--color-ember);
+    linear-gradient(180deg, rgba(139, 61, 34, 0.86), rgba(65, 35, 26, 0.94)), var(--color-ember);
   box-shadow:
     inset 0 1px 0 rgba(255, 240, 197, 0.2),
     0 0 0 1px rgba(224, 120, 56, 0.14),
@@ -4382,7 +4402,9 @@
 
 .camp-option[aria-pressed="true"] {
   border-color: var(--color-copper);
-  box-shadow: 0 0 0 1px rgba(212, 160, 84, 0.3), 0 0 14px rgba(224, 120, 56, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(212, 160, 84, 0.3),
+    0 0 14px rgba(224, 120, 56, 0.14);
 }
 
 .camp-option[aria-pressed="true"] .intel-kicker {
@@ -4487,7 +4509,11 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--boss-color, #e07838) 70%, #2a1a12), var(--boss-color, #e07838));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--boss-color, #e07838) 70%, #2a1a12),
+    var(--boss-color, #e07838)
+  );
   transition: width 140ms ease-out;
 }
 

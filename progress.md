@@ -1,5 +1,18 @@
 Original prompt: ok keep working. more upgrades across the game
 
+## 2026-09-15 — briefing rite accessibility and full regression pass
+
+- Fixed: tapping a creep now publishes a transient `Marked …` / `Unmarked …` status in addition to the canvas float/ring, so manual target selection is visible and announced through the existing HUD status path.
+- Fixed: briefing rites now use real `role="radio"` / `aria-checked` semantics inside the existing `radiogroup`, replacing the previous pressed-button contract that exposed as checkboxes in the in-app browser.
+- Improved: rite selection now uses roving focus with wrapping Arrow keys plus Home/End navigation; touch/click selection still uses the same engine state and selected plaque styling follows `aria-checked`.
+- Verified in fresh installed Chrome at 390×844: the briefing exposes three radios, only the active rite is tabbable, ArrowRight, Home, and End update selection and focus, and the watch enters ready without console or page errors.
+- Audited with the live in-app browser: title menus, Campaign, Bestiary/Chronicle, Orders, Watch hall, hard watch, briefing, ready deck, placement rejection/placement, undo, move, upgrades, ability, aim, pace, wave launch, Scout, Horn, Flare, pause/resume, creep marking, first-wave resolution, stall, and camp choice.
+- Responsive evidence at exact 320×568, 390×844, 667×375, and 1280×800: no document overflow, no clipped non-scrollable controls, and the short-phone briefing keeps `Take the watch` reachable via the action dock.
+- Required web-game Playwright choreography passed two iterations; refreshed `output/web-game/shot-0.png`, `shot-1.png`, `state-0.json`, and `state-1.json` were nonblank and contained no error artifact.
+- Format: Prettier now passes for the three touched source files after normalizing their existing layout drift.
+- Source gates: 142/142 tests, typecheck, lint, auth invariant, production build, and `git diff --check` passed. `npm run test:scripts` remains 193/197 because four fixture-contract tests require unavailable `.grok/skills/og/SKILL.md` and `.grok/skills/og/references` paths.
+- Limitation: exact viewport coverage used installed local Chrome because the in-app browser has no viewport override; this is browser proof, not physical touch, Safari, battery, or hardware performance proof.
+
 ## 2026-09-15 — overlay focus and Orders clarity pass
 
 - Fixed: Escape now closes Watch hall through its focus-restoring callback instead of bypassing the trigger; title Orders and the in-board `?` Help opener now restore focus correctly after both Escape and visible Close.

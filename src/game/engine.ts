@@ -703,7 +703,8 @@ export class EmberEngine {
   renderText() {
     const hud = this.hud();
     return JSON.stringify({
-      coordinateSystem: "origin top-left; x increases right; y increases down; board is 13 columns by 9 rows",
+      coordinateSystem:
+        "origin top-left; x increases right; y increases down; board is 13 columns by 9 rows",
       phase: hud.phase,
       map: hud.mapName,
       field: hud.field,
@@ -762,7 +763,13 @@ export class EmberEngine {
           progress: Number(creep.progress.toFixed(2)),
           flared: creep.markedT > 0,
         })),
-      controls: { aim: hud.towerAim, speed: hud.speed, paused: hud.paused, canUndo: hud.canUndo, nextWave: hud.nextWave },
+      controls: {
+        aim: hud.towerAim,
+        speed: hud.speed,
+        paused: hud.paused,
+        canUndo: hud.canUndo,
+        nextWave: hud.nextWave,
+      },
       flare: {
         cooldown: Number(hud.flareCd.toFixed(2)),
         marked: this.creeps.filter((creep) => creep.alive && creep.markedT > 0).length,
@@ -802,13 +809,20 @@ export class EmberEngine {
     } else if (rule.id === "emberfall") {
       current = this.towers.some((tower) => this.formOf(tower) >= 4) ? 1 : 0;
     } else if (rule.id === "glass-tide") {
-      current = Math.min(rule.target, this.towers.filter((tower) => this.besideWater(tower)).length);
+      current = Math.min(
+        rule.target,
+        this.towers.filter((tower) => this.besideWater(tower)).length,
+      );
     } else if (rule.id === "ash-draw") {
-      current = this.towers.some((tower) => (tower.kind === "cinder" || tower.kind === "mortar") && this.besidePath(tower))
+      current = this.towers.some(
+        (tower) => (tower.kind === "cinder" || tower.kind === "mortar") && this.besidePath(tower),
+      )
         ? 1
         : 0;
     } else if (rule.id === "wicker-draft") {
-      current = this.towers.some((tower) => (tower.kind === "frost" || tower.kind === "bramble") && this.besidePath(tower))
+      current = this.towers.some(
+        (tower) => (tower.kind === "frost" || tower.kind === "bramble") && this.besidePath(tower),
+      )
         ? 1
         : 0;
     }
@@ -830,11 +844,15 @@ export class EmberEngine {
 
   watchOrderSnapshot(): WatchOrderSnap | null {
     const index = this.phase === "wave" ? this.wave - 1 : this.wave;
-    const previewIndex = this.endless ? Math.max(0, index) : Math.min(index, Math.max(0, this.map.waves.length - 1));
+    const previewIndex = this.endless
+      ? Math.max(0, index)
+      : Math.min(index, Math.max(0, this.map.waves.length - 1));
     const plan = this.wavePlan(previewIndex);
     const order = this.phase === "wave" && this.waveOrder ? this.waveOrder : watchOrderFor(plan);
     if (!order) return null;
-    const current = order.targetKind ? Math.min(order.target, this.waveKillCounts[order.targetKind] ?? 0) : 0;
+    const current = order.targetKind
+      ? Math.min(order.target, this.waveKillCounts[order.targetKind] ?? 0)
+      : 0;
     return {
       ...order,
       current,
@@ -857,7 +875,8 @@ export class EmberEngine {
 
   inLanternAura(tower: Tower) {
     return this.props.some(
-      (prop) => prop.kind === "lamp" && Math.abs(prop.c - tower.c) + Math.abs(prop.r - tower.r) <= 2,
+      (prop) =>
+        prop.kind === "lamp" && Math.abs(prop.c - tower.c) + Math.abs(prop.r - tower.r) <= 2,
     );
   }
 
@@ -885,7 +904,8 @@ export class EmberEngine {
       this.towers.filter((tower) =>
         this.towers.some(
           (other) =>
-            other.id !== tower.id && Math.abs(other.c - tower.c) + Math.abs(other.r - tower.r) === 1,
+            other.id !== tower.id &&
+            Math.abs(other.c - tower.c) + Math.abs(other.r - tower.r) === 1,
         ),
       ).length,
     );
@@ -894,7 +914,12 @@ export class EmberEngine {
   fieldDamageMultiplier(tower: Tower) {
     if (this.map.profile.rule.id === "stone-latch" && this.besidePath(tower)) return 1.12;
     if (this.map.profile.rule.id === "emberfall" && this.formOf(tower) >= 4) return 1.16;
-    if (this.map.profile.rule.id === "glass-tide" && tower.kind === "spark" && this.besideWater(tower)) return 1.12;
+    if (
+      this.map.profile.rule.id === "glass-tide" &&
+      tower.kind === "spark" &&
+      this.besideWater(tower)
+    )
+      return 1.12;
     if (this.map.profile.rule.id === "ash-draw" && tower.kind === "cinder") return 1.14;
     return 1;
   }
@@ -940,7 +965,9 @@ export class EmberEngine {
     const t = this.selectedTower();
     const upcoming = this.phase === "wave" ? Math.max(0, this.wave - 1) : this.wave;
     const map = this.map;
-    const previewIndex = this.endless ? Math.max(0, upcoming) : Math.min(upcoming, Math.max(0, map.waves.length - 1));
+    const previewIndex = this.endless
+      ? Math.max(0, upcoming)
+      : Math.min(upcoming, Math.max(0, map.waves.length - 1));
     const previewPlan = this.wavePlan(previewIndex);
     const livePlan = this.wave > 0 ? this.wavePlan(this.wave - 1) : undefined;
     const remaining = this.creeps.filter((c) => c.alive).length + this.spawnQ.length;
@@ -979,9 +1006,18 @@ export class EmberEngine {
         : null,
       nextCosts: t
         ? {
-            dmg: t.dmgLvl >= MAX_UPGRADE ? 0 : this.upgradePrice(upgradeDamageCost(t.kind, t.dmgLvl + 1)),
-            rate: t.rateLvl >= MAX_UPGRADE ? 0 : this.upgradePrice(upgradeRateCost(t.kind, t.rateLvl + 1)),
-            range: t.rangeLvl >= MAX_UPGRADE ? 0 : this.upgradePrice(upgradeRangeCost(t.kind, t.rangeLvl + 1)),
+            dmg:
+              t.dmgLvl >= MAX_UPGRADE
+                ? 0
+                : this.upgradePrice(upgradeDamageCost(t.kind, t.dmgLvl + 1)),
+            rate:
+              t.rateLvl >= MAX_UPGRADE
+                ? 0
+                : this.upgradePrice(upgradeRateCost(t.kind, t.rateLvl + 1)),
+            range:
+              t.rangeLvl >= MAX_UPGRADE
+                ? 0
+                : this.upgradePrice(upgradeRangeCost(t.kind, t.rangeLvl + 1)),
           }
         : null,
       aim: this.aim,
@@ -1026,7 +1062,13 @@ export class EmberEngine {
       muted: this.muted,
       route: MAPS.map((entry, index) => {
         const state: RouteNodeSnap["state"] =
-          index === this.mapIndex ? "current" : index < this.unlocked ? "held" : index === this.unlocked ? "available" : "locked";
+          index === this.mapIndex
+            ? "current"
+            : index < this.unlocked
+              ? "held"
+              : index === this.unlocked
+                ? "available"
+                : "locked";
         return {
           id: entry.id,
           name: entry.name,
@@ -1074,7 +1116,10 @@ export class EmberEngine {
       waveKills: this.waveKills,
       waveLeaks: this.waveLeaks,
       waveEarned: this.waveEarned,
-      relicNames: SHOP.filter((item) => this.relics.has(item.id)).map((item) => ({ id: item.id, name: item.name })),
+      relicNames: SHOP.filter((item) => this.relics.has(item.id)).map((item) => ({
+        id: item.id,
+        name: item.name,
+      })),
       rite: this.rite,
       riteName: RITES.find((item) => item.id === this.rite)?.name ?? "Spare purse",
       scoutReady: this.scoutReady,
@@ -1100,17 +1145,23 @@ export class EmberEngine {
         relics: set.relics,
         active: set.relics.every((id) => this.relics.has(id)),
       })),
-      setBonus: { damage: this.setAmount("damage") + this.perks.whet * 0.04, rate: this.setAmount("rate") },
+      setBonus: {
+        damage: this.setAmount("damage") + this.perks.whet * 0.04,
+        rate: this.setAmount("rate"),
+      },
       ability: t
         ? {
             name: ABILITIES[t.kind].name,
             detail: ABILITIES[t.kind].detail,
             cd: Math.ceil(t.abilityCd),
-            ready: t.abilityCd <= 0 && this.playing() && !t.volt && !t.siege && !t.storm && !t.brace,
+            ready:
+              t.abilityCd <= 0 && this.playing() && !t.volt && !t.siege && !t.storm && !t.brace,
           }
         : null,
       emberlitOptions:
-        t && this.formOf(t) >= 4 && !t.empowered ? { a: EMBERLIT[t.kind].a, b: EMBERLIT[t.kind].b } : null,
+        t && this.formOf(t) >= 4 && !t.empowered
+          ? { a: EMBERLIT[t.kind].a, b: EMBERLIT[t.kind].b }
+          : null,
       marks: this.marks,
       perkOptions: PERKS.map((perk) => {
         const tier = this.perks[perk.id];
@@ -1127,7 +1178,9 @@ export class EmberEngine {
       }),
       omen: (() => {
         const omen = this.omenNow();
-        return omen ? { id: omen.id, name: omen.name, detail: omen.detail, color: omen.color } : null;
+        return omen
+          ? { id: omen.id, name: omen.name, detail: omen.detail, color: omen.color }
+          : null;
       })(),
       bestEndless: this.bestEndless,
       endless: this.endless,
@@ -1319,7 +1372,8 @@ export class EmberEngine {
   }
 
   refundFor(t: Tower) {
-    const rate = t.dmgLvl === 1 && t.rateLvl === 1 && t.rangeLvl === 1 && !t.empowered ? 0.7 : REFUND_RATE;
+    const rate =
+      t.dmgLvl === 1 && t.rateLvl === 1 && t.rangeLvl === 1 && !t.empowered ? 0.7 : REFUND_RATE;
     return Math.floor(t.spent * rate);
   }
 
@@ -1516,11 +1570,18 @@ export class EmberEngine {
   }
 
   maxLives() {
-    return (this.hard ? HARD_LIVES : START_LIVES) + (this.relics.has("timber") ? 2 : 0) + this.perks.wall;
+    return (
+      (this.hard ? HARD_LIVES : START_LIVES) + (this.relics.has("timber") ? 2 : 0) + this.perks.wall
+    );
   }
 
   startGold() {
-    return START_GOLD + (this.relics.has("purse") ? 50 : 0) + this.setAmount("gold") + this.perks.purse * 20;
+    return (
+      START_GOLD +
+      (this.relics.has("purse") ? 50 : 0) +
+      this.setAmount("gold") +
+      this.perks.purse * 20
+    );
   }
 
   setAmount(effect: RelicSet["effect"]) {
@@ -1688,7 +1749,8 @@ export class EmberEngine {
     let best: Creep | null = null;
     for (const creep of this.creeps) {
       if (!creep.alive) continue;
-      if (!best || creep.hp > best.hp || (creep.hp === best.hp && creep.progress > best.progress)) best = creep;
+      if (!best || creep.hp > best.hp || (creep.hp === best.hp && creep.progress > best.progress))
+        best = creep;
     }
     if (!best) {
       sfx.deny();
@@ -1715,7 +1777,11 @@ export class EmberEngine {
       (kind) => TOWER_UNLOCK[kind] > 0 && TOWER_UNLOCK[kind] === this.mapIndex,
     );
     if (fresh.length > 0) {
-      this.banner = { text: `${fresh.map((kind) => TOWERS[kind].name).join(" · ")} unsealed`, life: 2.4, max: 2.4 };
+      this.banner = {
+        text: `${fresh.map((kind) => TOWERS[kind].name).join(" · ")} unsealed`,
+        life: 2.4,
+        max: 2.4,
+      };
     }
     this.notify();
   }
@@ -1950,15 +2016,21 @@ export class EmberEngine {
       this.ring(x, y, "#e07838");
     } else {
       const slow = t.kind === "ward" ? 0.5 : t.kind === "frost" ? 0.6 : 0;
-      const dmg = t.kind === "ward" ? damageAt(t.kind, t.dmgLvl) * 1.5 : t.kind === "frost" ? 10 : 12;
+      const dmg =
+        t.kind === "ward" ? damageAt(t.kind, t.dmgLvl) * 1.5 : t.kind === "frost" ? 10 : 12;
       const root = t.kind === "frost" ? 0.7 : t.kind === "bramble" ? 1 : 0;
       for (const creep of this.creeps) {
         if (!creep.alive || !inRange(creep)) continue;
-        if (slow > 0 && !creep.slowResist) creep.slowT = Math.max(creep.slowT, t.kind === "frost" ? 1.6 : 1.2);
+        if (slow > 0 && !creep.slowResist)
+          creep.slowT = Math.max(creep.slowT, t.kind === "frost" ? 1.6 : 1.2);
         if (root > 0) creep.rootT = Math.max(creep.rootT, root);
         this.damageCreep(creep, dmg, slow, t.emberlit === "a", true);
       }
-      this.ring(cx, cy, t.kind === "frost" ? "#6aa8b4" : t.kind === "bramble" ? "#4a6a32" : "#d4a054");
+      this.ring(
+        cx,
+        cy,
+        t.kind === "frost" ? "#6aa8b4" : t.kind === "bramble" ? "#4a6a32" : "#d4a054",
+      );
       this.burst(cx, cy, t.kind === "frost" ? "#6aa8b4" : "#d4a054", 10, "spark");
     }
     t.abilityCd = def.cd;
@@ -1997,8 +2069,11 @@ export class EmberEngine {
 
   markCreep(creep: Creep) {
     this.markedId = this.markedId === creep.id ? -1 : creep.id;
-    this.float(creep.x, creep.y - 0.45, this.markedId === creep.id ? "Marked" : "Unmarked", "#e07838");
-    if (this.markedId === creep.id) this.ring(creep.x, creep.y, "#e07838");
+    const marked = this.markedId === creep.id;
+    const action = marked ? "Marked" : "Unmarked";
+    this.float(creep.x, creep.y - 0.45, action, "#e07838");
+    this.banner = { text: `${action} ${CREEPS[creep.kind].name}`, life: 1.1, max: 1.1 };
+    if (marked) this.ring(creep.x, creep.y, "#e07838");
     sfx.place();
     this.notify();
   }
@@ -2051,7 +2126,12 @@ export class EmberEngine {
       this.ring(c + 0.5, r + 0.5, "#d4a054");
       this.burst(c + 0.5, r + 0.62, "#4a3a22", 3, "smoke");
       const bond = this.bondFor(mover);
-      this.float(c + 0.5, r + 0.1, bond ? `${bond.label} link` : "Moved", bond ? "#6aa8b4" : "#d4a054");
+      this.float(
+        c + 0.5,
+        r + 0.1,
+        bond ? `${bond.label} link` : "Moved",
+        bond ? "#6aa8b4" : "#d4a054",
+      );
       sfx.place();
       this.notify();
       return;
@@ -2409,11 +2489,16 @@ export class EmberEngine {
     sfx.boss();
     if (def.effect === "summon") {
       for (let i = 0; i < 3; i++) {
-        this.spawnAt(i % 2 === 0 ? "hound" : "grub", creep.x + (i - 1) * 0.7, creep.y + (i % 2 === 0 ? 0.5 : -0.5));
+        this.spawnAt(
+          i % 2 === 0 ? "hound" : "grub",
+          creep.x + (i - 1) * 0.7,
+          creep.y + (i % 2 === 0 ? 0.5 : -0.5),
+        );
       }
     } else if (def.effect === "burn") {
       for (let i = 0; i < 5; i++) {
-        const node = this.path[Math.min(this.path.length - 1, Math.max(0, Math.floor(creep.progress) + i))];
+        const node =
+          this.path[Math.min(this.path.length - 1, Math.max(0, Math.floor(creep.progress) + i))];
         this.burns.push({ x: node.c + 0.5, y: node.r + 0.5, r: 0.8, life: 3.4, tick: 0.1 });
       }
       this.burst(creep.x, creep.y, "#e07838", 14, "ember");
@@ -2496,7 +2581,12 @@ export class EmberEngine {
 
   damageCreep(creep: Creep, amount: number, slow: number, ignoreArmor = false, quiet = false) {
     if (creep.kind === "knave" && creep.dodge) {
-      const caught = slow > 0 || creep.rootT > 0 || creep.markedT > 0 || this.markedId === creep.id || ignoreArmor;
+      const caught =
+        slow > 0 ||
+        creep.rootT > 0 ||
+        creep.markedT > 0 ||
+        this.markedId === creep.id ||
+        ignoreArmor;
       if (!caught) {
         creep.dodge = false;
         creep.flash = 1;
@@ -2576,8 +2666,14 @@ export class EmberEngine {
         }
       }
       this.float(creep.x, creep.y, `+${gold}`, "#d4a054");
-      const deathColor = creep.kind === "lord" ? "#e07838" : creep.kind === "shell" ? "#7a8470" : "#5a7a48";
-      this.poof(creep.x, creep.y, deathColor, creep.kind === "lord" ? 2.4 : creep.kind === "shell" ? 1.4 : 1);
+      const deathColor =
+        creep.kind === "lord" ? "#e07838" : creep.kind === "shell" ? "#7a8470" : "#5a7a48";
+      this.poof(
+        creep.x,
+        creep.y,
+        deathColor,
+        creep.kind === "lord" ? 2.4 : creep.kind === "shell" ? 1.4 : 1,
+      );
       this.burst(creep.x, creep.y, "#3a4432", creep.kind === "lord" ? 12 : 6, "smoke");
       this.ring(creep.x, creep.y, "#d4a054");
       if (creep.kind === "lord") {
@@ -2652,7 +2748,11 @@ export class EmberEngine {
     if (tower.kind !== "ward" && this.markedId === target.id) dmg *= MARK_BONUS;
     if (tower.kind === "mortar" && target.kind === "shell") dmg *= 1.28;
     if (tower.kind === "bramble" && target.kind === "shell") dmg *= 1.18;
-    if ((tower.kind === "frost" || tower.kind === "ward") && (target.kind === "hound" || target.kind === "ashfang")) dmg *= 1.22;
+    if (
+      (tower.kind === "frost" || tower.kind === "ward") &&
+      (target.kind === "hound" || target.kind === "ashfang")
+    )
+      dmg *= 1.22;
     if (tower.kind === "frost" && target.kind === "runner") dmg *= 1.16;
     if ((tower.kind === "spark" || tower.kind === "bow") && target.kind === "wisp") dmg *= 1.18;
     if (tower.kind === "bramble" && target.kind === "runner") dmg *= 1.2;
@@ -2685,7 +2785,11 @@ export class EmberEngine {
     if (tower.kind === "ward") {
       const range = this.sightRange(tower);
       this.ring(tower.c + 0.5, tower.r + 0.5, tower.emberlit === "a" ? "#e07838" : "#d4a054");
-      const slow = def.slow + (form >= 3 ? 0.12 : 0) + (tower.emberlit === "b" ? 0.12 : 0) + (tower.empowered && tower.emberlit !== "b" ? 0.08 : 0);
+      const slow =
+        def.slow +
+        (form >= 3 ? 0.12 : 0) +
+        (tower.emberlit === "b" ? 0.12 : 0) +
+        (tower.empowered && tower.emberlit !== "b" ? 0.08 : 0);
       for (const c of this.creeps) {
         if (!c.alive) continue;
         const dx = c.x - (tower.c + 0.5);
@@ -2703,7 +2807,9 @@ export class EmberEngine {
           : 0.7
         : tower.kind === "cinder"
           ? def.splash * (form >= 3 ? 1.18 : 1)
-          : def.splash * (siege ? 1.6 : 1) * (tower.emberlit === "b" && tower.kind === "mortar" ? 1.25 : 1);
+          : def.splash *
+            (siege ? 1.6 : 1) *
+            (tower.emberlit === "b" && tower.kind === "mortar" ? 1.25 : 1);
     if (def.beam) {
       this.beams.push({
         x1: sx,
@@ -2718,7 +2824,9 @@ export class EmberEngine {
       this.burst(target.x, target.y, "#e8c56a", form >= 3 || tower.empowered ? 11 : 8, "spark");
       const storm = tower.storm;
       tower.storm = false;
-      const hops = storm ? 6 : (form >= 4 ? 2 : form >= 3 ? 1 : 0) + (tower.emberlit === "a" ? 1 : 0);
+      const hops = storm
+        ? 6
+        : (form >= 4 ? 2 : form >= 3 ? 1 : 0) + (tower.emberlit === "a" ? 1 : 0);
       if (hops > 0) {
         const chained = new Set<number>([target.id]);
         let from = target;
@@ -2739,7 +2847,12 @@ export class EmberEngine {
             max: storm ? 0.14 : 0.1,
             color: "#fff3c0",
           });
-          this.damageCreep(extra, dmg * (storm ? Math.max(0.35, 0.75 - h * 0.08) : 0.7 - h * 0.12), 0, true);
+          this.damageCreep(
+            extra,
+            dmg * (storm ? Math.max(0.35, 0.75 - h * 0.08) : 0.7 - h * 0.12),
+            0,
+            true,
+          );
           from = extra;
         }
       }
@@ -2766,7 +2879,10 @@ export class EmberEngine {
         (tower.emberlit === "b" && tower.kind === "frost" ? 1.5 : 1),
       ttl: 1.4,
       angle: tower.angle,
-      pierce: tower.kind === "bow" ? (form >= 4 ? 2 : form >= 3 ? 1 : 0) + (tower.emberlit === "a" ? 1 : 0) : 0,
+      pierce:
+        tower.kind === "bow"
+          ? (form >= 4 ? 2 : form >= 3 ? 1 : 0) + (tower.emberlit === "a" ? 1 : 0)
+          : 0,
       hit: new Set(),
       form,
       ox: sx,
@@ -2776,7 +2892,11 @@ export class EmberEngine {
       ignoreArmor: tower.kind === "pike" && (tower.emberlit === "a" || brace),
     });
     const spark =
-      tower.kind === "frost" ? "#6aa8b4" : tower.kind === "mortar" || tower.kind === "cinder" ? "#e07838" : "#d4a054";
+      tower.kind === "frost"
+        ? "#6aa8b4"
+        : tower.kind === "mortar" || tower.kind === "cinder"
+          ? "#e07838"
+          : "#d4a054";
     if (tower.kind === "mortar" || tower.kind === "cinder") this.burst(sx, sy, spark, 2, "spark");
     if (tower.kind === "bow" || tower.kind === "pike") sfx.shootBow();
     else if (tower.kind === "mortar" || tower.kind === "cinder") sfx.shootMortar();
@@ -2791,7 +2911,10 @@ export class EmberEngine {
     }
     if (tower.kind === "bramble" && target.kind === "knave") target.dodge = false;
     if (tower.kind === "pike" && (form >= 3 || tower.emberlit === "a" || brace)) {
-      target.rootT = Math.max(target.rootT, brace ? 1.1 : tower.emberlit === "b" ? 0.8 : form >= 4 ? 0.7 : 0.4);
+      target.rootT = Math.max(
+        target.rootT,
+        brace ? 1.1 : tower.emberlit === "b" ? 0.8 : form >= 4 ? 0.7 : 0.4,
+      );
     }
     if (tower.kind === "frost" && tower.emberlit === "a" && !target.slowResist) {
       target.rootT = Math.max(target.rootT, 0.28);
@@ -2832,7 +2955,14 @@ export class EmberEngine {
         best = creep;
       } else if (tower.aim === "strong") {
         const threat =
-          creep.hp + (creep.kind === "lord" ? 400 : creep.kind === "shaman" ? 180 : creep.kind === "ashfang" ? 90 : 0);
+          creep.hp +
+          (creep.kind === "lord"
+            ? 400
+            : creep.kind === "shaman"
+              ? 180
+              : creep.kind === "ashfang"
+                ? 90
+                : 0);
         if (threat > score) {
           score = threat;
           best = creep;
@@ -2843,7 +2973,8 @@ export class EmberEngine {
   }
 
   impact(shot: Shot, x: number, y: number) {
-    const color = shot.kind === "frost" ? "#6aa8b4" : shot.kind === "mortar" ? "#e07838" : "#d4a054";
+    const color =
+      shot.kind === "frost" ? "#6aa8b4" : shot.kind === "mortar" ? "#e07838" : "#d4a054";
     this.burst(x, y, color, shot.kind === "mortar" ? 5 : shot.splash > 0 ? 8 : 5, "spark");
     if (shot.kind === "mortar") {
       this.ring(x, y, "#e07838");
@@ -2860,7 +2991,8 @@ export class EmberEngine {
         const dy = creep.y - y;
         if (dx * dx + dy * dy <= r2) {
           this.damageCreep(creep, shot.damage, shot.slow, false, true);
-          if (shot.kind === "frost" && shot.empowered && !creep.slowResist) creep.rootT = Math.max(creep.rootT, 0.28);
+          if (shot.kind === "frost" && shot.empowered && !creep.slowResist)
+            creep.rootT = Math.max(creep.rootT, 0.28);
         }
       }
       this.trauma = Math.min(1, this.trauma + (shot.kind === "mortar" ? 0.05 : 0.1));
@@ -2873,7 +3005,11 @@ export class EmberEngine {
           x,
           y,
           r: (0.48 + form * 0.06) * fat,
-          life: (1.5 + form * 0.2) * (shot.empowered ? 1.35 : 1) * ash * (this.omenNow()?.burnLife ?? 1),
+          life:
+            (1.5 + form * 0.2) *
+            (shot.empowered ? 1.35 : 1) *
+            ash *
+            (this.omenNow()?.burnLife ?? 1),
           tick: 0,
           tar: shot.tar,
         });
@@ -2908,7 +3044,15 @@ export class EmberEngine {
     this.time += dt;
     this.stepFx(dt);
 
-    if (this.phase === "title" || this.phase === "brief" || this.phase === "shop" || this.phase === "stall" || this.phase === "won" || this.phase === "lost") return;
+    if (
+      this.phase === "title" ||
+      this.phase === "brief" ||
+      this.phase === "shop" ||
+      this.phase === "stall" ||
+      this.phase === "won" ||
+      this.phase === "lost"
+    )
+      return;
     if (this.paused) return;
 
     if (this.hitstop > 0) {
@@ -2974,7 +3118,8 @@ export class EmberEngine {
       const dx = target.x - creep.x;
       const dy = target.y - creep.y;
       const dist = Math.hypot(dx, dy);
-      const pack = (creep.kind === "hound" || creep.kind === "ashfang") && packCount >= 3 ? 1.12 : 1;
+      const pack =
+        (creep.kind === "hound" || creep.kind === "ashfang") && packCount >= 3 ? 1.12 : 1;
       const draft =
         this.map.profile.rule.id === "wicker-draft" &&
         (creep.kind === "moth" || creep.kind === "knave") &&
@@ -3021,7 +3166,10 @@ export class EmberEngine {
             const hx = other.x - creep.x;
             const hy = other.y - creep.y;
             if (hx * hx + hy * hy <= 1.45 * 1.45) {
-              other.hp = Math.min(other.maxHp, other.hp + stats.heal * (this.relics.has("salt") ? 0.5 : 1));
+              other.hp = Math.min(
+                other.maxHp,
+                other.hp + stats.heal * (this.relics.has("salt") ? 0.5 : 1),
+              );
             }
           }
           this.ring(creep.x, creep.y, "#7a9a58");
@@ -3199,14 +3347,16 @@ export class EmberEngine {
         this.unlocked = Math.max(this.unlocked, this.mapIndex + 1);
         this.earnMarks(1 + (this.hard ? 1 : 0));
         this.persist();
-        if (!objective.complete) this.banner = { text: `${this.map.name} held`, life: 2.2, max: 2.2 };
+        if (!objective.complete)
+          this.banner = { text: `${this.map.name} held`, life: 2.2, max: 2.2 };
         sfx.win();
       } else {
         this.phase = "won";
         this.unlocked = Math.max(this.unlocked, MAPS.length);
         this.earnMarks(3);
         this.persist();
-        if (!objective.complete) this.banner = { text: "Dawn — the line held", life: 2.2, max: 2.2 };
+        if (!objective.complete)
+          this.banner = { text: "Dawn — the line held", life: 2.2, max: 2.2 };
         sfx.win();
       }
       this.trauma = 0.25;
@@ -3226,11 +3376,12 @@ export class EmberEngine {
         this.float(COLS / 2, 0.55, `Interest +${interest}`, "#d4a054");
       }
       this.banner = {
-        text: orderHeld && order
-          ? `Wave ${this.wave} held · Order +${orderPayout}g`
-          : hold === "clean"
-            ? `Wave ${this.wave} held`
-            : `Wave ${this.wave} held · ${hold === "frayed" ? "line frayed" : "keep shaken"}`,
+        text:
+          orderHeld && order
+            ? `Wave ${this.wave} held · Order +${orderPayout}g`
+            : hold === "clean"
+              ? `Wave ${this.wave} held`
+              : `Wave ${this.wave} held · ${hold === "frayed" ? "line frayed" : "keep shaken"}`,
         life: 1.6,
         max: 1.6,
       };
@@ -3275,7 +3426,8 @@ export class EmberEngine {
     this.moteAcc += dt;
     if (!this.reducedMotion && !this.paused && this.moteAcc > 0.14 && this.particles.length < 140) {
       this.moteAcc = 0;
-      const node = this.path[Math.floor(Math.random() * Math.max(1, this.path.length - 1))] ?? this.path[0];
+      const node =
+        this.path[Math.floor(Math.random() * Math.max(1, this.path.length - 1))] ?? this.path[0];
       const drift = Math.random();
       const px = drift < 0.42 ? this.waypoint(0).x : node.c + 0.5;
       const py = drift < 0.42 ? this.waypoint(0).y : node.r + 0.5;
@@ -3323,7 +3475,7 @@ export class EmberEngine {
   }
 
   maybeNotify() {
-    const heroKey = this.heroT > 0 ? this.hero?.kind ?? "active" : "none";
+    const heroKey = this.heroT > 0 ? (this.hero?.kind ?? "active") : "none";
     const objective = this.objectiveProgress();
     const marked = this.markedCreep();
     const flared = this.creeps.filter((creep) => creep.alive && creep.markedT > 0).length;
