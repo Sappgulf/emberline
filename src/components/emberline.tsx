@@ -911,6 +911,7 @@ export function Emberline() {
               action="Take the watch"
               onAction={() => engine.dismissBrief()}
               dimmer
+              actionDock
             >
               <p className="max-w-2xl text-sm leading-relaxed text-parchment">{hud.story.line}</p>
               <p className="brief-route">
@@ -2130,6 +2131,7 @@ function Overlay({
   dimmer,
   emblem,
   surface,
+  actionDock,
 }: {
   children?: React.ReactNode;
   wide?: boolean;
@@ -2143,6 +2145,7 @@ function Overlay({
   dimmer?: boolean;
   emblem?: boolean;
   surface?: "campaign" | "dawn";
+  actionDock?: boolean;
 }) {
   const layout = size ?? (wide ? "wide" : "card");
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -2189,7 +2192,7 @@ function Overlay({
       />
       <div
         ref={dialogRef}
-        className={`overlay-in dispatch dispatch-${layout} ${surface === "campaign" ? "dispatch-campaign" : surface === "dawn" ? "dispatch-dawn" : ""} relative flex w-full max-h-[92dvh] flex-col ${layout === "keep" ? "items-stretch text-left" : "items-center text-center"} gap-3 overflow-y-auto`}
+        className={`overlay-in dispatch dispatch-${layout} ${surface === "campaign" ? "dispatch-campaign" : surface === "dawn" ? "dispatch-dawn" : ""} ${actionDock ? "dispatch-action-dock" : ""} relative flex w-full max-h-[92dvh] flex-col ${layout === "keep" ? "items-stretch text-left" : "items-center text-center"} gap-3 overflow-y-auto`}
       >
         {close && onClose && (
           <button type="button" className="pressable stamp overlay-close min-h-9 px-3 text-[10px] text-dust" onClick={onClose}>
@@ -2199,7 +2202,7 @@ function Overlay({
         <img className={emblem ? "dispatch-crest" : "wax"} src={emblem ? "/ui/emberline-crest-v1.png" : "/ui/wax.png"} alt="" />
         {kicker && <p className="dispatch-kicker">{kicker}</p>}
         {title && <h2 className="font-display text-4xl leading-none text-copper sm:text-[2.75rem]">{title}</h2>}
-        {children}
+        {actionDock ? <div className="dispatch-body">{children}</div> : children}
         {action && onAction && (
           <button type="button" className="pressable send-flag min-h-11 px-7 text-sm" onClick={onAction}>
             {action}

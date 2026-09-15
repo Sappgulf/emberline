@@ -307,3 +307,12 @@ Original prompt: ok keep working. more upgrades across the game
 - Completed: Flare catches Knave dodge, applies at shared damage resolution across direct hits and projectiles, exposes cooldown/coverage in `render_game_to_text()`, and uses gold reticles, banner/float feedback, audio, accessible labeling, and the `R` shortcut.
 - Completed: kept the seven-control command row coherent at medium and phone widths after adding Flare, while retaining the remote campaign assets and all eight-road systems.
 - Verified: 142 tests, typecheck, lint, auth invariant, production build, required web-game Playwright choreography, and `git diff --check`; browser QA covers the merged title → brief → ready → wave flow, Flare control state, and zero console errors/warnings. The build skips the optional database migration because `DATABASE_URL` is unset.
+
+## 2026-09-15 — landscape mobile playfield pass
+
+- Fixed: short landscape viewports no longer let the command deck consume the playfield row; the board remains visible and playable while secondary forecast details yield to the field.
+- Improved: the title CTA is reachable in landscape, briefing copy scrolls independently while “Take the watch” stays visible, and selected-tower upgrades collapse into a compact action strip with a persistent command row.
+- Verified with exact local Playwright fallback at 390×844, 320×568, 844×390, and 667×375: briefing action visible, board rendered, real tower placement reached, six selected-tower actions present, eight packet controls present, active wave reached, no document overflow, and browser error/warning arrays empty. Landscape canvases measured 260×180 and 247×171; portrait canvases measured 351×243 and 284×198.
+- Verified in the live in-app browser through title → briefing → ready → `{c:4,r:1}` placement → active wave; selected-tower controls and the fixed landscape command surface rendered, and console error/warn diagnostics were empty.
+- Verified with the required `web_game_playwright_client.js` choreography after the responsive changes; title and Canvas artifacts were nonblank and `render_game_to_text()` completed without an error artifact.
+- Limitation: exact viewport validation used installed local Chrome because the in-app browser has no viewport override; this does not replace physical-device touch, Safari, battery, or hardware performance proof.
