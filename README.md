@@ -29,7 +29,7 @@ Open `http://localhost:8080`. `npm test` covers the watch engine (build, waves, 
 - **Emberlit:** At Crowned, choose one of two awakenings for each tower (C key ability, two branch buttons).
 - **Abilities:** Every tower has an active power on a cooldown — Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm.
 - **Watch hall:** Marks earned from held roads and bosses buy permanent perks. Hold all eight roads to unlock the endless Long Night.
-- **Tools:** Horn (burn the road + slow), Scout flare (mark every live enemy for four seconds and deal +22% damage), Mend (lives + drag), Move, Sell. Pause is pause. 1× / 2× / 3× is speed.
+- **Tools:** Horn (burn the road + slow), Scout flare (R during a wave; mark every live enemy for four seconds and deal +22% damage), Mend (lives + drag), Move, Sell. Pause is pause. 1× / 2× / 3× is speed.
 - **Relics** persist between maps (including Watch cord, Gate flint, and Lantern wick). Stall prices drop each wave.
 
 ## Chronicle

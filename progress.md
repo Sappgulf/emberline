@@ -9,6 +9,13 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified with the responsive fallback at 1280×800 and 390×844: title → menus → brief → ready → active wave worked, no horizontal overflow, no console/page/request failures, and headless frame samples stayed about 58–61 FPS. This is browser evidence, not physical-device or battery proof.
 - Platform limitation: `npm run test:scripts` is 193/197 because four tests require the unavailable `.grok/skills/og/SKILL.md` and `.grok/skills/og/references` fixture; the bundled browser-smoke wrapper also cannot create its hard-coded `/workspace` output directory in this desktop checkout.
 
+## 2026-09-15 — phase-aware command help pass
+
+- Fixed: Orders now distinguishes `R` as Reach while ready and Scout Flare during a wave, matching the engine’s phase-sensitive shortcut; the README’s tool note carries the same guidance.
+- Improved: the transient Undo action now visibly advertises `Z`, exposes `aria-keyshortcuts`, and explains that the existing rollback window is brief without changing its 3.2-second rule.
+- Verified in the live in-app browser: Orders shows the corrected ready/wave rows, a fresh plant exposes `Undo last plant · Z`, pressing `Z` removes the tower and refunds its full cost, and local browser warnings/errors remain empty.
+- Source gates after the pass: 142 tests, typecheck, lint, auth invariant, production build, `git diff --check`, and the required web-game Playwright choreography (two iterations) pass.
+
 ## 2026-09-06 — upgrade pass
 
 - Baseline: `main` is clean at `dc1321f`; the current shipped build already includes the campaign route rail, threat forecast, tower intel, and live wave progress HUD.

@@ -714,8 +714,8 @@ export function Emberline() {
                   ["1–8", "Pick a packet. Pike unseals after Keep Stair; Cinder after River Ford."],
                   ["Click a creep", "Mark it. Towers focus and hit 18% harder. Beats a knave dodge."],
                   ["K scout", "Once a wave, mark the toughest body on the road."],
-                  ["Q / E / R", "Forge damage, rate, or reach. Highest sets the form. X sell. Z undo."],
-                  ["H / M / S", "Horn burns the road. Mend the keep. Stall after a wave."],
+                  ["Q / E / R (ready)", "Forge damage, rate, or reach. Highest sets the form. X sells; Z undoes the last plant."],
+                  ["H / M / S / R (wave)", "Horn burns the road. R launches Scout Flare. Mend the keep; Stall opens between waves."],
                   ["Space / P / F", "Send the wave. Pause. Cycle 1× / 2× / 3×."],
                   ["Line two", "Same kind +10% rate. Bonds: Windcut, Ashring, Stormroot, Brand."],
                   ["Rites", "At the brief: spare purse, spare timber, or first ember."],
@@ -1184,8 +1184,15 @@ export function Emberline() {
                 </div>
               )}
               {hud.canUndo && (
-                <button type="button" className="text-[11px] text-copper" onClick={() => engine.undoLast()}>
-                  Undo last plant
+                <button
+                  type="button"
+                  className="text-[11px] text-copper"
+                  aria-keyshortcuts="Z"
+                  aria-label="Undo last plant; press Z while it is briefly available"
+                  title="Undo last plant (Z, briefly available)"
+                  onClick={() => engine.undoLast()}
+                >
+                  Undo last plant · Z
                 </button>
               )}
             </div>
