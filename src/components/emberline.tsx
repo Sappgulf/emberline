@@ -79,6 +79,9 @@ export function Emberline() {
   const campaignTriggerRef = useRef<HTMLButtonElement>(null);
   const codexTriggerRef = useRef<HTMLButtonElement>(null);
   const hallTriggerRef = useRef<HTMLButtonElement>(null);
+  const titleHelpTriggerRef = useRef<HTMLButtonElement>(null);
+  const headerHelpTriggerRef = useRef<HTMLButtonElement>(null);
+  const helpRestoreRef = useRef<{ current: HTMLButtonElement | null }>(headerHelpTriggerRef);
   const hud = useHud();
   const [cell, setCell] = useState(40);
   const [hoverCell, setHoverCell] = useState<HoverCell | null>(null);
@@ -113,7 +116,9 @@ export function Emberline() {
   );
 
   const restoreOverlayTrigger = useCallback((target: { current: HTMLButtonElement | null }) => {
-    window.requestAnimationFrame(() => target.current?.focus());
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => target.current?.focus({ preventScroll: true }));
+    });
   }, []);
   const closeCampaign = useCallback(() => {
     engine.toggleCampaign();
@@ -126,6 +131,14 @@ export function Emberline() {
   const closeHall = useCallback(() => {
     engine.toggleHall();
     restoreOverlayTrigger(hallTriggerRef);
+  }, [restoreOverlayTrigger]);
+  const openHelp = useCallback((target: { current: HTMLButtonElement | null }) => {
+    helpRestoreRef.current = target;
+    engine.toggleHelp();
+  }, []);
+  const closeHelp = useCallback(() => {
+    engine.toggleHelp();
+    restoreOverlayTrigger(helpRestoreRef.current);
   }, [restoreOverlayTrigger]);
   useEffect(() => {
     if (hud.phase === "ready") readyActionRef.current?.focus({ preventScroll: true });
@@ -180,15 +193,22 @@ export function Emberline() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "?" || e.key === "/") {
         e.preventDefault();
+        helpRestoreRef.current = engine.phase === "title" ? titleHelpTriggerRef : headerHelpTriggerRef;
         engine.toggleHelp();
         return;
       }
       if (engine.help) {
-        if (e.key === "Escape") engine.toggleHelp();
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeHelp();
+        }
         return;
       }
       if (engine.hall) {
-        if (e.key === "Escape") engine.toggleHall();
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeHall();
+        }
         return;
       }
       if (engine.codex) {
@@ -251,7 +271,7 @@ export function Emberline() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeCampaign, closeCodex]);
+  }, [closeCampaign, closeCodex, closeHall, closeHelp]);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -478,7 +498,8 @@ export function Emberline() {
             type="button"
             className="pressable packet px-2 py-1 text-[10px] text-dust"
             aria-label="How to watch"
-            onClick={() => engine.toggleHelp()}
+            ref={headerHelpTriggerRef}
+            onClick={() => openHelp(headerHelpTriggerRef)}
           >
             ?
           </button>
@@ -748,7 +769,7 @@ export function Emberline() {
           )}
 
           {hud.help && (
-            <Overlay kicker="Orders" title="How to watch" close="Close" onClose={() => engine.toggleHelp()} size="wide">
+            <Overlay kicker="Orders" title="How to watch" close="Close" onClose={closeHelp} size="wide">
               <div className="orders-grid w-full text-left">
                 {[
                   ["1–8", "Pick a packet. Pike unseals after Keep Stair; Cinder after River Ford."],
@@ -757,7 +778,8 @@ export function Emberline() {
                   ["Q / E / R (ready)", "Forge damage, rate, or reach. Highest sets the form. X sells; Z undoes the last plant."],
                   ["H / M / S / R (wave)", "Horn burns the road. R launches Scout Flare. Mend the keep; Stall opens between waves."],
                   ["Space / P / F", "Send the wave. Pause. Cycle 1× / 2× / 3×."],
-                  ["Line two", "Same kind +10% rate. Bonds: Windcut, Ashring, Stormroot, Brand."],
+                  ["Pairing", "Two of one kind beside each other fire 10% faster."],
+                  ["Bonds", "Pair Bow + Frost, Mortar + Ward, Spark + Bramble, or Pike + Cinder for +8% power."],
                   ["Rites", "At the brief: spare purse, spare timber, or first ember."],
                   ["Omens", "Some waves carry an omen. Read the forecast before you send."],
                   ["Camp", "After a road, choose a preparation for the next one."],
@@ -875,7 +897,7 @@ export function Emberline() {
                     <button ref={codexTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleCodex()}>
                       Bestiary
                     </button>
-                    <button type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => engine.toggleHelp()}>
+                    <button ref={titleHelpTriggerRef} type="button" className="pressable stamp min-h-11 px-5 text-sm text-dust" onClick={() => openHelp(titleHelpTriggerRef)}>
                       Orders
                     </button>
                     <button ref={hallTriggerRef} type="button" className="pressable stamp hall-trigger min-h-11 px-5 text-sm text-copper" onClick={() => engine.toggleHall()}>

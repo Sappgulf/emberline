@@ -1,5 +1,16 @@
 Original prompt: ok keep working. more upgrades across the game
 
+## 2026-09-15 — overlay focus and Orders clarity pass
+
+- Fixed: Escape now closes Watch hall through its focus-restoring callback instead of bypassing the trigger; title Orders and the in-board `?` Help opener now restore focus correctly after both Escape and visible Close.
+- Improved: the shared overlay restoration waits for conditional title surfaces to remount before focusing, covering modal flows whose opener is temporarily removed from the DOM.
+- Improved: Orders now separates same-kind Pairing (`+10%` rate) from named Bonds (`+8%` power) so the help surface teaches the actual adjacency rules without the former vague “Line two” label.
+- Verified at exact local Chrome 390×844: Watch hall returned focus to `Watch hall`, title Orders returned focus to `Orders`, live Help returned focus to `How to watch` for both close paths, Pairing and Bonds labels rendered, and page error/warning arrays were empty.
+- Visually inspected: `/tmp/emberline-orders-390.png` shows the readable mobile Orders overlay with the new Pairing/Bonds cards; `/tmp/emberline-help-focus-390.png` shows the unobstructed live board and command deck after closing Help.
+- Verified the required web-game Playwright choreography for two iterations and inspected refreshed title/board screenshots and state JSON; no app error artifact was present.
+- Source gates: 142/142 tests, typecheck, lint, auth invariant, production build, and `git diff --check` passed. `npm run test:scripts` remains 193/197 because four fixture-contract tests require unavailable `.grok/skills/og/SKILL.md` and `.grok/skills/og/references` paths.
+- Limitation: exact viewport coverage used installed local Chrome because the in-app browser has no viewport override; this is browser proof, not physical-device touch, Safari, battery, or hardware performance proof.
+
 ## 2026-09-15 — mobile action reachability and short-portrait deck finish
 
 - Fixed: Campaign route selection and Night market/roadside-stall overlays now use the existing action dock, so long route and shop content scrolls independently while `Begin The Low Road`, `March on`, or `Back to the road` stays reachable at the bottom of the viewport.
