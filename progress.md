@@ -16,6 +16,14 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified in the live in-app browser: Orders shows the corrected ready/wave rows, a fresh plant exposes `Undo last plant · Z`, pressing `Z` removes the tower and refunds its full cost, and local browser warnings/errors remain empty.
 - Source gates after the pass: 142 tests, typecheck, lint, auth invariant, production build, `git diff --check`, and the required web-game Playwright choreography (two iterations) pass.
 
+## 2026-09-15 — mobile playfield scale pass
+
+- Fixed: on phones, selecting a tower no longer shrinks the 13×9 board; the live playfield owns an aspect-ratio-stable row while the command deck handles its own overflow.
+- Improved: the eight-packet tray is a horizontal touch rail with snap points, and short phones scroll the control deck without moving the board out from under the player.
+- Verified locally with exact Playwright fallback at 390×844 and 320×568: title → brief → ready → placement → active wave, selected-tower board stays about 351×243 / 284×198, no horizontal overflow, the mobile packet rail has scrollable content, and browser error arrays are empty.
+- Verified with the required web-game choreography after each CSS change (two iterations per change); screenshots and state artifacts are refreshed under `output/web-game`.
+- Limitation: exact phone validation used the installed local Chrome fallback because the in-app browser does not expose a viewport override; this is browser evidence, not physical-device or battery proof.
+
 ## 2026-09-06 — upgrade pass
 
 - Baseline: `main` is clean at `dc1321f`; the current shipped build already includes the campaign route rail, threat forecast, tower intel, and live wave progress HUD.

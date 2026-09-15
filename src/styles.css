@@ -4762,3 +4762,67 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* Mobile watch deck: keep the board at a playable scale while the command
+   surface grows around selected-tower details and touch controls. */
+@media (max-width: 640px) {
+  .game-shell[data-phase="ready"],
+  .game-shell[data-phase="wave"] {
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  .playfield-shell-live {
+    flex: 0 0 auto;
+    grid-template-rows: auto auto;
+  }
+
+  .playfield-shell-live .playfield-wrap {
+    height: auto;
+    aspect-ratio: 13 / 9;
+  }
+
+  .game-shell[data-phase="ready"] > .tray,
+  .game-shell[data-phase="wave"] > .tray {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-width: thin;
+  }
+
+  .tray .packet-row {
+    display: flex;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    gap: 0.28rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 0.08rem 0.06rem 0.28rem;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+  }
+
+  .tray .packet-row .packet {
+    flex: 0 0 4.2rem;
+    width: 4.2rem;
+    scroll-snap-align: start;
+  }
+
+  .selected-tower-bar > button[aria-keyshortcuts="Z"] {
+    min-height: 1.25rem;
+    padding: 0 0.2rem;
+    font-size: 8px !important;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 360px) {
+  .tray .packet-row .packet {
+    flex-basis: 3.85rem;
+    width: 3.85rem;
+  }
+}
