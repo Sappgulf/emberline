@@ -1608,7 +1608,11 @@ export function Emberline() {
               );
             })}
           </div>
-          <div className="command-row flex flex-wrap items-center gap-1">
+          <div
+            className="command-row flex flex-wrap items-center gap-1"
+            role="group"
+            aria-label="Watch commands"
+          >
             <button
               type="button"
               className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust"

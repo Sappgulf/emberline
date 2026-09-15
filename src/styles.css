@@ -5498,3 +5498,35 @@
     min-height: 40px;
   }
 }
+
+/* Very narrow portrait phones: keep the primary send action pinned while
+   secondary commands stay touch-sized and scroll horizontally as a group. */
+@media (orientation: portrait) and (max-width: 380px) and (max-height: 720px) {
+  .tray .command-row {
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-right: 0.16rem;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+  }
+
+  .tray .command-row > button:not(.command-send) {
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    scroll-snap-align: start;
+  }
+
+  .tray .command-row .command-send {
+    position: sticky;
+    top: 0.12rem;
+    right: 0.16rem;
+    z-index: 2;
+    flex: 0 0 4.15rem;
+    width: 4.15rem;
+    min-width: 4.15rem;
+    padding-inline: 0.12rem !important;
+    background: linear-gradient(180deg, rgba(224, 120, 56, 0.98), rgba(139, 61, 34, 0.98));
+  }
+}

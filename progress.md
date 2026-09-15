@@ -1,5 +1,14 @@
 Original prompt: ok keep working. more upgrades across the game
 
+## 2026-09-15 — narrow-phone command rail polish
+
+- Fixed: short portrait phones no longer compress Aim, Pace, Scout, Horn, Flare, Stall, and Mend into sub-44px controls; utility commands now scroll as a touch-sized rail while `Send wave` stays pinned at the trailing edge.
+- Improved: the command surface is exposed as a labeled `Watch commands` group, and the send action keeps its position while the secondary rail scrolls to later controls.
+- Verified at exact 320×568 and 360×640: utility controls are 44px wide, the send action remains visible before and after horizontal scrolling, Aim cycles from First to Last, Send wave enters `wave`, document overflow is false, and console/page errors are empty.
+- Responsive regression verified at 390×844, 667×375, and 1280×800: rite radios remain present, command text is not clipped, the send action stays inside the viewport, and document overflow remains false.
+- Required web-game Playwright choreography passed two iterations after the final CSS correction; refreshed title/board screenshots and state artifacts contain no error artifact.
+- Limitation: exact viewport coverage uses installed local Chrome because the in-app browser has no viewport override; physical touch, Safari, battery, and hardware GPU proof remain outside this pass.
+
 ## 2026-09-15 — briefing rite accessibility and full regression pass
 
 - Fixed: tapping a creep now publishes a transient `Marked …` / `Unmarked …` status in addition to the canvas float/ring, so manual target selection is visible and announced through the existing HUD status path.
