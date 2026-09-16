@@ -69,6 +69,10 @@ export const sfx = {
     beep(460, 0.08, "sine", 0.04, 180);
     setTimeout(() => beep(720, 0.12, "triangle", 0.04, 100), 55);
   },
+  focus: () => {
+    beep(540, 0.06, "sine", 0.035, 120);
+    setTimeout(() => beep(780, 0.1, "triangle", 0.035, 80), 45);
+  },
   hit: () => {
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     if (now - lastHit < 45) return;

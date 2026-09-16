@@ -141,6 +141,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   }
   drawLines(ctx, engine, cell);
   drawHover(ctx, engine, cell);
+  const focus = engine.focusSnapshot();
 
   actorCount = 0;
   for (const prop of engine.props) actor(prop.r + 0.55, -1, 0).prop = prop;
@@ -153,7 +154,16 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     const slot = actorSlots[actorOrder[i]];
     if (slot.type === 0 && slot.prop) drawProp(ctx, slot.prop.c, slot.prop.r, slot.prop.kind, cell, engine.time);
     else if (slot.type === 1 && slot.tower) drawTower(ctx, slot.tower, cell, slot.tower.id === engine.selectedId, engine.time, !engine.reducedMotion);
-    else if (slot.creep) drawCreep(ctx, slot.creep, cell, engine.path.length, slot.creep.id === engine.markedId, engine.time);
+    else if (slot.creep)
+      drawCreep(
+        ctx,
+        slot.creep,
+        cell,
+        engine.path.length,
+        slot.creep.id === engine.markedId,
+        engine.time,
+        focus?.id === slot.creep.id,
+      );
   }
 
   for (const burn of engine.burns) {
@@ -1106,7 +1116,15 @@ function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, se
   ctx.restore();
 }
 
-function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pathLen: number, marked = false, time = 0) {
+function drawCreep(
+  ctx: CanvasRenderingContext2D,
+  creep: Creep,
+  cell: number,
+  pathLen: number,
+  marked = false,
+  time = 0,
+  focused = false,
+) {
   const px = creep.x * cell;
   const py = creep.y * cell;
   const fade = creep.alive ? 1 : Math.max(0, creep.death / 0.28);
@@ -1239,6 +1257,30 @@ function drawCreep(ctx: CanvasRenderingContext2D, creep: Creep, cell: number, pa
     ctx.beginPath();
     ctx.arc(0, -size * 0.12, size * 1.15, 0, Math.PI * 2);
     ctx.fill();
+  }
+  if (creep.markedT > 0 && creep.alive) {
+    ctx.strokeStyle = COPPER;
+    ctx.lineWidth = Math.max(1.4, cell * 0.028);
+    ctx.globalAlpha = 0.66 + Math.sin(time * 7 + creep.progress * 3) * 0.16;
+    ctx.setLineDash([size * 0.34, size * 0.24]);
+    ctx.lineDashOffset = time * -cell * 0.3;
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.1, size * 1.78, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = fade;
+  }
+  if (focused && creep.alive) {
+    ctx.strokeStyle = PARCHMENT;
+    ctx.lineWidth = Math.max(1.6, cell * 0.035);
+    ctx.globalAlpha = 0.72 + Math.sin(time * 8) * 0.12;
+    ctx.setLineDash([size * 0.52, size * 0.26]);
+    ctx.lineDashOffset = time * -cell * 0.42;
+    ctx.beginPath();
+    ctx.arc(0, -size * 0.1, size * 2.08, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = fade;
   }
   if (marked && creep.alive) {
     ctx.strokeStyle = EMBER;

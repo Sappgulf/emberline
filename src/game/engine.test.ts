@@ -5,6 +5,8 @@ import {
   CREEPS,
   FLARE_BONUS,
   FLARE_COST,
+  FOCUS_BONUS,
+  FOCUS_DURATION,
   START_GOLD,
   START_LIVES,
   HARD_LIVES,
@@ -930,6 +932,64 @@ describe("creep stats", () => {
 });
 
 describe("watch depth", () => {
+  it("lets a tap focus fire before aim, reports the order, and expires it", () => {
+    const e = play();
+    e.gold = 400;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    tower.aim = "strong";
+    tower.volley = false;
+    e.phase = "wave";
+    e.spawn("grub");
+    e.spawn("shaman");
+    const targetCell = { c: grass.c < COLS - 1 ? grass.c + 1 : grass.c - 1, r: grass.r };
+    const grub = e.creeps.find((creep) => creep.kind === "grub")!;
+    const shaman = e.creeps.find((creep) => creep.kind === "shaman")!;
+    grub.x = targetCell.c + 0.5;
+    grub.y = targetCell.r + 0.5;
+    shaman.x = targetCell.c + 1.5;
+    shaman.y = targetCell.r + 0.5;
+    shaman.progress = 5;
+
+    e.tapCell(targetCell.c, targetCell.r);
+
+    assert.equal(e.hud().focus?.id, grub.id);
+    assert.equal(e.pickTarget(tower)?.id, grub.id);
+    const snapshot = JSON.parse(e.renderText()) as {
+      focus: { id: number; bonus: number };
+      creeps: Array<{ id: number; focused: boolean }>;
+    };
+    assert.deepEqual(snapshot.focus, {
+      id: grub.id,
+      name: "Grubs",
+      kind: "grub",
+      seconds: FOCUS_DURATION,
+      bonus: FOCUS_BONUS,
+    });
+    assert.equal(snapshot.creeps.find((creep) => creep.id === grub.id)?.focused, true);
+
+    e.focusId = -1;
+    e.focusT = 0;
+    e.fire(tower, grub);
+    const normalDamage = e.shots.at(-1)!.damage;
+    e.shots = [];
+    e.focusId = grub.id;
+    e.focusT = FOCUS_DURATION;
+    e.fire(tower, grub);
+    const focusedDamage = e.shots.at(-1)!.damage;
+    assert.ok(Math.abs(focusedDamage / normalDamage - (1 + FOCUS_BONUS)) < 1e-9);
+
+    e.tapCell(targetCell.c, targetCell.r);
+    assert.equal(e.hud().marked?.kind, "grub");
+    e.towers = [];
+    e.hitstop = 0;
+    e.focusT = 1 / 120;
+    e.tick(1 / 60);
+    assert.equal(e.focusId, -1);
+    assert.equal(e.hud().focus, null);
+  });
+
   it("marks a creep so towers prefer it over aim", () => {
     const e = play();
     e.gold = 400;

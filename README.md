@@ -23,7 +23,8 @@ Open `http://localhost:8080`. `npm test` covers the watch engine (build, waves, 
 - **Scout:** Once a wave, K marks the toughest body.
 - **Lines:** Pair adjacent Bow + Frost (Windcut), Mortar + Ward (Ashring), Spark + Bramble (Stormroot), or Pike + Cinder (Brand) for +8% damage to both. Two of the same kind beside each other fire 10% faster.
 - **Sets:** Relic pairs unlock set bonuses — Winter vigil, Forge fire, Watchlight, Keepfield, and Bounty belt.
-- **Mark:** Tap a creep. Towers in range focus it and hit 18% harder.
+- **Focus fire:** Tap a live creep during a wave. Towers prioritize it and hit 10% harder for four seconds; tap again to apply the stronger manual Mark priority.
+- **Mark:** Tap the focused creep again, press K for the scout's toughest target, or use Scout Flare for a four-second road-wide damage window.
 - **Hard watch:** 14 lives, tougher creeps, richer bounties. Shells splinter into a grub. Three hounds run as a pack.
 - **Forge:** Damage, Rate, or Reach. Highest of the three is the form: Timber → Bound → Tempered → Crowned.
 - **Emberlit:** At Crowned, choose one of two awakenings for each tower (C key ability, two branch buttons).

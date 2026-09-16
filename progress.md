@@ -1,5 +1,14 @@
 Original prompt: ok keep working. more upgrades across the game
 
+## 2026-09-16 — focus-fire combat and title atmosphere pass
+
+- Completed: tapping a live creep during a wave now creates a four-second Focus fire order; towers prioritize that target and deal +10% power, with a second tap escalating it to the stronger manual Mark priority.
+- Completed: exposed the focus target, bonus, timer, and per-creep `focused` state through the HUD and `renderText()` contract; added a parchment focus ring, focus banner, announcer cue, status chip, Watch Desk card, aria guidance, and updated Orders/README copy.
+- Completed: generated a new text-free dusk watch panorama with built-in imagegen, preserved the prompt/provenance note, and shipped WebP-first `menu-backdrop-v4` assets with a PNG fallback for title and mobile shell surfaces.
+- Verified: 143/143 source tests, typecheck, lint, auth invariant, production build, and `git diff --check` pass. `npm run test:scripts` is 193/197 because four pre-existing fixture-contract tests require unavailable `.grok/skills/og/SKILL.md` and `.grok/skills/og/references` paths.
+- Verified with the installed local Chrome Playwright fallback at exact 320×568, 390×844, 667×375, 844×390, and 1280×720: eight packets render, selected-tower actions remain reachable, document geometry has no horizontal or vertical overflow, the desktop and phone focus states show the target ring/status chip, and browser errors/warnings are empty.
+- Limitation: the requested game-dev CLI is not installed in this environment, so sealed game-dev capture, asset-vendoring receipts, and hardware performance proof remain unavailable; the browser evidence is local Chrome proof, not physical touch, Safari, battery, or GPU proof.
+
 ## 2026-09-15 — title CTA focus polish
 
 - Found: the shared title overlay focused the optional Hard watch checkbox first, so keyboard and assistive-technology users entered the game on a setting instead of the primary action.

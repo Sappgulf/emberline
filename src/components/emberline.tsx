@@ -448,6 +448,9 @@ export function Emberline() {
       : hud.flareCd > 0
         ? `${Math.ceil(hud.flareCd)}s`
         : `${hud.flareCost}g`;
+  const focusReadout = hud.focus
+    ? `Focus fire · ${hud.focus.name} · +${Math.round(hud.focus.bonus * 100)}% · ${Math.ceil(hud.focus.seconds)}s`
+    : null;
   const stallHint =
     hud.wave < 1
       ? "Stall opens after the first wave"
@@ -623,7 +626,7 @@ export function Emberline() {
           <canvas
             ref={canvasRef}
             className={`stage-frame touch-none xl:max-h-full ${hud.selectedKind ? "cursor-crosshair" : "cursor-pointer"}`}
-            aria-label="Emberline tower defense board. Use number keys to choose a tower, click grass beside the road to plant it, or tap a creep during a wave to mark it."
+            aria-label="Emberline tower defense board. Use number keys to choose a tower, click grass beside the road to plant it, or tap an enemy during a wave to focus fire; tap again to mark it."
             tabIndex={0}
             onPointerMove={onMove}
             onPointerDown={(e) => {
@@ -681,6 +684,15 @@ export function Emberline() {
               <span className="streak-chip-kicker">Momentum</span>
               <strong>{hud.streak} streak</strong>
               <span>Every pair pays +3g</span>
+            </div>
+          )}
+          {playing && hud.focus && (
+            <div className="focus-chip" role="status" aria-live="polite">
+              <span className="focus-chip-kicker">Focus fire</span>
+              <strong>{hud.focus.name}</strong>
+              <span>
+                +{Math.round(hud.focus.bonus * 100)}% power · {Math.ceil(hud.focus.seconds)}s
+              </span>
             </div>
           )}
           {playing && hud.boss && (
@@ -920,7 +932,7 @@ export function Emberline() {
             <div className="orders-grid w-full text-left">
               {[
                 ["1–8", "Pick a packet. Pike unseals after Keep Stair; Cinder after River Ford."],
-                ["Click a creep", "Mark it. Towers focus and hit 18% harder. Beats a knave dodge."],
+                ["Click a creep", "Focus fire for four seconds. Tap again to mark it for a stronger priority."],
                 ["K scout", "Once a wave, mark the toughest body on the road."],
                 [
                   "Q / E / R (ready)",
@@ -1040,7 +1052,7 @@ export function Emberline() {
             <div className="keep-book">
               <div className="keep-main">
                 <p className="keep-lead">
-                  Plant on grass. Forge damage, rate, or reach. Tap a creep to mark it. Hold{" "}
+                  Plant on grass. Forge damage, rate, or reach. Tap an enemy to focus fire. Hold{" "}
                   {hud.mapTotal} roads until dawn.
                 </p>
                 <label className="keep-hard">
@@ -1162,8 +1174,8 @@ export function Emberline() {
                   <li>
                     <b>3</b>
                     <span>
-                      <strong>Send and mark</strong>
-                      <small>K scouts the toughest. Horn if it frays.</small>
+                      <strong>Send and focus</strong>
+                      <small>Tap a body to focus fire; K marks the toughest. Horn if it frays.</small>
                     </span>
                   </li>
                 </ol>
@@ -1570,7 +1582,7 @@ export function Emberline() {
             ) : playing && hud.phase === "ready" ? (
               `Next: ${hud.nextWave}`
             ) : hud.phase === "wave" ? (
-              "Tap a creep to mark it. Towers focus and hit 18% harder."
+              focusReadout ?? "Tap an enemy to focus fire. Tap again to mark it for +18% power."
             ) : (
               "Pick a packet, plant on grass beside the road."
             )}
@@ -2173,6 +2185,15 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
             {hud.marked.hp}/{hud.marked.maxHp} hp · leak {hud.marked.leak}
             {hud.marked.low ? " · low air" : hud.marked.flying ? " · air" : ""}
             {hud.marked.dodge ? " · first dodge" : ""}
+          </p>
+        </section>
+      )}
+      {hud.focus && (
+        <section className="desk-card desk-focus">
+          <span className="intel-kicker">Focus fire</span>
+          <strong>{hud.focus.name}</strong>
+          <p>
+            +{Math.round(hud.focus.bonus * 100)}% tower power · {Math.ceil(hud.focus.seconds)}s remaining
           </p>
         </section>
       )}
