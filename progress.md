@@ -8,6 +8,8 @@ Original prompt: ok keep working. more upgrades across the game
 - Verified: 143/143 source tests, typecheck, lint, auth invariant, production build, and `git diff --check` pass. `npm run test:scripts` is 193/197 because four pre-existing fixture-contract tests require unavailable `.grok/skills/og/SKILL.md` and `.grok/skills/og/references` paths.
 - Verified with the installed local Chrome Playwright fallback at exact 320×568, 390×844, 667×375, 844×390, and 1280×720: eight packets render, selected-tower actions remain reachable, document geometry has no horizontal or vertical overflow, the desktop and phone focus states show the target ring/status chip, and browser errors/warnings are empty.
 - Limitation: the requested game-dev CLI is not installed in this environment, so sealed game-dev capture, asset-vendoring receipts, and hardware performance proof remain unavailable; the browser evidence is local Chrome proof, not physical touch, Safari, battery, or GPU proof.
+- Ship: runtime commit `2a646fc` (`Add player focus fire and title art`) is pushed to `origin/main`; Vercel production deployment `dpl_F7dsLDmJhCLUVY6ETTYd9KahvjKC` is READY at https://emberline-xi.vercel.app.
+- Live smoke: the production title resolves `menu-backdrop-v4.webp` with HTTP 200, and the 1280×720 title → watch → plant → wave → focus path reports `FOCUS FIRE / Grubs / +10% power · 4s`, a 585×405 board, no document overflow, and zero browser errors or warnings.
 
 ## 2026-09-15 — title CTA focus polish
 
