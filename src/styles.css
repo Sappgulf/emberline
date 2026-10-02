@@ -5752,3 +5752,32 @@
     background: linear-gradient(180deg, rgba(224, 120, 56, 0.98), rgba(139, 61, 34, 0.98));
   }
 }
+
+/* Gate arrivals share the forecast's quiet disclosure language. */
+.arrival-plan { border-top: 1px solid #d4a05444; margin-top: 6px; }
+.arrival-plan > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  cursor: pointer;
+  list-style: none;
+  color: var(--color-parchment);
+  font-size: 10px;
+}
+.arrival-plan > summary::-webkit-details-marker { display: none; }
+.arrival-plan > summary > span:first-child::before { content: "+ "; color: var(--color-copper); }
+.arrival-plan[open] > summary > span:first-child::before { content: "− "; }
+.arrival-plan > summary > span:last-child { color: var(--color-copper); font-size: 9px; }
+.arrival-plan > summary:focus-visible { outline: 2px solid #efbb65; outline-offset: 2px; border-radius: 3px; }
+.arrival-entries { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.arrival-entries li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 6px; align-items: center; text-align: left; }
+.arrival-entries img { width: 26px; height: 26px; object-fit: contain; }
+.arrival-entries strong { display: block; color: var(--color-parchment); font-size: 10px; font-weight: 500; }
+.arrival-entries small { display: block; color: var(--color-dust); font-size: 8px; margin-top: 2px; }
+.arrival-time { color: var(--color-copper); font-size: 10px; font-variant-numeric: tabular-nums; }
+.arrival-note { color: var(--color-dust); font-size: 9px; line-height: 1.4; margin: 8px 0; }
+@media (max-height: 600px) and (orientation: landscape) {
+  .threat-panel .arrival-plan { display: none; }
+}

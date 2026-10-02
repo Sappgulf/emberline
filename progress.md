@@ -421,3 +421,10 @@ Original prompt: ok keep working. more upgrades across the game
 - Added focused health/armor/status readouts, status-aware enemy bars, and actual near-keep lives-at-risk feedback. Added generated four-frame runner gallops and cached ash terrain for Ember Copse/Ash Hollow; PNG originals and exact prompts are retained in `art/imagegen/watch-upgrade-v2.md`.
 - Fixed responsive grids for the ninth command and extended browser regression coverage. Added a release smoke script using normal gameplay in fresh sessions and delivered art hashes, with no test save seeding.
 - All 178 source tests, typecheck, lint, production build, auth invariant, and diff checks pass. The required web-game client reached combat in two production-preview screenshot/state iterations. The 17-case browser audit passes; release verification and limits are documented in `docs/game-upgrade-2026-10-02.md`.
+
+## 2026-10-02 — gate arrival forecasts and projectile status timing
+
+- Reproduced four impact regressions before the fix: roots/bleeding applied at launch, roots ignored resistance, and Kindle could trigger before its setup projectile landed. Shot payloads now capture root/bleed effects and apply them only after a successful impact; selling/changing a tower cannot rewrite a fired shot. Resistant splash targets remain immune.
+- Fixed Bloodthorn's repeated hits delaying its bleed tick and deferred knave dodges after a caught first shot. Added a static bleeding cue and focused status label.
+- Added an Arrival plan to briefing, forecast, and Orders, using authored timings before a wave and the real pending queue during combat. Countdown timing respects simulation speed and pause/menu suspension. Short landscape layouts use Orders for this information.
+- All 189 source tests pass (eleven new), along with typecheck, lint, auth invariant, production build, and diff checks. Responsive browser checks cover native disclosure keys, actual queue freezing, and next-wave forecasts. Findings and limits are in `docs/game-tactics-2026-10-02.md`.

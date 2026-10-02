@@ -238,6 +238,13 @@ function wavePreviewFor(plan: MapDef["waves"][number] | undefined): WavePreviewS
   return plan?.map(({ kind, count }) => ({ kind, count })) ?? [];
 }
 
+export interface ArrivalSnap {
+  kind: CreepKind;
+  count: number;
+  first: number;
+  last: number;
+}
+
 function waveTotalFor(plan: MapDef["waves"][number] | undefined): number {
   return plan?.reduce((sum, entry) => sum + entry.count, 0) ?? 0;
 }
@@ -352,6 +359,8 @@ export interface Shot {
   splash: number;
   slow: number;
   chillMultiplier?: number;
+  rootDuration?: number;
+  bleedDuration?: number;
   ttl: number;
   angle: number;
   pierce: number;
@@ -448,6 +457,7 @@ export interface HudSnap {
   route: RouteNodeSnap[];
   previewWave: number;
   wavePreview: WavePreviewSnap[];
+  arrivals: ArrivalSnap[];
   threatTier: ThreatTier;
   watchOrder: WatchOrderSnap | null;
   campaign: boolean;
@@ -858,6 +868,7 @@ export class EmberEngine {
       danger: hud.danger,
       prey: hud.prey,
       waveDuration: hud.waveDuration,
+      arrivals: hud.arrivals,
       lastResult: hud.lastResult,
       objective: hud.objective,
       watchOrder: hud.watchOrder,
@@ -1078,6 +1089,30 @@ export class EmberEngine {
     return omenFor(this.mapIndex, waveNumber, this.endless);
   }
 
+  arrivalSnapshot(plan: MapDef["waves"][number] | undefined): ArrivalSnap[] {
+    const groups = new Map<CreepKind, ArrivalSnap>();
+    const add = (kind: CreepKind, count: number, first: number, last: number) => {
+      const group = groups.get(kind);
+      if (group) {
+        group.count += count;
+        group.first = Math.min(group.first, first);
+        group.last = Math.max(group.last, last);
+      } else groups.set(kind, { kind, count, first, last });
+    };
+    if (this.phase === "wave") {
+      for (const spawn of this.spawnQ) {
+        const seconds = Math.max(0, spawn.t - this.time);
+        add(spawn.kind, 1, seconds, seconds);
+      }
+    } else {
+      for (const pack of plan ?? []) {
+        if (pack.count > 0)
+          add(pack.kind, pack.count, pack.delay, pack.delay + (pack.count - 1) * pack.gap);
+      }
+    }
+    return [...groups.values()].sort((a, b) => a.first - b.first || a.kind.localeCompare(b.kind));
+  }
+
   buildHud(): HudSnap {
     const t = this.selectedTower();
     const upcoming = this.phase === "wave" ? Math.max(0, this.wave - 1) : this.wave;
@@ -1121,6 +1156,7 @@ export class EmberEngine {
         (prey.chillT ?? 0) > 0 ? "Chilled" : null,
         prey.rootT > 0 ? "Rooted" : null,
         (prey.wardT ?? 0) > 0 ? "Warded" : null,
+        (prey.bleedT ?? 0) > 0 ? "Bleeding" : null,
         prey.hasteT > 0 ? "Hastened" : null,
         prey.dodge ? "Dodge" : null,
       ].filter((status): status is string => status !== null) } : null,
@@ -1216,6 +1252,7 @@ export class EmberEngine {
       }),
       previewWave: previewIndex + 1,
       wavePreview: wavePreviewFor(previewPlan),
+      arrivals: this.arrivalSnapshot(previewPlan),
       thenPreview: wavePreviewFor(this.wavePlan(previewIndex + 1)),
       threatTier: threatTierFor(previewPlan),
       campaign: this.campaignOpen,
@@ -2780,10 +2817,11 @@ export class EmberEngine {
     chillMultiplier = 1,
     allowReactions = true,
   ) {
-    if (!creep.alive) return;
+    if (!creep.alive) return false;
     if (creep.kind === "knave" && creep.dodge) {
       const caught =
-        slow > 0 ||
+        (slow > 0 && !creep.slowResist) ||
+        source === "bramble" ||
         creep.rootT > 0 ||
         creep.markedT > 0 ||
         this.markedId === creep.id ||
@@ -2792,8 +2830,9 @@ export class EmberEngine {
         creep.dodge = false;
         creep.flash = 1;
         this.float(creep.x, creep.y - 0.35, "Dodge", "#e8dcc4");
-        return;
+        return false;
       }
+      creep.dodge = false;
     }
     const reaction = allowReactions ? reactionFor(source, creep, this.time) : null;
     if (reaction) {
@@ -2923,6 +2962,7 @@ export class EmberEngine {
     } else {
       sfx.hit();
     }
+    return true;
   }
 
   spawnSplinter(from: Creep) {
@@ -3090,6 +3130,14 @@ export class EmberEngine {
       sfx.shootSpark();
       return;
     }
+    let rootDuration = 0;
+    if (tower.kind === "bramble" && (form >= 3 || tower.emberlit === "a")) {
+      rootDuration = form >= 4 || tower.emberlit === "a" ? 0.95 : 0.55;
+    } else if (tower.kind === "pike" && (form >= 3 || tower.emberlit === "a" || brace)) {
+      rootDuration = brace ? 1.1 : tower.emberlit === "b" ? 0.8 : form >= 4 ? 0.7 : 0.4;
+    } else if (tower.kind === "frost" && (tower.empowered || tower.emberlit)) {
+      rootDuration = tower.emberlit === "b" ? 0.4 : 0.28;
+    }
     this.shots.push({
       id: this.nextId++,
       kind: tower.kind,
@@ -3103,6 +3151,8 @@ export class EmberEngine {
       speed: def.projectileSpeed,
       damage: dmg,
       splash,
+      rootDuration,
+      bleedDuration: tower.kind === "bramble" && tower.emberlit === "b" ? 3 : 0,
       chillMultiplier: tower.kind === "frost" && tower.emberlit === "b" ? 1.5 : 1,
       slow:
         def.slow *
@@ -3134,26 +3184,7 @@ export class EmberEngine {
     else if (tower.kind === "mortar" || tower.kind === "cinder") sfx.shootMortar();
     else if (tower.kind === "bramble") sfx.shootBramble();
     else sfx.shootFrost();
-    if (tower.kind === "bramble" && (form >= 3 || tower.emberlit === "a")) {
-      target.rootT = Math.max(target.rootT, form >= 4 || tower.emberlit === "a" ? 0.95 : 0.55);
-    }
-    if (tower.kind === "bramble" && tower.emberlit === "b") {
-      target.bleedT = 3;
-      target.bleedTick = 0.5;
-    }
-    if (tower.kind === "bramble" && target.kind === "knave") target.dodge = false;
-    if (tower.kind === "pike" && (form >= 3 || tower.emberlit === "a" || brace)) {
-      target.rootT = Math.max(
-        target.rootT,
-        brace ? 1.1 : tower.emberlit === "b" ? 0.8 : form >= 4 ? 0.7 : 0.4,
-      );
-    }
-    if (tower.kind === "frost" && tower.emberlit === "a" && !target.slowResist) {
-      target.rootT = Math.max(target.rootT, 0.28);
-    }
-    if (tower.kind === "frost" && tower.emberlit === "b" && !target.slowResist) {
-      target.rootT = Math.max(target.rootT, 0.4);
-    }
+
   }
 
   pickTarget(tower: Tower, ignore: Set<number> = new Set()): Creep | null {
@@ -3212,6 +3243,20 @@ export class EmberEngine {
     return best;
   }
 
+  impactDamage(shot: Shot, prey: Creep, quiet = false) {
+    const hit = this.damageCreep(prey, shot.damage, shot.slow, shot.ignoreArmor,
+      quiet, shot.kind, shot.chillMultiplier);
+    if (!hit || !prey.alive) return;
+    const root = shot.rootDuration ?? 0;
+    const bleed = shot.bleedDuration ?? 0;
+    if (!prey.slowResist && root > 0) prey.rootT = Math.max(prey.rootT, root);
+    if (bleed > 0) {
+      // Refresh the lifetime, not the cadence: fast thorns must not starve the first tick.
+      if ((prey.bleedT ?? 0) <= 0) prey.bleedTick = 0.5;
+      prey.bleedT = Math.max(prey.bleedT ?? 0, bleed);
+    }
+  }
+
   impact(shot: Shot, x: number, y: number) {
     const color =
       shot.kind === "frost" ? "#6aa8b4" : shot.kind === "mortar" ? "#e07838" : "#d4a054";
@@ -3233,9 +3278,7 @@ export class EmberEngine {
         const dx = creep.x - x;
         const dy = creep.y - y;
         if (dx * dx + dy * dy <= r2) {
-          this.damageCreep(creep, shot.damage, shot.slow, shot.ignoreArmor, true, shot.kind, shot.chillMultiplier);
-          if (shot.kind === "frost" && shot.empowered && !creep.slowResist)
-            creep.rootT = Math.max(creep.rootT, 0.28);
+          this.impactDamage(shot, creep, true);
         }
       }
       this.trauma = Math.min(1, this.trauma + (shot.kind === "mortar" ? 0.05 : 0.1));
@@ -3263,7 +3306,7 @@ export class EmberEngine {
     const target = this.creeps.find((c) => c.id === shot.targetId && c.alive);
     if (target) {
       shot.hit.add(target.id);
-      this.damageCreep(target, shot.damage, shot.slow, shot.ignoreArmor, false, shot.kind, shot.chillMultiplier);
+      this.impactDamage(shot, target);
     }
     if (shot.pierce > 0) {
       shot.pierce -= 1;

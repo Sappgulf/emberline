@@ -1433,6 +1433,19 @@ function drawCreep(
       ctx.fillRect(px - barW / 2, py - size - 8, barW, 4);
       ctx.fillStyle = creep.hp / creep.maxHp > 0.4 ? ((creep.chillT ?? 0) > 0 ? FROST : "#7a9a58") : BLOOD;
       ctx.fillRect(px - barW / 2, py - size - 8, barW * Math.max(0, creep.hp / creep.maxHp), 4);
+      if ((creep.bleedT ?? 0) > 0) {
+        const bx = px + barW / 2 + 4;
+        const by = py - size - 7;
+        ctx.fillStyle = BLOOD;
+        ctx.strokeStyle = "#efc1a3";
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(bx, by - 4);
+        ctx.quadraticCurveTo(bx + 4, by + 1, bx, by + 3);
+        ctx.quadraticCurveTo(bx - 4, by + 1, bx, by - 4);
+        ctx.fill();
+        ctx.stroke();
+      }
       if (creep.rootT > 0 || (creep.wardT ?? 0) > 0) {
         ctx.fillStyle = creep.rootT > 0 ? "#a4c477" : COPPER;
         ctx.fillRect(px - barW / 2, py - size - 2, barW, 2);

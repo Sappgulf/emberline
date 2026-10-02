@@ -2256,3 +2256,200 @@ describe("rally command and combat ledger", () => {
     assert.equal(text.rally.max, 100);
   });
 });
+
+describe("projectile status timing", () => {
+  function armed(kind: "bramble" | "frost" | "pike", branch: "a" | "b") {
+    const e = play();
+    e.gold = 2000;
+    e.unlocked = MAPS.length;
+    e.chooseKind(kind);
+    const cell = emptyGrass(e);
+    e.tapCell(cell.c, cell.r);
+    const tower = e.towers[0];
+    tower.dmgLvl = 4;
+    tower.emberlit = branch;
+    tower.empowered = true;
+    e.startWave();
+    e.spawnQ = [{ t: 1000, kind: "grub" }];
+    e.spawn("shell");
+    const prey = e.creeps[0];
+    prey.hp = prey.maxHp = 1000;
+    prey.x = cell.c + 1;
+    prey.y = cell.r + 0.5;
+    return { e, tower, prey };
+  }
+
+  it("roots only when Bramble, Pike, and Frost projectiles arrive", () => {
+    for (const kind of ["bramble", "pike", "frost"] as const) {
+      const { e, tower, prey } = armed(kind, "a");
+      e.fire(tower, prey);
+      const shot = e.shots.at(-1)!;
+      assert.equal(prey.rootT, 0, `${kind}: no root while in flight`);
+      assert.equal(prey.hp, 1000);
+      e.impact(shot, prey.x, prey.y);
+      assert.ok(prey.rootT > 0, `${kind}: root on impact`);
+      assert.ok(prey.hp < 1000);
+    }
+  });
+
+  it("captures the status on the shot even if the tower is sold or changed", () => {
+    const { e, tower, prey } = armed("frost", "b");
+    e.fire(tower, prey);
+    const shot = e.shots.at(-1)!;
+    tower.emberlit = "a";
+    e.towers = [];
+    e.impact(shot, prey.x, prey.y);
+    assert.equal(prey.rootT, 0.4);
+  });
+
+  it("does not root resistant prey, including secondary frost splash targets", () => {
+    for (const kind of ["bramble", "pike", "frost"] as const) {
+      const { e, tower, prey } = armed(kind, "a");
+      prey.slowResist = true;
+      e.fire(tower, prey);
+      assert.equal(prey.rootT, 0);
+      if (kind === "frost") {
+        e.spawn("grub");
+        const secondary = e.creeps.at(-1)!;
+        secondary.x = prey.x + 0.1;
+        secondary.y = prey.y;
+        secondary.slowResist = true;
+        e.impact(e.shots.at(-1)!, prey.x, prey.y);
+        assert.equal(secondary.rootT, 0);
+      } else e.impact(e.shots.at(-1)!, prey.x, prey.y);
+      assert.equal(prey.rootT, 0);
+    }
+  });
+
+  it("starts bleeding on impact and refreshes duration without postponing ticks", () => {
+    const { e, tower, prey } = armed("bramble", "b");
+    e.fire(tower, prey);
+    assert.equal(prey.bleedT ?? 0, 0);
+    e.impact(e.shots.at(-1)!, prey.x, prey.y);
+    assert.equal(prey.bleedT, 3);
+    prey.bleedTick = 0.1;
+    e.fire(tower, prey);
+    e.impact(e.shots.at(-1)!, prey.x, prey.y);
+    assert.equal(prey.bleedTick, 0.1);
+    const hp = prey.hp;
+    e.towers = [];
+    e.shots = [];
+    e.step(0.11);
+    assert.ok(prey.hp < hp, "bleeding still ticks under repeated hits");
+  });
+
+  it("catches a knave with Bramble on impact and consumes its first-shot dodge", () => {
+    const { e, tower } = armed("bramble", "a");
+    e.creeps = [];
+    e.spawn("knave");
+    const prey = e.creeps[0];
+    prey.hp = prey.maxHp = 1000;
+    e.fire(tower, prey);
+    assert.equal(prey.dodge, true);
+    e.impact(e.shots.at(-1)!, prey.x, prey.y);
+    assert.equal(prey.dodge, false);
+    assert.ok(prey.hp < 1000);
+    const hp = prey.hp;
+    prey.rootT = 0;
+    e.damageCreep(prey, 10, 0, false, true, "bow");
+    assert.ok(prey.hp < hp, "later arrows do not encounter a deferred first dodge");
+  });
+
+  it("does not apply projectile statuses to dead or dodging targets", () => {
+    const { e, tower, prey } = armed("bramble", "b");
+    e.fire(tower, prey);
+    const shot = e.shots.at(-1)!;
+    prey.alive = false;
+    e.impact(shot, prey.x, prey.y);
+    assert.equal(prey.rootT, 0);
+    assert.equal(prey.bleedT ?? 0, 0);
+    e.spawn("knave");
+    const knave = e.creeps.at(-1)!;
+    knave.slowResist = true;
+    e.impactDamage({ ...shot, kind: "frost", slow: 0.5 }, knave);
+    assert.equal(knave.hp, knave.maxHp);
+    assert.equal(knave.rootT, 0);
+    assert.equal(knave.bleedT ?? 0, 0);
+  });
+
+  it("does not set up Kindle before the root projectile lands", () => {
+    const { e, tower, prey } = armed("bramble", "a");
+    e.fire(tower, prey);
+    e.damageCreep(prey, 10, 0, false, true, "mortar");
+    assert.equal(e.waveReactions, 0);
+    e.impact(e.shots.at(-1)!, prey.x, prey.y);
+    e.damageCreep(prey, 10, 0, false, true, "mortar");
+    assert.equal(e.waveReactions, 1);
+  });
+});
+
+describe("gate arrival forecasts", () => {
+  it("groups authored packs by kind and sorts them by first entry", () => {
+    const e = play();
+    const arrivals = e.arrivalSnapshot([
+      { kind: "shell", count: 2, delay: 4, gap: 2 },
+      { kind: "grub", count: 3, delay: 0, gap: 1 },
+      { kind: "grub", count: 2, delay: 7, gap: 0.5 },
+    ]);
+    assert.deepEqual(arrivals, [
+      { kind: "grub", count: 5, first: 0, last: 7.5 },
+      { kind: "shell", count: 2, first: 4, last: 6 },
+    ]);
+    assert.deepEqual(e.arrivalSnapshot(undefined), []);
+  });
+
+  it("uses the real pending queue during combat, not the full original plan", () => {
+    const e = play();
+    e.startWave();
+    e.time = 10;
+    e.spawnQ = [
+      { t: 14, kind: "shell" }, { t: 9, kind: "grub" },
+      { t: 13, kind: "grub" }, { t: 16, kind: "shell" },
+    ];
+    assert.deepEqual(e.arrivalSnapshot(e.wavePlan(0)), [
+      { kind: "grub", count: 2, first: 0, last: 3 },
+      { kind: "shell", count: 2, first: 4, last: 6 },
+    ]);
+    e.step(0.1);
+    const arrivals = e.arrivalSnapshot(e.wavePlan(0));
+    assert.equal(arrivals[0].count, 1);
+    assert.ok(Math.abs(arrivals[0].first - 2.9) < 1e-9);
+    assert.equal(e.creeps.length, 1);
+    e.spawnQ = [];
+    assert.deepEqual(e.arrivalSnapshot(e.wavePlan(0)), [], "gate clear does not mean road clear");
+    assert.equal(e.creeps[0].alive, true);
+  });
+
+  it("freezes arrival countdowns with pause and reading Orders", () => {
+    const e = play();
+    e.startWave();
+    const before = e.arrivalSnapshot(e.wavePlan(0));
+    e.paused = true;
+    e.tick(1);
+    assert.deepEqual(e.arrivalSnapshot(e.wavePlan(0)), before);
+    e.paused = false;
+    e.help = true;
+    e.tick(1);
+    assert.deepEqual(e.arrivalSnapshot(e.wavePlan(0)), before);
+    e.help = false;
+    e.tick(0.1);
+    assert.notDeepEqual(e.arrivalSnapshot(e.wavePlan(0)), before);
+  });
+
+  it("publishes the next wave plan between waves and clears on retry", () => {
+    const e = play();
+    const plan = e.wavePlan(0)!;
+    assert.equal(e.hud().arrivals.reduce((n, group) => n + group.count, 0),
+      plan.reduce((n, group) => n + group.count, 0));
+    e.startWave();
+    e.spawnQ = [];
+    e.finishWaveIfClear();
+    assert.equal(e.hud().previewWave, 2);
+    assert.equal(e.hud().arrivals.reduce((n, group) => n + group.count, 0),
+      e.wavePlan(1)!.reduce((n, group) => n + group.count, 0));
+    e.retryMap();
+    e.dismissBrief();
+    assert.equal(e.hud().previewWave, 1);
+    assert.deepEqual(JSON.parse(e.renderText()).arrivals, e.hud().arrivals);
+  });
+});

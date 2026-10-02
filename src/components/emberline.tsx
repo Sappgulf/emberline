@@ -956,6 +956,7 @@ export function Emberline() {
                 ],
                 ["K scout", "Once a wave, mark the toughest body on the road."],
                 ["V · Rally", "Kills earn 5 resolve; reactions earn 10. At 100, rally all towers for +25% fire rate for six seconds. Breaches cost 20 resolve. Carry resolve between waves on this road."],
+                ["Arrival plan", "See when each enemy kind enters at the gate. During combat, the countdown uses the actual remaining spawn queue. Times follow game pace and stop with pause or Orders."],
                 ["Battle ledger", "Open the forecast's ledger to compare actual damage and kills by tower kind. Armor, wards, burn damage, and overkill are accounted for."],
                 [
                   "Q / E / R (ready)",
@@ -996,6 +997,7 @@ export function Emberline() {
                 </div>
               ))}
             </div>
+            {playing && <ArrivalPlan hud={hud} />}
             {playing && <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />}
           </Overlay>
         )}
@@ -1239,6 +1241,7 @@ export function Emberline() {
             <FieldNote field={hud.field} markerId={hud.route[hud.mapIndex]?.id} />
             <RitePicker rite={hud.rite} />
             <BriefWave hud={hud} />
+            <ArrivalPlan hud={hud} />
             {firstWatch && <BriefingSteps />}
             <p className="text-[11px] text-dust">Space also takes the watch.</p>
           </Overlay>
@@ -2483,9 +2486,40 @@ function ThreatPanel({
           {uncoveredAir ? hud.airHint : THREAT_NOTE[hud.threatTier]}
         </p>
       </div>
+      <ArrivalPlan hud={hud} />
       <ReactionGuide count={hud.reactions} />
       <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />
     </section>
+  );
+}
+
+function ArrivalPlan({ hud }: { hud: HudSnap }) {
+  const live = hud.phase === "wave";
+  const count = hud.arrivals.reduce((total, group) => total + group.count, 0);
+  return (
+    <details className="arrival-plan">
+      <summary><span>Arrival plan</span><span>{live && count === 0 ? "Gate clear" : `${count} ${live ? "queued" : "incoming"}`}</span></summary>
+      <div className="arrival-plan-body">
+        {count === 0 ? <p className="arrival-note">All prey have entered. Hold the road.</p> : (
+          <ol className="arrival-entries">
+            {hud.arrivals.map(group => {
+              const start = Math.ceil(group.first);
+              const end = Math.ceil(group.last);
+              const time = start === end ? `${start}s` : `${start}–${end}s`;
+              const creep = CREEPS[group.kind];
+              return (
+                <li key={group.kind}>
+                  <img src={spriteUrl(group.kind)} alt="" />
+                  <span><strong>{group.count} {creep.name}</strong><small>{creep.flying ? creep.low ? "Low air" : "Air" : creep.armor > 0 ? "Armored ground" : "Ground"}</small></span>
+                  <span className="arrival-time">{live ? "in " : "at "}{time}</span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        <p className="arrival-note">{live ? "Time until entry at the gate." : "Time after sending the wave."} Times follow game pace; pause and Orders stop the clock.</p>
+      </div>
+    </details>
   );
 }
 

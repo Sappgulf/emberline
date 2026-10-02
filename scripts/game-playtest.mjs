@@ -39,7 +39,7 @@ try {
       if (click) await page.mouse.click(x, y);
       else await page.mouse.move(x, y);
     };
-    await page.goto(url);
+    await page.goto(url, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.render_game_to_text === "function");
     await page.getByRole("button", { name: "Campaign", exact: true }).focus();
     await page.keyboard.press("Space");
@@ -113,12 +113,23 @@ try {
         .scrollIntoViewIfNeeded();
       await page.keyboard.press("Escape");
     }
+    const arrivals = page.locator(".threat-panel .arrival-plan summary");
+    if (await arrivals.isVisible()) {
+      await arrivals.focus();
+      await page.keyboard.press("Space");
+      assert.equal((await state()).phase, "ready", "arrival disclosure keeps native Space behavior");
+      await page.locator(".threat-panel .arrival-entries").waitFor({ state: "visible" });
+      assert.equal((await state()).arrivals.reduce((sum, group) => sum + group.count, 0), 8);
+      await page.screenshot({ path: `output/audit/${id}-arrivals.png` });
+      await page.keyboard.press("Enter");
+    }
     await page.locator(".command-send").scrollIntoViewIfNeeded();
     const sendBounds = await page.locator(".command-send").boundingBox();
     assert.ok(sendBounds && sendBounds.y >= 0 && sendBounds.y + sendBounds.height <= height,
       `${id}: Send wave must stay inside the viewport`);
     await page.locator(".command-send").click();
     assert.equal((await state()).phase, "wave");
+    assert.ok((await state()).arrivals.length > 0);
     let reaction = false;
     for (let i = 0; i < 120; i++) {
       await advance(100);
@@ -133,6 +144,7 @@ try {
     const reading = await state();
     await advance(2000);
     assert.deepEqual((await state()).creeps, reading.creeps, "reading Orders must suspend combat");
+    assert.deepEqual((await state()).arrivals, reading.arrivals, "Orders freezes the actual arrival queue");
     await page.keyboard.press("Escape");
     await page.keyboard.press("p");
     const paused = await state();
@@ -152,6 +164,7 @@ try {
     const held = await state();
     assert.equal(held.phase, "ready");
     assert.ok(held.lastResult.reactions > 0);
+    assert.equal(held.arrivals.reduce((n, group) => n + group.count, 0), 12);
     assert.ok(held.lastResult.ledger.some(entry => entry.source === "mortar"));
     assert.ok(held.lastResult.duration > 0);
     const ledger = page.locator('.threat-panel .battle-ledger summary');
@@ -264,7 +277,7 @@ try {
     page.on("console", (m) => {
       if (m.type() === "error") errors.push(m.text());
     });
-    await page.goto(url);
+    await page.goto(url, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.render_game_to_text === "function");
     const state = () => page.evaluate(() => JSON.parse(window.render_game_to_text()));
     await page.getByRole("button", { name: "Hold the line", exact: true }).click();
@@ -302,7 +315,7 @@ try {
     page.on("console", (m) => {
       if (m.type() === "error") errors.push(m.text());
     });
-    await page.goto(url);
+    await page.goto(url, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.render_game_to_text === "function");
     await page.evaluate(() =>
       localStorage.setItem(
@@ -310,7 +323,7 @@ try {
         JSON.stringify({ unlocked: 8, marks: 10, bestEndless: 4, relics: [] }),
       ),
     );
-    await page.reload();
+    await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.render_game_to_text === "function");
     await page.getByRole("button", { name: /^Watch hall/ }).click();
     await page.getByRole("button", { name: "Walk the Long Night", exact: true }).click();
@@ -345,7 +358,7 @@ try {
         }),
       ),
     );
-    await page.goto(url);
+    await page.goto(url, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => typeof window.render_game_to_text === "function");
     await page.getByRole("button", { name: "Campaign", exact: true }).click();
     await page.locator(".campaign-select button").nth(index).click();

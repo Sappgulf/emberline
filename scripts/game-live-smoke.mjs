@@ -32,6 +32,9 @@ try {
     await page.waitForFunction(() => typeof window.render_game_to_text === "function");
     assert.equal((await state()).phase, "title");
     await page.getByRole("button", { name: "Hold the line", exact: true }).click();
+    await page.locator(".dispatch .arrival-plan summary").click();
+    await page.locator(".dispatch .arrival-entries").waitFor({ state: "visible" });
+    assert.equal((await state()).arrivals.reduce((n, group) => n + group.count, 0), 8);
     await page.getByRole("button", { name: "Take the watch", exact: true }).click();
     await page.keyboard.press("3");
     await cell(1, 4);
@@ -57,6 +60,7 @@ try {
     const paused = await state();
     await advance(1000);
     assert.equal((await state()).rally.seconds, paused.rally.seconds);
+    assert.deepEqual((await state()).arrivals, paused.arrivals);
     const enemy = paused.creeps[0];
     if (enemy) {
       await cell(Math.floor(enemy.x), Math.floor(enemy.y));
@@ -72,6 +76,14 @@ try {
     assert.equal(held.lastResult.rallies, 1);
     assert.equal(held.keep.lives, 20);
     await page.keyboard.press("?");
+    await page.locator(".dispatch .arrival-plan summary").click();
+    await page.locator(".dispatch .arrival-entries").waitFor({ state: "visible" });
+    const reading = await state();
+    await advance(1000);
+    assert.deepEqual((await state()).arrivals, reading.arrivals);
+    await page.locator(".dispatch .arrival-note").scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${output}/${width}x${height}-arrivals.png` });
+    await page.locator(".dispatch .arrival-plan summary").click();
     await page.locator(".dispatch .battle-ledger summary").click();
     await page.locator(".dispatch .ledger-note").waitFor({ state: "visible" });
     await page.screenshot({ path: `${output}/${width}x${height}-ledger.png` });
