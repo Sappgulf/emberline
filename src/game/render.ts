@@ -825,7 +825,8 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
             : "212,160,84";
     ctx.fillStyle = `rgba(${ink},0.08)`;
     ctx.fill();
-    ctx.strokeStyle = `rgba(${ink},0.55)`;
+    ctx.strokeStyle = engine.reachesRoad(selected.c, selected.r, range)
+      ? `rgba(${ink},0.55)` : "rgba(230,125,102,0.85)";
     ctx.lineWidth = 1.6;
     ctx.stroke();
   }
@@ -856,7 +857,8 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   if (ok && engine.selectedKind) {
     const range = engine.placementRange(engine.selectedKind, engine.hoverC, engine.hoverR);
     drawCoverage(ctx, engine, cell, engine.hoverC, engine.hoverR, range);
-    ctx.strokeStyle = "rgba(232,220,196,0.35)";
+    ctx.strokeStyle = engine.reachesRoad(engine.hoverC, engine.hoverR, range)
+      ? "rgba(232,220,196,0.35)" : "rgba(230,125,102,0.85)";
     ctx.beginPath();
     ctx.arc((engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell, range * cell, 0, Math.PI * 2);
     ctx.stroke();
@@ -1760,21 +1762,33 @@ function drawBanner(ctx: CanvasRenderingContext2D, engine: EmberEngine, w: numbe
   if (!engine.banner) return;
   const t = engine.banner.life / engine.banner.max;
   const enter = Math.min(1, (1 - t) * 4.5);
-  const pop = 0.82 + enter * 0.18;
+  const pop = engine.reducedMotion ? 1 : 0.82 + enter * 0.18;
   ctx.save();
   ctx.globalAlpha = Math.min(1, t * 2);
   ctx.translate(w / 2, cell * 0.7);
   ctx.scale(pop, pop);
-  ctx.font = `700 ${Math.max(16, cell * 0.38)}px Fraunces, serif`;
+  const fontSize = Math.max(16, cell * 0.38);
+  ctx.font = `700 ${fontSize}px Fraunces, serif`;
+  const maxWidth = Math.max(1, w - 24);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of engine.banner.text.split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(next).width > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else line = next;
+  }
+  if (line) lines.push(line);
   ctx.textAlign = "center";
   ctx.lineWidth = Math.max(3, cell * 0.09);
   ctx.strokeStyle = "rgba(18,22,15,0.85)";
-  ctx.strokeText(engine.banner.text, 0, 0);
+  lines.forEach((line, i) => ctx.strokeText(line, 0, i * fontSize * 1.2, maxWidth));
   ctx.globalAlpha = Math.min(1, t * 2) * 0.45;
   ctx.fillStyle = EMBER;
-  ctx.fillText(engine.banner.text, 1.5, 1.5);
+  lines.forEach((line, i) => ctx.fillText(line, 1.5, i * fontSize * 1.2 + 1.5, maxWidth));
   ctx.globalAlpha = Math.min(1, t * 2);
   ctx.fillStyle = PARCHMENT;
-  ctx.fillText(engine.banner.text, 0, 0);
+  lines.forEach((line, i) => ctx.fillText(line, 0, i * fontSize * 1.2, maxWidth));
   ctx.restore();
 }

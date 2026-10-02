@@ -447,6 +447,7 @@ export interface HudSnap {
   hero: { who: string; line: string; kind: "horn" | "mend" | "gold" } | null;
   grade: string | null;
   towerAim: Aim;
+  towerSightline: { reachesRoad: boolean; tiles: number } | null;
   codex: boolean;
   canUndo: boolean;
   nextAir: boolean;
@@ -852,11 +853,15 @@ export class EmberEngine {
         })),
       controls: {
         aim: hud.towerAim,
+        aimScope: hud.selectedTower ? "selected" : "new",
+        defaultAim: hud.aim,
         speed: hud.speed,
         paused: hud.paused,
         canUndo: hud.canUndo,
         nextWave: hud.nextWave,
       },
+      sightline: hud.towerSightline,
+      airReadiness: { covered: hud.airCovered, hint: hud.airHint },
       flare: {
         cooldown: Number(hud.flareCd.toFixed(2)),
         marked: this.creeps.filter((creep) => creep.alive && creep.markedT > 0).length,
@@ -1121,6 +1126,7 @@ export class EmberEngine {
       ? Math.max(0, upcoming)
       : Math.min(upcoming, Math.max(0, map.waves.length - 1));
     const previewPlan = this.wavePlan(previewIndex);
+    const airCoverage = this.coversPreview(previewPlan);
     const livePlan = this.wave > 0 ? this.wavePlan(this.wave - 1) : undefined;
     const remaining = this.creeps.filter((c) => c.alive).length + this.spawnQ.length;
     const waveTotal = waveTotalFor(livePlan);
@@ -1219,11 +1225,15 @@ export class EmberEngine {
       hero: this.heroT > 0 ? this.hero : null,
       grade: this.grade,
       towerAim: t?.aim ?? this.aim,
+      towerSightline: t ? {
+        reachesRoad: this.reachesRoad(t.c, t.r, this.sightRange(t)),
+        tiles: this.roadCoverage(t.c, t.r, this.sightRange(t)).length,
+      } : null,
       codex: this.codex,
       canUndo: this.canUndo(),
       nextAir: this.planHasAirAt(previewIndex),
-      airCovered: this.coversPreview(previewPlan).covered,
-      airHint: this.coversPreview(previewPlan).hint,
+      airCovered: airCoverage.covered,
+      airHint: airCoverage.hint,
       sellRefund: t ? this.refundFor(t) : 0,
       muted: this.muted,
       route: MAPS.map((entry, index) => {
@@ -1569,10 +1579,17 @@ export class EmberEngine {
   }
 
   setAim(aim: Aim) {
+    if (!this.playing()) return;
     const t = this.selectedTower();
     if (t) t.aim = aim;
-    this.aim = aim;
+    else this.aim = aim;
     this.notify();
+  }
+
+  cycleAim() {
+    const modes: Aim[] = ["first", "last", "close", "strong"];
+    const current = this.selectedTower()?.aim ?? this.aim;
+    this.setAim(modes[(modes.indexOf(current) + 1) % modes.length]);
   }
 
   toggleCodex() {
@@ -2079,6 +2096,21 @@ export class EmberEngine {
     return covered;
   }
 
+  reachesRoad(c: number, r: number, range: number) {
+    // Creeps travel between tile centers; include range that touches a segment.
+    return this.path.some((point, index) => {
+      const next = this.path[index + 1] ?? point;
+      const dx = next.c - point.c;
+      const dy = next.r - point.r;
+      const length2 = dx * dx + dy * dy;
+      const t = length2 === 0 ? 0 : Math.max(0, Math.min(1,
+        ((c - point.c) * dx + (r - point.r) * dy) / length2));
+      const x = point.c + t * dx - c;
+      const y = point.r + t * dy - r;
+      return x * x + y * y <= range * range;
+    });
+  }
+
   rejectAction(text: string) {
     sfx.deny();
     this.banner = { text, life: 0.9, max: 0.9 };
@@ -2105,10 +2137,11 @@ export class EmberEngine {
     if (!plan || plan.length === 0) return { covered: true, hint: null as string | null };
     const needsHigh = plan.some((entry) => CREEPS[entry.kind].flying && !CREEPS[entry.kind].low);
     const needsLow = plan.some((entry) => CREEPS[entry.kind].low);
-    const hasHigh = this.towers.some((tower) => TOWERS[tower.kind].hitsAir);
-    const hasLow = this.towers.some((tower) => this.strikesLow(tower.kind));
-    if (needsHigh && !hasHigh) return { covered: false, hint: "Plant Bow or Spark" };
-    if (needsLow && !hasLow) return { covered: false, hint: "Plant Mortar or Pike" };
+    const sighted = this.towers.filter((tower) => this.reachesRoad(tower.c, tower.r, this.sightRange(tower)));
+    const hasHigh = sighted.some((tower) => TOWERS[tower.kind].hitsAir);
+    const hasLow = sighted.some((tower) => this.strikesLow(tower.kind));
+    if (needsHigh && !hasHigh) return { covered: false, hint: "Bow or Spark needs road reach" };
+    if (needsLow && !hasLow) return { covered: false, hint: "Mortar or Pike needs road reach" };
     return { covered: true, hint: null as string | null };
   }
 

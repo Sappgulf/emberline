@@ -40,6 +40,12 @@ const AIM_LABEL: Record<Aim, string> = {
   close: "Near",
   strong: "Tough",
 };
+const AIM_DETAIL: Record<Aim, string> = {
+  first: "Nearest the keep",
+  last: "Nearest the gate",
+  close: "Nearest this tower",
+  strong: "Bosses, healers, and tough prey",
+};
 const COUNTER_ORDER: TowerKind[] = [
   "bow",
   "frost",
@@ -81,6 +87,9 @@ function placementMessage(engine: EmberEngine, hud: HudSnap, hover: HoverCell | 
     const reason = hover ? engine.buildReason(hover.c, hover.r) : null;
     if (reason) return reason;
     if (hud.gold < hud.moveCost) return `Need ${hud.moveCost}g to move`;
+    if (hover && hud.selectedTower && !engine.reachesRoad(hover.c, hover.r,
+      engine.sightRange({ ...hud.selectedTower, c: hover.c, r: hover.r })))
+      return "No road in reach · choose a closer tile or forge Reach";
     return hover ? `Move here · ${hud.moveCost}g` : "Move armed · tap a highlighted grass tile";
   }
 
@@ -89,6 +98,8 @@ function placementMessage(engine: EmberEngine, hud: HudSnap, hover: HoverCell | 
     const reason = hover ? engine.buildReason(hover.c, hover.r) : null;
     if (reason) return reason;
     if (hud.gold < def.cost) return `Need ${def.cost}g for ${def.short}`;
+    if (hover && !engine.reachesRoad(hover.c, hover.r, engine.placementRange(hud.selectedKind, hover.c, hover.r)))
+      return "No road in reach · choose a closer tile or forge Reach";
     const coverage = hover
       ? engine.roadCoverage(hover.c, hover.r, engine.placementRange(hud.selectedKind, hover.c, hover.r)).length
       : 0;
@@ -98,16 +109,23 @@ function placementMessage(engine: EmberEngine, hud: HudSnap, hover: HoverCell | 
   }
 
   return hud.selectedTower
-    ? "Tower selected · tap a tower to inspect or choose a packet"
+    ? hud.towerSightline?.reachesRoad
+      ? `${hud.towerSightline.tiles} road tiles in reach · Aim ${AIM_LABEL[hud.towerAim]} · ${AIM_DETAIL[hud.towerAim]}`
+      : "No road in reach · move this tower closer or forge Reach"
     : "Pick a packet · highlighted grass shows safe tiles";
 }
 
 function placementTone(engine: EmberEngine, hud: HudSnap, hover: HoverCell | null) {
   if (hud.phase !== "ready" && hud.phase !== "wave") return "idle";
-  if (!hud.selectedKind && !hud.moving) return "idle";
+  if (!hud.selectedKind && !hud.moving)
+    return hud.towerSightline && !hud.towerSightline.reachesRoad ? "invalid" : "idle";
   const reason = hover ? engine.buildReason(hover.c, hover.r) : null;
   const cost = hud.moving ? hud.moveCost : hud.selectedKind ? TOWERS[hud.selectedKind].cost : 0;
   if (reason || hud.gold < cost) return "invalid";
+  const tower = hud.moving ? hud.selectedTower : null;
+  const range = tower && hover ? engine.sightRange({ ...tower, c: hover.c, r: hover.r })
+    : hud.selectedKind && hover ? engine.placementRange(hud.selectedKind, hover.c, hover.r) : 0;
+  if (hover && !engine.reachesRoad(hover.c, hover.r, range)) return "invalid";
   return hover ? "valid" : "armed";
 }
 
@@ -116,6 +134,7 @@ export function Emberline() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const readyActionRef = useRef<HTMLButtonElement>(null);
   const qualityRef = useRef(1);
+  const paintRef = useRef<() => void>(() => {});
   const campaignTriggerRef = useRef<HTMLButtonElement>(null);
   const codexTriggerRef = useRef<HTMLButtonElement>(null);
   const hallTriggerRef = useRef<HTMLButtonElement>(null);
@@ -204,6 +223,7 @@ export function Emberline() {
         const steps = Math.max(1, Math.round((ms / 1000) * 60));
         for (let i = 0; i < steps; i += 1) engine.tick(1 / 60);
         engine.notify();
+        paintRef.current();
       };
     } catch {
       return;
@@ -355,13 +375,27 @@ export function Emberline() {
     let fastFrames = 0;
     let frameMs = 0;
     let frameCount = 0;
+    const paint = () => {
+      const w = COLS * cell;
+      const h = ROWS * cell;
+      const rawDpr = Math.min(2, window.devicePixelRatio || 1);
+      const areaCap = w * h > 520000 ? 1.5 : 2;
+      const dpr = Math.min(rawDpr, areaCap) * qualityRef.current;
+      if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawWorld(ctx, engine, cell, w, h);
+    };
+    paintRef.current = paint;
     const loop = (now: number) => {
       const dt = (now - last) / 1000;
       frameMs = frameMs === 0 ? dt * 1000 : frameMs * 0.9 + dt * 1000 * 0.1;
       last = now;
       engine.tick(dt);
-      const w = COLS * cell;
-      const h = ROWS * cell;
       frameCount += 1;
       const adapting = frameCount > 150;
       if (adapting && frameMs > 28 && frameMs < 200) slowFrames += 1;
@@ -376,21 +410,14 @@ export function Emberline() {
         qualityRef.current = Math.min(1, qualityRef.current + 0.15);
         fastFrames = 0;
       }
-      const rawDpr = Math.min(2, window.devicePixelRatio || 1);
-      const areaCap = w * h > 520000 ? 1.5 : 2;
-      const dpr = Math.min(rawDpr, areaCap) * qualityRef.current;
-      if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
-        canvas.width = Math.floor(w * dpr);
-        canvas.height = Math.floor(h * dpr);
-        canvas.style.width = `${w}px`;
-        canvas.style.height = `${h}px`;
-      }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawWorld(ctx, engine, cell, w, h);
+      paint();
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (paintRef.current === paint) paintRef.current = () => {};
+    };
   }, [cell]);
 
   const toCell = (e: React.PointerEvent) => {
@@ -641,14 +668,13 @@ export function Emberline() {
             onPointerDown={(e) => {
               if (e.button === 1) {
                 e.preventDefault();
-                engine.setAim(AIMS[(AIMS.indexOf(engine.aim) + 1) % AIMS.length]);
                 return;
               }
               if (e.button === 0) onTap(e);
             }}
             onAuxClick={(e) => {
               e.preventDefault();
-              engine.setAim(AIMS[(AIMS.indexOf(engine.aim) + 1) % AIMS.length]);
+              if (e.button === 1) engine.cycleAim();
             }}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -967,6 +993,8 @@ export function Emberline() {
                   "Horn burns the road. R launches Scout Flare. Mend the keep; Stall opens between waves.",
                 ],
                 ["Space / P / F", "Send the wave. Pause. Cycle 1× / 2× / 3×."],
+                ["Aim / middle click", "Choose First (nearest keep), Last (nearest gate), Near (nearest tower), or Tough (bosses, healers, and high health). This changes only the selected tower. With no tower selected, choose the default for new plants. Focus and marks take priority."],
+                ["Air sightline", "An air-capable tower must reach the road before sending flying prey. Move it closer or forge Reach. Coverage is a sightline check, not a promise that a wave will be held."],
                 ["Pairing", "Two of one kind beside each other fire 10% faster."],
                 [
                   "Bonds",
@@ -1680,17 +1708,19 @@ export function Emberline() {
             role="group"
             aria-label="Watch commands"
           >
-            <button
-              type="button"
-              className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust"
-              aria-label={`Tower targeting: ${AIM_LABEL[hud.towerAim]}. Activate to cycle targeting mode.`}
-              title={`Targeting ${AIM_LABEL[hud.towerAim]}`}
-              disabled={!playing}
-              onClick={() => engine.setAim(AIMS[(AIMS.indexOf(hud.towerAim) + 1) % AIMS.length])}
-            >
-              <span className="command-label">Aim</span>
-              <span className="command-value">{AIM_LABEL[hud.towerAim]}</span>
-            </button>
+            <label className="packet command-control command-aim min-h-11 px-2 text-[11px] text-dust">
+              <span className="command-label">{hud.selectedTower ? "Aim" : "New aim"}</span>
+              <select
+                aria-label={hud.selectedTower ? `${TOWERS[hud.selectedTower.kind].name} targeting` : "New towers targeting"}
+                title={`${hud.selectedTower ? "Selected tower only" : "Future plants only"}. ${AIM_DETAIL[hud.towerAim]}. Focus and marks take priority.`}
+                disabled={!playing}
+                value={hud.towerAim}
+                onChange={(e) => engine.setAim(e.target.value as Aim)}
+              >
+                {AIMS.map((aim) => <option key={aim} value={aim}>{AIM_LABEL[aim]} · {AIM_DETAIL[aim]}</option>)}
+              </select>
+              <span className="command-value" aria-hidden="true">{AIM_LABEL[hud.towerAim]}⌄</span>
+            </label>
             <button
               type="button"
               className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust"
@@ -2841,6 +2871,9 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
           </div>
         </dl>
       </div>
+      <p className="tower-intel-sightline" data-reaches={hud.towerSightline?.reachesRoad}>
+        {hud.towerSightline?.reachesRoad ? `${hud.towerSightline.tiles} road tiles in reach` : "No road in reach · move or forge Reach"}
+      </p>
       <p className="tower-intel-bond" data-active={Boolean(hud.bond)}>
         {bondText}
       </p>
@@ -2850,7 +2883,8 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
         {hud.field.rule.label}
       </p>
       <p className="tower-intel-meta">
-        Aim {AIM_LABEL[hud.towerAim]} <span aria-hidden="true">·</span> Line +
+        Aim {AIM_LABEL[hud.towerAim]} · {AIM_DETAIL[hud.towerAim]}
+        {" · "}Line +
         {Math.round((hud.lineBonus - 1) * 100)}%
       </p>
     </section>

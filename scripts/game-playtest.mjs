@@ -71,6 +71,11 @@ try {
     await page.screenshot({ path: `output/audit/${id}-title.png` });
     await page.getByRole("button", { name: "Hold the line", exact: true }).click();
     await page.getByRole("button", { name: "Take the watch", exact: true }).click();
+    if (width < 640 && height > 720) {
+      const initialSend = await page.locator(".command-send").boundingBox();
+      assert.ok(initialSend.y >= 0 && initialSend.y + initialSend.height <= height,
+        "portrait wave command is visible before tray scrolling");
+    }
     if (reduced) {
       await page.waitForTimeout(600);
       const before = await page.locator("canvas").evaluate(canvas => canvas.toDataURL());
@@ -87,6 +92,30 @@ try {
     await page.keyboard.press("2");
     await cell(3, 4);
     assert.equal((await state()).towers.length, 2);
+    const aim = page.locator(".command-aim select");
+    await aim.selectOption("strong");
+    assert.equal((await state()).selectedTower.aim, "strong");
+    assert.equal((await state()).towers[0].aim, "first");
+    assert.equal((await state()).controls.defaultAim, "first");
+    await aim.focus();
+    await page.keyboard.press("Space");
+    assert.equal((await state()).phase, "ready", "Space belongs to the native aim selector");
+    await page.keyboard.press("Escape");
+    const aimBoard = await page.locator("canvas").boundingBox();
+    await page.mouse.click(aimBoard.x + 3.5 * aimBoard.width / 13,
+      aimBoard.y + 4.5 * aimBoard.height / 9, { button: "middle" });
+    assert.equal((await state()).selectedTower.aim, "first", "middle click cycles exactly once");
+    await page.mouse.click(aimBoard.x + 3.5 * aimBoard.width / 13,
+      aimBoard.y + 4.5 * aimBoard.height / 9, { button: "right" });
+    assert.equal((await state()).selectedTower, null);
+    assert.deepEqual((await state()).towers.map(t => t.aim), ["first", "first"],
+      "right click deselects without retargeting");
+    await page.getByRole("combobox", { name: "New towers targeting" }).selectOption("close");
+    assert.equal((await state()).controls.aimScope, "new");
+    assert.equal((await state()).controls.defaultAim, "close");
+    assert.deepEqual((await state()).towers.map(t => t.aim), ["first", "first"]);
+    await aim.selectOption("first");
+    await cell(3, 4);
     const guide = page.locator(".reaction-guide summary");
     if (await guide.isVisible()) {
       await guide.focus();
@@ -128,6 +157,11 @@ try {
     assert.ok(sendBounds && sendBounds.y >= 0 && sendBounds.y + sendBounds.height <= height,
       `${id}: Send wave must stay inside the viewport`);
     await page.locator(".command-send").click();
+    assert.equal(await page.locator("canvas").evaluate(canvas => {
+      const before = canvas.toDataURL();
+      window.advanceTime(100);
+      return canvas.toDataURL() !== before;
+    }), true, "the time bridge paints combat before returning");
     assert.equal((await state()).phase, "wave");
     assert.ok((await state()).arrivals.length > 0);
     let reaction = false;
@@ -195,6 +229,11 @@ try {
     await cell(3, 3, false);
     await page.waitForTimeout(100);
     await page.screenshot({ path: `output/audit/${id}-planning.png` });
+    if (width < 640 && height > 720) {
+      const planningSend = await page.locator(".command-send").boundingBox();
+      assert.ok(planningSend.y >= 0 && planningSend.y + planningSend.height <= height,
+        "planning changes keep the primary command in view");
+    }
     const geometry = await page.evaluate(() => ({
       width: innerWidth,
       height: innerHeight,
@@ -337,6 +376,79 @@ try {
     await page.screenshot({ path: "output/audit/endless-ready.png" });
     assert.deepEqual(errors, []);
     reports.push({ id: "endless-resume", endless: state.endless, best: state.bestEndless, errors });
+    await page.close();
+  }
+  // Exercise range recovery on the first flying road in isolated local saves.
+  for (const [width, height] of [[1440, 1000], [390, 844]]) {
+    const page = await browser.newPage({ viewport: { width, height } });
+    const errors = [];
+    page.on("pageerror", e => errors.push(e.message));
+    page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
+    await page.addInitScript(() => localStorage.setItem("emberline-watch",
+      JSON.stringify({ unlocked: 1, relics: [], marks: 0 })));
+    const state = () => page.evaluate(() => JSON.parse(window.render_game_to_text()));
+    const cell = async (c, r, click = true) => {
+      const b = await page.locator("canvas").boundingBox();
+      const x = b.x + (c + 0.5) * b.width / 13, y = b.y + (r + 0.5) * b.height / 9;
+      if (click) await page.mouse.click(x, y);
+      else await page.mouse.move(x, y);
+    };
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => typeof window.render_game_to_text === "function");
+    await page.getByRole("button", { name: "Campaign", exact: true }).click();
+    await page.locator(".campaign-select button").nth(1).click();
+    await page.getByRole("button", { name: /^Begin / }).click();
+    await page.getByRole("button", { name: "Take the watch", exact: true }).click();
+    assert.equal((await state()).selectedPacket, "bow");
+    await cell(10, 0, false);
+    assert.match(await page.locator("body").innerText(), /No road in reach/);
+    await cell(10, 0);
+    assert.equal((await state()).sightline.reachesRoad, false);
+    assert.equal((await state()).airReadiness.covered, false);
+    await page.locator("canvas").focus();
+    await page.keyboard.press("Space");
+    assert.equal((await state()).phase, "ready");
+    assert.match((await state()).banner, /road reach/);
+    const bannerText = (await state()).banner;
+    const bannerLines = await page.locator("canvas").evaluate(canvas => {
+      const proto = CanvasRenderingContext2D.prototype;
+      const fillText = proto.fillText;
+      const lines = [];
+      // Observe the actual renderer without replacing drawing or game behavior.
+      proto.fillText = function(text, x, y, maxWidth) {
+        if (this.canvas === canvas && this.font.includes("Fraunces") && x === 0) {
+          const width = Math.min(this.measureText(text).width, maxWidth ?? Infinity);
+          const transform = this.getTransform();
+          lines.push({ text, left: transform.e - width * transform.a / 2,
+            right: transform.e + width * transform.a / 2, canvasWidth: canvas.width });
+        }
+        return maxWidth === undefined ? fillText.call(this, text, x, y)
+          : fillText.call(this, text, x, y, maxWidth);
+      };
+      try { window.advanceTime(100); }
+      finally { proto.fillText = fillText; }
+      return lines;
+    });
+    assert.equal(bannerLines.map(line => line.text).join(" "), bannerText);
+    assert.ok(bannerLines.every(line => line.left >= 0 && line.right <= line.canvasWidth),
+      "actual banner lines fit inside the canvas");
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: `output/audit/${width}x${height}-no-sightline.png` });
+    await page.keyboard.press("r");
+    assert.equal((await state()).selectedTower.rangeLevel, 2);
+    assert.equal((await state()).sightline.reachesRoad, true);
+    assert.equal((await state()).airReadiness.covered, true);
+    await page.getByRole("combobox", { name: "Longbow targeting" }).selectOption("last");
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: `output/audit/${width}x${height}-sightline-restored.png` });
+    await page.locator("canvas").focus();
+    await page.keyboard.press("Space");
+    assert.equal((await state()).phase, "wave");
+    assert.equal((await state()).selectedTower.aim, "last");
+    const geometry = await page.evaluate(() => ({ w: document.documentElement.scrollWidth, h: document.documentElement.scrollHeight }));
+    assert.ok(geometry.w <= width && geometry.h <= height);
+    assert.deepEqual(errors, []);
+    reports.push({ id: `${width}x${height}-sightline-recovery`, phase: "wave", reach: 2, aim: "last", errors });
     await page.close();
   }
   // Seed an earned campaign save in a fresh context; never change an actual player save.

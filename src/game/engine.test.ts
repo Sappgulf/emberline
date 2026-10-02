@@ -2453,3 +2453,139 @@ describe("gate arrival forecasts", () => {
     assert.deepEqual(JSON.parse(e.renderText()).arrivals, e.hud().arrivals);
   });
 });
+
+// Keep targeting scope separate from the defaults used when planting towers.
+describe("tactical sightlines and targeting", () => {
+  const airPlan = [{ kind: "wisp" as const, count: 1, gap: 1, delay: 0 }];
+  const lowPlan = [{ kind: "moth" as const, count: 1, gap: 1, delay: 0 }];
+  const plant = (e: EmberEngine, kind: "bow" | "mortar", c: number, r: number) => {
+    e.gold = 2000;
+    e.chooseCounter(kind);
+    assert.equal(e.canBuild(c, r), true);
+    e.tapCell(c, r);
+    return e.selectedTower()!;
+  };
+
+  it("changes only the selected tower, preserving existing towers and the plant default", () => {
+    const e = play();
+    const bow = plant(e, "bow", 1, 4);
+    e.setAim("last");
+    const mortar = plant(e, "mortar", 3, 4);
+    assert.equal(bow.aim, "last");
+    assert.equal(mortar.aim, "first");
+    e.setAim("strong");
+    assert.equal(mortar.aim, "strong");
+    assert.equal(bow.aim, "last");
+    assert.equal(e.aim, "first");
+    e.cycleAim();
+    assert.equal(mortar.aim, "first", "cycle starts from the selected tower's own mode");
+  });
+
+  it("uses the unselected aim for future plants without retargeting existing towers", () => {
+    const e = play();
+    const first = plant(e, "bow", 1, 4);
+    e.selectedId = null;
+    e.setAim("close");
+    const second = plant(e, "bow", 3, 4);
+    assert.equal(first.aim, "first");
+    assert.equal(second.aim, "close");
+    assert.equal(e.hud().towerAim, "close");
+    e.selectedId = null;
+    e.cycleAim();
+    assert.equal(e.aim, "strong");
+    assert.equal(second.aim, "close");
+    e.notify();
+    const text = JSON.parse(e.renderText());
+    assert.equal(text.controls.aimScope, "new");
+    assert.equal(text.controls.defaultAim, "strong");
+  });
+
+  it("does not retarget outside a watch", () => {
+    const e = play();
+    const bow = plant(e, "bow", 1, 4);
+    e.toggleHelp();
+    e.phase = "shop";
+    e.setAim("strong");
+    e.cycleAim();
+    assert.equal(bow.aim, "first");
+    assert.equal(e.aim, "first");
+  });
+
+  it("includes continuous segments even if both centers are beyond reach", () => {
+    const e = play();
+    e.path = [{ c: 0, r: 0 }, { c: 1, r: 0 }];
+    assert.equal(e.reachesRoad(0.5, 1, 1), true);
+    assert.equal(e.reachesRoad(0.5, 1, 0.999), false);
+    assert.equal(e.reachesRoad(2, 0, 0.999), false, "does not extend the road past its endpoint");
+    e.path = [{ c: 0, r: 0 }];
+    assert.equal(e.reachesRoad(0, 1, 1), true);
+    e.path = [];
+    assert.equal(e.reachesRoad(0, 0, 10), false);
+  });
+
+  it("blocks flying waves when the only air tower cannot reach the road", () => {
+    const e = play();
+    const bow = plant(e, "bow", 9, 0);
+    e.map = { ...e.map, waves: [airPlan] };
+    assert.equal(e.reachesRoad(bow.c, bow.r, e.sightRange(bow)), false);
+    assert.equal(e.coversPreview(airPlan).covered, false);
+    assert.equal(e.hud().towerSightline?.reachesRoad, false);
+    e.startWave();
+    assert.equal(e.phase, "ready");
+    assert.match(e.banner?.text ?? "", /road reach/);
+    assert.equal(e.spawnQ.length, 0);
+    assert.equal(e.wave, 0);
+    bow.rangeLvl = 4;
+    e.notify();
+    assert.equal(e.coversPreview(airPlan).covered, true);
+    assert.equal(e.hud().towerSightline?.reachesRoad, true);
+    assert.equal(JSON.parse(e.renderText()).airReadiness.covered, true);
+    e.startWave();
+    assert.equal(e.phase, "wave");
+    assert.equal(e.spawnQ.length, 1);
+  });
+
+  it("updates air coverage after moving and selling a tower", () => {
+    const e = play();
+    const bow = plant(e, "bow", 9, 0);
+    assert.equal(e.coversPreview(airPlan).covered, false);
+    e.armMove();
+    e.tapCell(1, 4);
+    assert.deepEqual([bow.c, bow.r], [1, 4]);
+    assert.equal(e.coversPreview(airPlan).covered, true);
+    e.sellSelected();
+    assert.equal(e.coversPreview(airPlan).covered, false);
+  });
+
+  it("uses real range modifiers for readiness and still distinguishes low and high air", () => {
+    const e = play();
+    const mortar = plant(e, "mortar", 9, 0);
+    e.path = [{ c: 9 - e.sightRange(mortar) * 1.05, r: 0 }];
+    assert.equal(e.coversPreview(lowPlan).covered, false);
+    e.relics.add("glass");
+    assert.equal(e.coversPreview(lowPlan).covered, true);
+    assert.equal(e.coversPreview(airPlan).covered, false);
+    assert.equal(e.coversPreview(undefined).covered, true);
+    assert.equal(e.coversPreview([{ kind: "grub", count: 1, gap: 1, delay: 0 }]).covered, true);
+  });
+
+  it("chooses different targets for all four modes and honors focus before aim", () => {
+    const e = play();
+    const tower = plant(e, "bow", 1, 4);
+    e.phase = "wave";
+    for (const kind of ["grub", "runner", "shaman"] as const) e.spawn(kind);
+    const [front, rear, healer] = e.creeps;
+    Object.assign(front, { x: 1.5, y: 5.5, progress: 7, hp: 30 });
+    Object.assign(rear, { x: 1.6, y: 4.5, progress: 1, hp: 20 });
+    Object.assign(healer, { x: 2.5, y: 4.5, progress: 4, hp: 50 });
+    for (const [aim, target] of [["first", front], ["last", rear], ["close", rear], ["strong", healer]] as const) {
+      e.setAim(aim);
+      assert.equal(e.pickTarget(tower)?.id, target.id);
+    }
+    e.focusId = front.id;
+    e.focusT = 4;
+    assert.equal(e.pickTarget(tower)?.id, front.id);
+    front.x = 12;
+    assert.equal(e.pickTarget(tower)?.id, healer.id, "out-of-range focus falls back to aim");
+  });
+});
