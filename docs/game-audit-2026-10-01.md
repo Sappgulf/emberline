@@ -39,4 +39,12 @@ Scope: combat resolution, abilities and upgrades, campaign/endless state, progre
 - The production build skips the optional database migration when `DATABASE_URL` is unset.
 - The external web-game client logs a start-button selector timeout warning after the title transitions. It exits successfully and captures active combat in both iterations; the project browser suite independently completes all 17 scenarios with no browser errors.
 - Browser evidence is local Chrome. Physical touch, Safari, battery use, GPU performance, and a complete human difficulty assessment of all roads remain unverified. The 92-wave simulation uses upgraded towers and extra lives to test stability.
-- No commit, push, or deployment was performed.
+- This audit was completed locally before the subsequent commit, push, and deployment request.
+
+## Deployment security patch
+
+Vercel rejected the first deployment because `@tanstack/react-start@1.168.49` is affected by [CVE-2026-102989](https://github.com/TanStack/router/security/advisories/GHSA-qx66-fv34-fjm8). The dependency minimum and lockfile now use Start 1.168.60 and resolve `@tanstack/start-server-core@1.169.39`, the patched versions. The router error screen now guards unknown thrown values before reading an Error message.
+
+Reverified after the patch: all 168 source tests, typecheck, lint, production build, auth invariant, and all 17 Chrome scenarios against the built production preview pass. Four direct error-screen rendering checks cover Error instances and non-Error thrown values.
+
+The read-only Endor Dependency Reviewer package lookup was unavailable because no Endor credentials are configured. Patch provenance comes from the publisher advisory and resolved npm packages. `npm audit` still reports existing brace-expansion issues in lint tooling and a moderate fast-uri issue through form validation; the production-only audit reports that one moderate issue. These unrelated dependencies were not changed for deployment.

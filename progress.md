@@ -407,3 +407,9 @@ Original prompt: ok keep working. more upgrades across the game
 - Added `npm run test:game:browser`: six responsive/reduced-motion cases, all eight campaign entries, a real five-wave opening-road hold with 20 lives, market purchase/save/camp transition to Pine Cut, genuine defeat/retry with restored timber lives, and saved endless entry. All 17 cases pass with no browser errors; idle reduced-motion canvas pixels remain stable. The required web-game client also completed two gameplay screenshot/state iterations.
 - Typecheck, lint, production build, auth invariant, and diff checks pass. Script tests remain 193/197 because four existing contracts require missing legacy `.grok/skills/og` fixtures. The optional database migration skips without `DATABASE_URL`.
 - Findings and limits are recorded in `docs/game-audit-2026-10-01.md`; screenshots/verdicts are under `output/audit/`. Physical-device Safari, hardware performance, and a complete human campaign balance assessment remain unverified. No commit, push, or deployment was performed.
+
+## 2026-10-01 — production deployment security prerequisite
+
+- Committed and pushed the game improvements as `4bfd210` on main. Vercel rejected the initial deployment for CVE-2026-102989 in TanStack Start 1.168.49.
+- Raised the Start dependency minimum to 1.168.60; the lockfile resolves patched server core 1.169.39. Adapted the error boundary to the router's unknown error type with a safe fallback. No security bypass was enabled.
+- Reverified 168 source tests, typecheck, lint, production build, auth invariant, and all 17 browser scenarios against the built production preview. Four error-boundary rendering cases pass. Publisher advisory, dependency review gaps, and unrelated remaining npm advisories are recorded in the audit.
