@@ -2,6 +2,19 @@ import type { TowerKind } from "./config.ts";
 
 export const REACTION_BONUS = 0.3;
 export const REACTION_COOLDOWN = 2;
+export const RALLY_MAX = 100;
+export const RALLY_KILL_GAIN = 5;
+export const RALLY_REACTION_GAIN = 10;
+export const RALLY_BREACH_LOSS = 20;
+export const RALLY_DURATION = 6;
+export const RALLY_RATE = 1.25;
+
+export interface CombatEntry {
+  source: TowerKind | "watch";
+  damage: number;
+  hits: number;
+  kills: number;
+}
 export const REACTIONS = {
   shatter: {
     name: "Shatter",

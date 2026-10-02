@@ -931,6 +931,9 @@ describe("EmberEngine", () => {
       orderChain: 1,
       omen: null,
       reactions: 0,
+      duration: 0,
+      rallies: 0,
+      ledger: [],
     });
     assert.ok((e.hud().lastResult?.earned ?? 0) > 0);
     const text = JSON.parse(e.renderText()) as {
@@ -2049,5 +2052,207 @@ describe("season systems", () => {
     e.unlocked = 3;
     e.notify();
     assert.equal(e.hud().chronicle.find((entry) => entry.id === "omens")?.unlocked, true);
+  });
+});
+
+describe("rally command and combat ledger", () => {
+  function watch() {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [{ t: 1000, kind: "grub" }];
+    return e;
+  }
+
+  it("earns resolve from actual kills and reactions, excluding duplicate kills", () => {
+    const e = watch();
+    e.spawn("grub");
+    const prey = e.creeps[0];
+    prey.chillT = 1;
+    e.damageCreep(prey, 1, 0, false, true, "mortar");
+    assert.equal(e.rallyCharge, 10);
+    e.damageCreep(prey, 1000, 0, false, true, "mortar");
+    assert.equal(e.rallyCharge, 15);
+    const ledger = e.ledgerSnapshot();
+    e.damageCreep(prey, 1000, 0, false, true, "mortar");
+    assert.equal(e.rallyCharge, 15);
+    assert.deepEqual(e.ledgerSnapshot(), ledger);
+    e.gainRally(1000);
+    assert.equal(e.rallyCharge, 100);
+    assert.match(e.banner?.text ?? "", /Rally ready/);
+  });
+
+  it("does not earn resolve outside a wave or spend it while paused/in a menu", () => {
+    const e = play();
+    e.gainRally(100);
+    assert.equal(e.rallyCharge, 0);
+    e.rallyCharge = 100;
+    e.rallyWatch();
+    assert.equal(e.rallyT, 0);
+    e.startWave();
+    e.paused = true;
+    e.rallyWatch();
+    assert.equal(e.rallyCharge, 100);
+    e.paused = false;
+    e.help = true;
+    e.rallyWatch();
+    assert.equal(e.rallyT, 0);
+    e.help = false;
+    e.rallyWatch();
+    assert.equal(e.rallyT, 6);
+    assert.equal(e.rallyCharge, 0);
+    assert.equal(e.waveRallies, 1);
+    e.gainRally(100);
+    e.rallyWatch();
+    assert.equal(e.waveRallies, 1, "an active rally cannot be stacked");
+  });
+
+  it("boosts real firing and displayed rate without resetting a loaded shot", () => {
+    const e = play();
+    e.gold = 1000;
+    const cell = emptyGrass(e);
+    e.tapCell(cell.c, cell.r);
+    const tower = e.towers[0];
+    tower.cooldown = 2;
+    const rate = e.fieldRateMultiplier(tower);
+    e.startWave();
+    e.rallyCharge = 100;
+    e.rallyWatch();
+    assert.equal(tower.cooldown, 1.6);
+    assert.equal(e.fieldRateMultiplier(tower), rate * 1.25);
+    assert.equal(e.hud().fieldBoost?.rate, rate * 1.25);
+    e.spawn("grub");
+    e.fire(tower, e.creeps[0]);
+    const boosted = tower.cooldown;
+    e.rallyT = 0;
+    e.fire(tower, e.creeps[0]);
+    assert.ok(Math.abs(tower.cooldown / boosted - 1.25) < 1e-9);
+  });
+
+  it("freezes the rally clock and battle time while paused or reading orders", () => {
+    const e = watch();
+    e.rallyCharge = 100;
+    e.rallyWatch();
+    e.paused = true;
+    e.tick(0.1);
+    assert.equal(e.rallyT, 6);
+    assert.equal(e.waveDuration, 0);
+    e.paused = false;
+    e.help = true;
+    e.tick(0.1);
+    assert.equal(e.rallyT, 6);
+    e.help = false;
+    for (let i = 0; i < 70; i++) e.tick(0.1);
+    assert.equal(e.rallyT, 0);
+    assert.ok(e.waveDuration >= 6);
+    assert.equal(e.hud().rally.seconds, 0);
+  });
+
+  it("carries resolve between waves but clears boosts and road history on retry", () => {
+    const e = watch();
+    e.rallyCharge = 65;
+    e.rallyT = 4;
+    e.waveRallies = 1;
+    e.waveDuration = 3.4;
+    e.combatLedger.bow = { source: "bow", damage: 22, hits: 2, kills: 1 };
+    e.spawnQ = [];
+    e.finishWaveIfClear();
+    assert.equal(e.rallyCharge, 65);
+    assert.equal(e.rallyT, 0);
+    assert.equal(e.lastResult?.duration, 3.4);
+    assert.equal(e.lastResult?.rallies, 1);
+    assert.equal(e.lastResult?.ledger[0].damage, 22);
+    const previous = e.lastResult!;
+    e.startWave();
+    assert.deepEqual(e.ledgerSnapshot(), []);
+    assert.equal(e.rallyCharge, 65);
+    assert.equal(previous.ledger[0].damage, 22, "held ledger is immutable across waves");
+    e.retryMap();
+    assert.equal(e.rallyCharge, 0);
+    assert.equal(e.rallyT, 0);
+    assert.deepEqual(e.ledgerSnapshot(), []);
+  });
+
+  it("deducts resolve on a real breach and reports lives at risk near the keep", () => {
+    const e = watch();
+    e.rallyCharge = 40;
+    e.spawn("shell");
+    const prey = e.creeps[0];
+    prey.wp = e.path.length - 1;
+    Object.assign(prey, e.waypoint(prey.wp));
+    prey.progress = e.path.length - 1;
+    e.notify();
+    assert.deepEqual(e.hud().danger, { count: 1, livesAtRisk: leakCost("shell") });
+    e.step(0.1);
+    assert.equal(e.rallyCharge, 20);
+    assert.equal(e.waveLeaks, 1);
+    e.notify();
+    assert.deepEqual(e.hud().danger, { count: 0, livesAtRisk: 0 });
+  });
+
+  it("counts effective damage after armor/wards and excludes overkill", () => {
+    const e = watch();
+    e.spawn("shell");
+    const prey = e.creeps[0];
+    prey.wardT = 1;
+    prey.hp = 100;
+    e.damageCreep(prey, 30, 0, false, true, "bow");
+    assert.equal(e.ledgerSnapshot()[0].damage, Math.round((30 - CREEPS.shell.armor) * 0.5));
+    prey.hp = 7;
+    e.damageCreep(prey, 1000, 0, false, true, "mortar");
+    assert.deepEqual(e.combatLedger.mortar, { source: "mortar", damage: 7, hits: 1, kills: 1 });
+  });
+
+  it("ignores dodged hits and credits direct ward/spark fire to their own kind", () => {
+    const e = watch();
+    e.spawn("knave");
+    const knave = e.creeps[0];
+    knave.dodge = true;
+    e.damageCreep(knave, 20, 0, false, true, "bow");
+    assert.deepEqual(e.ledgerSnapshot(), []);
+    for (const kind of ["ward", "spark"] as const) {
+      const game = play();
+      game.gold = 1000;
+      game.chooseKind(kind);
+      const cell = emptyGrass(game);
+      game.tapCell(cell.c, cell.r);
+      game.startWave();
+      game.spawn("grub");
+      const prey = game.creeps[0];
+      prey.x = cell.c + 0.6;
+      prey.y = cell.r + 0.5;
+      game.fire(game.towers[0], prey);
+      assert.ok((game.combatLedger[kind]?.damage ?? 0) > 0, `${kind} has correct attribution`);
+      assert.equal(game.combatLedger.watch, undefined);
+    }
+  });
+
+  it("credits burning ground without retriggering impact reactions", () => {
+    const e = watch();
+    e.spawn("grub");
+    const prey = e.creeps[0];
+    prey.chillT = 5;
+    prey.rootT = 5;
+    e.burns.push({ x: prey.x, y: prey.y, r: 1, life: 2, tick: 0.35, source: "mortar" });
+    e.step(0.1);
+    assert.ok((e.combatLedger.mortar?.damage ?? 0) > 0);
+    assert.equal(e.waveReactions, 0);
+    assert.equal(e.rallyCharge, 0);
+  });
+
+  it("publishes focused health, armor, statuses, rally and ledger in text state", () => {
+    const e = watch();
+    e.spawn("shell");
+    const prey = e.creeps[0];
+    prey.chillT = 3;
+    prey.rootT = 2;
+    e.focusId = prey.id;
+    e.focusT = 4;
+    e.damageCreep(prey, 10, 0, false, true, "bow");
+    e.notify();
+    const text = JSON.parse(e.renderText());
+    assert.deepEqual(text.prey.statuses, ["Chilled", "Rooted"]);
+    assert.equal(text.prey.armor, CREEPS.shell.armor);
+    assert.equal(text.ledger[0].source, "bow");
+    assert.equal(text.rally.max, 100);
   });
 });

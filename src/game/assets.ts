@@ -41,6 +41,8 @@ export function spriteUrl(key: string) {
 export const BATTLEFIELD_ART = {
   ground: "/assets/tiles/woodland-floor-v1.webp",
   grubCrawl: "/assets/sprites/grub-crawl-v1.webp",
+  runnerGallop: "/assets/sprites/runner-gallop-v1.webp",
+  ashGround: "/assets/tiles/ash-floor-v1.webp",
 } as const;
 
 export const ROUTE_MARKER_REVISION = "v1";

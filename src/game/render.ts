@@ -1,6 +1,6 @@
 import { AFFIXES, COLS, MAX_UPGRADE, ROWS, towerForm, type PropKind } from "./config.ts";
 import { type Creep, type EmberEngine, type Tower } from "./engine.ts";
-import { drawGrubFrame, drawSprite, spr } from "./sprites.ts";
+import { drawCrawlFrame, drawSprite, spr } from "./sprites.ts";
 import { REACTIONS } from "./combat.ts";
 
 const PATH_EDGE = "#4a3a22";
@@ -92,7 +92,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   }
 
   const pad = 32;
-  const backdropKey = `${engine.map.id}|${cell}|${Math.round(w)}|${Math.round(h)}|${dpr}|${engine.phase}|${spr("woodland")?.naturalWidth ?? 0}|${spr("path")?.naturalWidth ?? 0}`;
+  const backdropKey = `${engine.map.id}|${cell}|${Math.round(w)}|${Math.round(h)}|${dpr}|${engine.phase}|${spr("woodland")?.naturalWidth ?? 0}|${spr("ash-ground")?.naturalWidth ?? 0}|${spr("path")?.naturalWidth ?? 0}`;
   if (!backdropCache || backdropCache.key !== backdropKey) {
     const canvas = makeCanvas((w + pad * 2) * dpr, (h + pad * 2) * dpr);
     const b = ctx2d(canvas);
@@ -142,6 +142,19 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     ctx.drawImage(glow, lx - r, ly - r, r * 2, r * 2);
   }
   drawLines(ctx, engine, cell);
+  if (engine.rallyT > 0) {
+    ctx.save();
+    ctx.strokeStyle = "#efbb65";
+    ctx.lineWidth = Math.max(1.5, cell * 0.03);
+    for (const tower of engine.towers) {
+      const pulse = engine.reducedMotion ? 0 : Math.sin(engine.time * 5 + tower.id) * 0.06;
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.ellipse((tower.c + 0.5) * cell, (tower.r + 0.75) * cell, cell * (0.4 + pulse), cell * 0.16, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   drawHover(ctx, engine, cell);
   const focus = engine.focusSnapshot();
 
@@ -303,7 +316,8 @@ function drawGroundBase(ctx: CanvasRenderingContext2D, cell: number, engine: Emb
   ctx.fillStyle = engine.map.theme.moss;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
   const grass = spr("grass");
-  const woodland = spr("woodland");
+  const scorched = engine.map.id === "ember-copse" || engine.map.id === "ash-hollow";
+  const woodland = (scorched ? spr("ash-ground") : null) ?? spr("woodland");
   if (woodland) {
     ctx.save();
     ctx.globalAlpha = 0.62;
@@ -1379,9 +1393,10 @@ function drawCreep(
   ctx.fill();
   const flip = Math.cos(creep.facing) < 0;
   const animated =
-    creep.kind === "grub" &&
-    drawGrubFrame(
+    (creep.kind === "grub" || creep.kind === "runner") &&
+    drawCrawlFrame(
       ctx,
+      creep.kind,
       0,
       size * 0.35,
       size * 2.15,
@@ -1410,14 +1425,18 @@ function drawCreep(
       ctx.fill();
     }
     ctx.restore();
-    if (creep.alive && creep.hp < creep.maxHp) {
+    if (creep.alive && (creep.hp < creep.maxHp || focused || marked || creep.kind === "lord")) {
       ctx.save();
       ctx.globalAlpha = fade;
-      const barW = size * 1.55;
+      const barW = Math.max(size * 1.55, focused || marked ? 28 : 14);
       ctx.fillStyle = "rgba(18,22,15,0.72)";
       ctx.fillRect(px - barW / 2, py - size - 8, barW, 4);
-      ctx.fillStyle = creep.hp / creep.maxHp > 0.4 ? "#7a9a58" : BLOOD;
+      ctx.fillStyle = creep.hp / creep.maxHp > 0.4 ? ((creep.chillT ?? 0) > 0 ? FROST : "#7a9a58") : BLOOD;
       ctx.fillRect(px - barW / 2, py - size - 8, barW * Math.max(0, creep.hp / creep.maxHp), 4);
+      if (creep.rootT > 0 || (creep.wardT ?? 0) > 0) {
+        ctx.fillStyle = creep.rootT > 0 ? "#a4c477" : COPPER;
+        ctx.fillRect(px - barW / 2, py - size - 2, barW, 2);
+      }
       ctx.restore();
     }
     return;

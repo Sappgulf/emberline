@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { RotateCcw } from "lucide-react";
-import { REACTIONS, REACTION_COOLDOWN } from "@/game/combat";
+import { REACTIONS, REACTION_COOLDOWN, type CombatEntry } from "@/game/combat";
 import {
   COLS,
   CREEPS,
@@ -289,6 +289,7 @@ export function Emberline() {
       if (e.key === "7") engine.chooseKind("pike");
       if (e.key === "8") engine.chooseKind("cinder");
       if (e.key === "h" || e.key === "H") engine.blowHorn();
+      if (e.key === "v" || e.key === "V") engine.rallyWatch();
       if (e.key === "r" || e.key === "R") {
         if (engine.phase === "wave") engine.scoutFlare();
         else engine.upgradeRange();
@@ -695,12 +696,21 @@ export function Emberline() {
             </div>
           )}
           {playing && hud.focus && (
-            <div className="focus-chip" role="status" aria-live="polite">
+            <div className="focus-chip" aria-label={`Focus fire: ${hud.focus.name}`}>
               <span className="focus-chip-kicker">Focus fire</span>
               <strong>{hud.focus.name}</strong>
               <span>
                 +{Math.round(hud.focus.bonus * 100)}% power · {Math.ceil(hud.focus.seconds)}s
               </span>
+              {hud.prey && (
+                <>
+                  <span className="prey-health" role="meter" aria-label="Focused enemy health" aria-valuemin={0} aria-valuemax={hud.prey.maxHp} aria-valuenow={hud.prey.hp}>
+                    <span style={{ width: `${Math.min(100, hud.prey.hp / hud.prey.maxHp * 100)}%` }} />
+                  </span>
+                  <span className="prey-readout">{hud.prey.hp}/{hud.prey.maxHp} hp{hud.prey.armor > 0 ? ` · ${hud.prey.armor} armor` : ""}</span>
+                  {hud.prey.statuses.length > 0 && <span className="prey-statuses">{hud.prey.statuses.join(" · ")}</span>}
+                </>
+              )}
             </div>
           )}
           {playing && hud.boss && (
@@ -945,6 +955,8 @@ export function Emberline() {
                   "Focus fire for four seconds. Tap again to mark it for a stronger priority.",
                 ],
                 ["K scout", "Once a wave, mark the toughest body on the road."],
+                ["V · Rally", "Kills earn 5 resolve; reactions earn 10. At 100, rally all towers for +25% fire rate for six seconds. Breaches cost 20 resolve. Carry resolve between waves on this road."],
+                ["Battle ledger", "Open the forecast's ledger to compare actual damage and kills by tower kind. Armor, wards, burn damage, and overkill are accounted for."],
                 [
                   "Q / E / R (ready)",
                   "Forge damage, rate, or reach. Highest sets the form. X sells; Z undoes the last plant.",
@@ -984,6 +996,7 @@ export function Emberline() {
                 </div>
               ))}
             </div>
+            {playing && <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />}
           </Overlay>
         )}
         {hud.hall && (
@@ -1297,6 +1310,7 @@ export function Emberline() {
               )}
               <ShopList items={hud.shopItems} relics={hud.relics} sets={hud.sets} gold={hud.gold} />
             </div>
+            <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />
           </Overlay>
         )}
 
@@ -1335,6 +1349,7 @@ export function Emberline() {
                 {hud.endless ? "best night" : "waves"}
               </span>
             </div>
+            <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />
             <div className="flex flex-wrap justify-center gap-2">
               <button
                 type="button"
@@ -1357,6 +1372,7 @@ export function Emberline() {
             )}
             {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
             <WatchSummary hud={hud} />
+            <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />
             <div className="flex flex-wrap justify-center gap-2">
               <button
                 type="button"
@@ -1714,6 +1730,21 @@ export function Emberline() {
                     ? `Ready${hud.scoutsLeft > 1 ? ` ×${hud.scoutsLeft}` : ""}`
                     : "Spent"}
               </span>
+            </button>
+            <button
+              type="button"
+              className="pressable packet command-control command-rally min-h-11 px-2 text-[11px] disabled:opacity-50"
+              aria-keyshortcuts="V"
+              aria-label={hud.rally.seconds > 0 ? `Rally active, ${Math.ceil(hud.rally.seconds)} seconds left` : hud.rally.ready ? "Rally the watch: +25% fire rate for six seconds" : `Rally resolve ${hud.rally.charge} of ${hud.rally.max}. Kills and reactions earn resolve.`}
+              title="V · Rally. Kills +5, reactions +10, breaches −20. At 100: +25% fire rate for 6s."
+              data-ready={hud.rally.ready}
+              data-active={hud.rally.seconds > 0}
+              disabled={!hud.rally.ready}
+              onClick={() => { unlockAudio(); engine.rallyWatch(); }}
+            >
+              <span className="command-label">Rally</span>
+              <span className="command-value">{hud.rally.seconds > 0 ? `${Math.ceil(hud.rally.seconds)}s` : hud.rally.charge >= hud.rally.max ? "Ready" : `${hud.rally.charge}%`}</span>
+              <span className="rally-meter" aria-hidden="true"><span style={{ width: `${hud.rally.seconds > 0 ? hud.rally.seconds / 6 * 100 : hud.rally.charge}%` }} /></span>
             </button>
             <button
               type="button"
@@ -2376,6 +2407,9 @@ function ThreatPanel({
           {hud.phase === "wave" ? `${hud.remaining}/${hud.waveTotal} left` : "Ready to send"}
         </span>
       </div>
+      {hud.danger.count > 0 && hud.phase === "wave" && (
+        <p className="keep-danger" role="status">Keep approach · {hud.danger.count} {hud.danger.count === 1 ? "enemy" : "enemies"} · {hud.danger.livesAtRisk} lives at risk</p>
+      )}
       {hud.wavePreview.some((item) => item.kind === "lord") && (
         <p className="threat-boss">
           <span className="intel-kicker">Boss</span>
@@ -2450,7 +2484,33 @@ function ThreatPanel({
         </p>
       </div>
       <ReactionGuide count={hud.reactions} />
+      <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />
     </section>
+  );
+}
+
+function BattleLedger({ entries, duration, rallies = 0 }: { entries: CombatEntry[]; duration: number; rallies?: number }) {
+  const total = entries.reduce((sum, entry) => sum + entry.damage, 0);
+  const seconds = Math.floor(duration);
+  return (
+    <details className="battle-ledger">
+      <summary><span>Battle ledger</span><span>{Math.round(total).toLocaleString()} damage</span></summary>
+      <div className="battle-ledger-body">
+        <p className="ledger-clock">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")} elapsed{rallies > 0 ? ` · ${rallies} ${rallies === 1 ? "rally" : "rallies"}` : ""}</p>
+        {entries.length === 0 ? <p className="ledger-empty">Damage appears when your defenses hit the road.</p> : (
+          <ol className="ledger-entries">
+            {entries.map(entry => (
+              <li key={entry.source}>
+                <span className="ledger-source">{entry.source === "watch" ? <span className="ledger-watch" aria-hidden="true">✦</span> : <img src={spriteUrl(entry.source)} alt="" />}<strong>{entry.source === "watch" ? "Watch / field" : TOWERS[entry.source].short}</strong></span>
+                <span className="ledger-score">{Math.round(entry.damage).toLocaleString()} dmg · {entry.kills} kills</span>
+                <span className="ledger-bar" aria-hidden="true"><span style={{ width: `${total > 0 ? entry.damage / total * 100 : 0}%` }} /></span>
+              </li>
+            ))}
+          </ol>
+        )}
+        <p className="ledger-note">Damage is health removed after armor and wards. Overkill is excluded. Totals group towers by kind; burns stay with their owner.</p>
+      </div>
+    </details>
   );
 }
 
@@ -2658,6 +2718,8 @@ function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
           : "Order missed · chain reset"}
       </div>
       {result.omen && <div className="wave-recap-omen">Omen · {result.omen}</div>}
+      {result.ledger[0] && <p className="recap-leader">Leading defense · {result.ledger[0].source === "watch" ? "Watch / field" : TOWERS[result.ledger[0].source].short} · {Math.round(result.ledger[0].damage)} damage</p>}
+      <p className="recap-timing">Held in {Math.round(result.duration)}s{result.rallies > 0 ? ` · ${result.rallies} rallies` : ""}</p>
     </div>
   );
 }

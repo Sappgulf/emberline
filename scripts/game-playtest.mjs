@@ -113,6 +113,10 @@ try {
         .scrollIntoViewIfNeeded();
       await page.keyboard.press("Escape");
     }
+    await page.locator(".command-send").scrollIntoViewIfNeeded();
+    const sendBounds = await page.locator(".command-send").boundingBox();
+    assert.ok(sendBounds && sendBounds.y >= 0 && sendBounds.y + sendBounds.height <= height,
+      `${id}: Send wave must stay inside the viewport`);
     await page.locator(".command-send").click();
     assert.equal((await state()).phase, "wave");
     let reaction = false;
@@ -148,6 +152,17 @@ try {
     const held = await state();
     assert.equal(held.phase, "ready");
     assert.ok(held.lastResult.reactions > 0);
+    assert.ok(held.lastResult.ledger.some(entry => entry.source === "mortar"));
+    assert.ok(held.lastResult.duration > 0);
+    const ledger = page.locator('.threat-panel .battle-ledger summary');
+    if (await ledger.isVisible()) {
+      await ledger.focus();
+      await page.keyboard.press('Space');
+      assert.equal((await state()).phase, 'ready', 'ledger disclosure preserves native Space');
+      await page.locator('.threat-panel .ledger-note').waitFor({state:'visible'});
+      await page.screenshot({path:`output/audit/${id}-ledger.png`});
+      await page.keyboard.press('Enter');
+    }
     await page.keyboard.press("s");
     assert.equal((await state()).phase, "stall");
     await page.getByRole("button", { name: "Back to the road", exact: true }).click();
@@ -198,6 +213,24 @@ try {
         const ability = page.locator(".ability-action");
         if (await ability.isEnabled()) await ability.click();
         await page.locator(".command-send").click();
+        if (wave === 2) {
+          for (let i = 0; i < 200 && !(await state()).rally.ready; i++) await advance(100);
+          assert.equal((await state()).rally.charge, 100, 'real combat earns a Rally');
+          await page.keyboard.press('p');
+          await page.keyboard.press('v');
+          assert.equal((await state()).rally.charge, 100, 'paused shortcut cannot spend resolve');
+          await page.keyboard.press('p');
+          await page.locator('.command-rally').click();
+          assert.equal((await state()).rally.uses, 1);
+          assert.equal((await state()).rally.charge, 0);
+          assert.ok((await state()).rally.seconds > 0);
+          await page.keyboard.press('?');
+          const seconds = (await state()).rally.seconds;
+          await advance(1000);
+          assert.equal((await state()).rally.seconds, seconds, 'Orders freezes an active Rally');
+          await page.keyboard.press('Escape');
+          await page.screenshot({path:'output/audit/rally-active.png'});
+        }
         for (let i = 0; i < 240 && (await state()).phase === "wave"; i++) await advance(250);
         assert.equal(
           (await state()).phase,
@@ -218,6 +251,7 @@ try {
       await page.getByRole("button", { name: "Take the watch", exact: true }).click();
       assert.equal((await state()).map, "Pine Cut");
       assert.equal((await state()).camp, "Bank the coals");
+      assert.equal((await state()).rally.charge, 0, 'new road resets resolve');
       assert.deepEqual(errors, []);
       reports.push({ id: "first-road-complete", lives, nextMap: (await state()).map, errors });
     }
@@ -246,6 +280,8 @@ try {
     }
     assert.equal((await state()).phase, "lost");
     await page.screenshot({ path: "output/audit/defeat-mobile.png" });
+    await page.locator('.battle-ledger summary').click();
+    await page.getByText('Damage appears when your defenses hit the road.').waitFor({state:'visible'});
     await page.getByRole("button", { name: "Hold this map", exact: true }).click();
     await page.getByRole("button", { name: "Take the watch", exact: true }).click();
     assert.equal((await state()).phase, "ready");

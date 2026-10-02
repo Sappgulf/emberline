@@ -413,3 +413,11 @@ Original prompt: ok keep working. more upgrades across the game
 - Committed and pushed the game improvements as `4bfd210` on main. Vercel rejected the initial deployment for CVE-2026-102989 in TanStack Start 1.168.49.
 - Raised the Start dependency minimum to 1.168.60; the lockfile resolves patched server core 1.169.39. Adapted the error boundary to the router's unknown error type with a safe fallback. No security bypass was enabled.
 - Reverified 168 source tests, typecheck, lint, production build, auth invariant, and all 17 browser scenarios against the built production preview. Four error-boundary rendering cases pass. Publisher advisory, dependency review gaps, and unrelated remaining npm advisories are recorded in the audit.
+
+## 2026-10-02 — Rally, combat reports, focused prey, and generated runner/ash art
+
+- Added earned Rally (V): actual kills/reactions build capped resolve, breaches reduce it, and a full meter gives all towers +25% fire rate for six simulation seconds. Charge carries across waves; menus/pause freeze timers and road changes clear the effect/history.
+- Added truthful damage/kill ledgers grouped by tower kind, burn ownership without repeated impact reactions, retained wave duration and Rally uses, leading-defense recaps, and access through forecast, Orders, market, victory, and defeat.
+- Added focused health/armor/status readouts, status-aware enemy bars, and actual near-keep lives-at-risk feedback. Added generated four-frame runner gallops and cached ash terrain for Ember Copse/Ash Hollow; PNG originals and exact prompts are retained in `art/imagegen/watch-upgrade-v2.md`.
+- Fixed responsive grids for the ninth command and extended browser regression coverage. Added a release smoke script using normal gameplay in fresh sessions and delivered art hashes, with no test save seeding.
+- All 178 source tests, typecheck, lint, production build, auth invariant, and diff checks pass. The required web-game client reached combat in two production-preview screenshot/state iterations. The 17-case browser audit passes; release verification and limits are documented in `docs/game-upgrade-2026-10-02.md`.

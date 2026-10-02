@@ -75,8 +75,15 @@ import {
   REACTIONS,
   REACTION_BONUS,
   REACTION_COOLDOWN,
+  RALLY_MAX,
+  RALLY_KILL_GAIN,
+  RALLY_REACTION_GAIN,
+  RALLY_BREACH_LOSS,
+  RALLY_DURATION,
+  RALLY_RATE,
   reactionFor,
   type ReactionKind,
+  type CombatEntry,
 } from "./combat.ts";
 
 const FIRST = MAPS[0];
@@ -120,6 +127,9 @@ export interface WaveResultSnap {
   orderChain: number;
   omen: string | null;
   reactions: number;
+  duration: number;
+  rallies: number;
+  ledger: CombatEntry[];
 }
 
 export interface ObjectiveSnap {
@@ -483,6 +493,11 @@ export interface HudSnap {
   endless: boolean;
   eliteCount: number;
   reactions: number;
+  rally: { charge: number; max: number; seconds: number; ready: boolean; rate: number; uses: number };
+  ledger: CombatEntry[];
+  waveDuration: number;
+  danger: { count: number; livesAtRisk: number };
+  prey: { hp: number; maxHp: number; armor: number; statuses: string[] } | null;
 }
 
 export interface Burn {
@@ -492,6 +507,7 @@ export interface Burn {
   life: number;
   tick: number;
   tar?: boolean;
+  source?: TowerKind;
 }
 
 export interface Banner {
@@ -531,6 +547,11 @@ export class EmberEngine {
   floaters: Floater[] = [];
   reactions: ReactionFx[] = [];
   waveReactions = 0;
+  rallyCharge = 0;
+  rallyT = 0;
+  waveRallies = 0;
+  waveDuration = 0;
+  combatLedger: Partial<Record<CombatEntry["source"], CombatEntry>> = {};
   selectedKind: TowerKind | null = "bow";
   selectedId: number | null = null;
   movingId: number | null = null;
@@ -832,6 +853,11 @@ export class EmberEngine {
       },
       banner: hud.bannerText,
       reactions: { triggered: hud.reactions, bonus: REACTION_BONUS, cooldown: REACTION_COOLDOWN },
+      rally: hud.rally,
+      ledger: hud.ledger,
+      danger: hud.danger,
+      prey: hud.prey,
+      waveDuration: hud.waveDuration,
       lastResult: hud.lastResult,
       objective: hud.objective,
       watchOrder: hud.watchOrder,
@@ -983,9 +1009,42 @@ export class EmberEngine {
   }
 
   fieldRateMultiplier(tower: Tower) {
-    if (!this.inLanternAura(tower)) return 1;
-    if (this.map.profile.rule.id === "lantern-aura") return this.relics.has("wick") ? 1.26 : 1.18;
-    return this.relics.has("wick") ? 1.1 : 1;
+    const rally = this.rallyT > 0 ? RALLY_RATE : 1;
+    if (!this.inLanternAura(tower)) return rally;
+    if (this.map.profile.rule.id === "lantern-aura") return (this.relics.has("wick") ? 1.26 : 1.18) * rally;
+    return (this.relics.has("wick") ? 1.1 : 1) * rally;
+  }
+
+  ledgerSnapshot(): CombatEntry[] {
+    return Object.values(this.combatLedger)
+      .map((entry) => ({ ...entry, damage: Math.round(entry.damage * 10) / 10 }))
+      .sort((a, b) => b.damage - a.damage || a.source.localeCompare(b.source));
+  }
+
+  gainRally(amount: number) {
+    if (this.phase !== "wave") return;
+    const before = this.rallyCharge;
+    this.rallyCharge = Math.max(0, Math.min(RALLY_MAX, this.rallyCharge + amount));
+    if (before < RALLY_MAX && this.rallyCharge === RALLY_MAX && this.rallyT <= 0) {
+      this.banner = { text: "Rally ready — V to rally the watch", life: 2.2, max: 2.2 };
+      sfx.rallyReady();
+    }
+  }
+
+  rallyWatch() {
+    if (this.phase !== "wave" || this.paused || this.help || this.codex || this.campaignOpen || this.hall) return;
+    if (this.rallyCharge < RALLY_MAX || this.rallyT > 0) return;
+    this.rallyCharge = 0;
+    this.rallyT = RALLY_DURATION;
+    this.waveRallies += 1;
+    this.banner = { text: "Rally the watch · +25% fire rate", life: 2, max: 2 };
+    for (const tower of this.towers) {
+      // Shorten the loaded shot as well as subsequent shots; never reset it for a free hit.
+      tower.cooldown /= RALLY_RATE;
+      this.ring(tower.c + 0.5, tower.r + 0.5, "#efbb65");
+    }
+    sfx.rally();
+    this.notify();
   }
 
   fieldRangeMultiplier(tower: Pick<Tower, "kind" | "c" | "r">) {
@@ -1038,6 +1097,8 @@ export class EmberEngine {
           : 0;
     const bossCreep = this.bossCreep();
     const bossDef = this.bossDef();
+    const danger = this.creeps.filter((creep) => creep.alive && creep.progress >= this.path.length - 3);
+    const prey = this.focusedCreep() ?? this.markedCreep();
     return {
       gold: this.gold,
       lives: this.lives,
@@ -1052,6 +1113,17 @@ export class EmberEngine {
       waveProgress,
       bannerText: this.banner?.text ?? null,
       lastResult: this.lastResult,
+      rally: { charge: this.rallyCharge, max: RALLY_MAX, seconds: this.rallyT, ready: this.phase === "wave" && !this.paused && this.rallyCharge >= RALLY_MAX && this.rallyT <= 0, rate: RALLY_RATE, uses: this.waveRallies },
+      ledger: this.ledgerSnapshot(),
+      waveDuration: this.waveDuration,
+      danger: { count: danger.length, livesAtRisk: danger.reduce((total, creep) => total + leakCost(creep.kind), 0) },
+      prey: prey ? { hp: Math.max(0, Math.min(prey.maxHp, Math.ceil(prey.hp))), maxHp: prey.maxHp, armor: CREEPS[prey.kind].armor + (prey.elite ? AFFIXES[prey.elite].armor : 0), statuses: [
+        (prey.chillT ?? 0) > 0 ? "Chilled" : null,
+        prey.rootT > 0 ? "Rooted" : null,
+        (prey.wardT ?? 0) > 0 ? "Warded" : null,
+        prey.hasteT > 0 ? "Hastened" : null,
+        prey.dodge ? "Dodge" : null,
+      ].filter((status): status is string => status !== null) } : null,
       field: map.profile,
       objective: this.objectiveSnapshot(),
       watchOrder: this.watchOrderSnapshot(),
@@ -1707,6 +1779,11 @@ export class EmberEngine {
     this.floaters = [];
     this.reactions = [];
     this.waveReactions = 0;
+    this.rallyCharge = 0;
+    this.rallyT = 0;
+    this.waveRallies = 0;
+    this.waveDuration = 0;
+    this.combatLedger = {};
     this.selectedKind = "bow";
     this.selectedId = null;
     this.movingId = null;
@@ -2094,7 +2171,7 @@ export class EmberEngine {
       }
       const x = best?.x ?? cx + Math.cos(t.angle) * Math.min(range, 1.6);
       const y = best?.y ?? cy + Math.sin(t.angle) * Math.min(range, 1.6);
-      this.burns.push({ x, y, r: 1.5, life: 4.2, tick: 0.2 });
+      this.burns.push({ x, y, r: 1.5, life: 4.2, tick: 0.2, source: t.kind });
       this.poof(x, y, "#e07838", 1.2);
       this.ring(x, y, "#e07838");
     } else {
@@ -2429,6 +2506,9 @@ export class EmberEngine {
     }
     this.waveKills = 0;
     this.waveReactions = 0;
+    this.waveRallies = 0;
+    this.waveDuration = 0;
+    this.combatLedger = {};
     this.reactions = [];
     this.waveLeaks = 0;
     this.waveEarned = 0;
@@ -2698,6 +2778,7 @@ export class EmberEngine {
     quiet = false,
     source?: TowerKind,
     chillMultiplier = 1,
+    allowReactions = true,
   ) {
     if (!creep.alive) return;
     if (creep.kind === "knave" && creep.dodge) {
@@ -2714,11 +2795,12 @@ export class EmberEngine {
         return;
       }
     }
-    const reaction = reactionFor(source, creep, this.time);
+    const reaction = allowReactions ? reactionFor(source, creep, this.time) : null;
     if (reaction) {
       amount *= 1 + REACTION_BONUS;
       creep.reactionReadyAt = this.time + REACTION_COOLDOWN;
       this.waveReactions += 1;
+      this.gainRally(RALLY_REACTION_GAIN);
       if (this.reactions.length < 32)
         this.reactions.push({ kind: reaction, x: creep.x, y: creep.y, life: 0.65 });
       this.float(creep.x, creep.y - 0.6, REACTIONS[reaction].name, REACTIONS[reaction].color);
@@ -2736,6 +2818,14 @@ export class EmberEngine {
     const flare = creep.markedT > 0 ? 1 + FLARE_BONUS : 1;
     let dealt = Math.max(1, amount * flare - armor);
     if (creep.wardT && creep.wardT > 0) dealt = Math.max(1, Math.round(dealt * 0.5));
+    const healthRemoved = Math.min(Math.max(0, creep.hp), dealt);
+    let entry: CombatEntry | undefined;
+    if (this.phase === "wave") {
+      const key = source ?? "watch";
+      entry = this.combatLedger[key] ??= { source: key, damage: 0, hits: 0, kills: 0 };
+      entry.damage += healthRemoved;
+      entry.hits += 1;
+    }
     creep.hp -= dealt;
     creep.flash = 1;
     creep.squash = 0.78;
@@ -2772,6 +2862,8 @@ export class EmberEngine {
       );
       this.gold += gold;
       this.waveKills += 1;
+      if (entry) entry.kills += 1;
+      this.gainRally(RALLY_KILL_GAIN);
       if (this.markedId === creep.id) this.markedId = -1;
       if (this.focusId === creep.id) {
         this.focusId = -1;
@@ -2933,7 +3025,7 @@ export class EmberEngine {
         const dy = c.y - (tower.r + 0.5);
         if (dx * dx + dy * dy > range * range) continue;
         const mark = c.id === this.markedId ? MARK_BONUS : 1;
-        this.damageCreep(c, dmg * mark, slow, tower.emberlit === "a");
+        this.damageCreep(c, dmg * mark, slow, tower.emberlit === "a", false, tower.kind);
       }
       return;
     }
@@ -2957,7 +3049,7 @@ export class EmberEngine {
         max: 0.16,
         color: form >= 4 ? "#fff4c8" : "#e8c56a",
       });
-      this.damageCreep(target, dmg, 0, true);
+      this.damageCreep(target, dmg, 0, true, false, tower.kind);
       this.burst(target.x, target.y, "#e8c56a", form >= 3 || tower.empowered ? 11 : 8, "spark");
       const storm = tower.storm;
       tower.storm = false;
@@ -2989,6 +3081,8 @@ export class EmberEngine {
             dmg * (storm ? Math.max(0.35, 0.75 - h * 0.08) : 0.7 - h * 0.12),
             0,
             true,
+            false,
+            tower.kind,
           );
           from = extra;
         }
@@ -3161,6 +3255,7 @@ export class EmberEngine {
             (this.omenNow()?.burnLife ?? 1),
           tick: 0,
           tar: shot.tar,
+          source: shot.kind,
         });
       }
       return;
@@ -3191,6 +3286,7 @@ export class EmberEngine {
 
   step(dt: number) {
     this.time += dt;
+    if (this.phase === "wave" && !this.paused) this.waveDuration += dt;
     this.stepFx(dt);
 
     if (
@@ -3216,6 +3312,7 @@ export class EmberEngine {
     this.hornCd = Math.max(0, this.hornCd - dt);
     this.flareCd = Math.max(0, this.flareCd - dt);
     this.flareT = Math.max(0, this.flareT - dt);
+    this.rallyT = Math.max(0, this.rallyT - dt);
     this.focusT = Math.max(0, this.focusT - dt);
     if (this.focusT <= 0) this.focusId = -1;
     if (this.phase === "ready") {
@@ -3296,7 +3393,7 @@ export class EmberEngine {
         creep.bleedTick = (creep.bleedTick ?? 0) - dt;
         if (creep.bleedTick <= 0) {
           creep.bleedTick = 0.5;
-          this.damageCreep(creep, 6, 0, true, true);
+          this.damageCreep(creep, 6, 0, true, true, "bramble");
           if (!creep.alive) continue;
         }
       }
@@ -3340,6 +3437,7 @@ export class EmberEngine {
           const wound = leakCost(creep.kind);
           this.lives = Math.max(0, this.lives - wound);
           this.waveLeaks += 1;
+          this.gainRally(-RALLY_BREACH_LOSS);
           if (this.markedId === creep.id) this.markedId = -1;
           if (this.focusId === creep.id) {
             this.focusId = -1;
@@ -3449,7 +3547,8 @@ export class EmberEngine {
           const dx = creep.x - burn.x;
           const dy = creep.y - burn.y;
           if (dx * dx + dy * dy <= burn.r * burn.r) {
-            this.damageCreep(creep, this.relics.has("ember") ? 7.2 : 6, burn.tar ? 0.5 : 0);
+            // Ongoing burns count toward their owner, without repeatedly triggering hit reactions.
+            this.damageCreep(creep, this.relics.has("ember") ? 7.2 : 6, burn.tar ? 0.5 : 0, false, true, burn.source, 1, false);
           }
         }
       }
@@ -3476,6 +3575,7 @@ export class EmberEngine {
     this.shots = [];
     this.beams = [];
     this.flareT = 0;
+    this.rallyT = 0;
     this.focusId = -1;
     this.focusT = 0;
     const heldWave = this.wave;
@@ -3567,6 +3667,9 @@ export class EmberEngine {
       orderChain: this.watchChain,
       omen: heldOmen,
       reactions: this.waveReactions,
+      duration: Math.round(this.waveDuration * 10) / 10,
+      rallies: this.waveRallies,
+      ledger: this.ledgerSnapshot(),
     };
     this.scoreGrade();
     this.notify();
@@ -3655,7 +3758,8 @@ export class EmberEngine {
     const boss = this.bossCreep();
     const bossKey = boss ? `${boss.id}|${Math.ceil(boss.hp)}|${boss.bossPhase}` : "none";
     const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${Math.ceil(this.flareCd)}|${Math.ceil(this.flareT)}|${flared}|${heroKey}|${this.canUndo()}|${this.banner?.text ?? ""}|${this.lastResult?.wave ?? 0}|${this.waveKills}|${this.waveLeaks}|${this.waveEarned}|${this.watchChain}|${objective.current}|${this.markedId}|${marked?.hp ?? 0}|${this.focusId}|${Math.ceil(this.focusT)}|${this.hard}|${this.help}|${this.hall}|${this.marks}|${this.campChoice ?? ""}|${this.endless}|${this.scoutsLeft}|${Math.ceil(ability)}|${this.bestEndless}`;
-    const nextKey = `${key}|${chargeKey}|${bossKey}`;
+    const focusPrey = this.focusedCreep();
+    const nextKey = `${key}|${chargeKey}|${bossKey}|${this.rallyCharge}|${Math.ceil(this.rallyT)}|${Math.floor(this.waveDuration)}|${this.creeps.filter(c => c.alive && c.progress >= this.path.length - 3).length}|${Math.ceil(focusPrey?.hp ?? 0)}|${Object.values(this.combatLedger).map(entry => Math.floor(entry.damage / 10)).join(",")}`;
     if (nextKey !== this.hudKey) {
       this.hudKey = nextKey;
       this.notify();

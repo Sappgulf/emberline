@@ -10,6 +10,8 @@ type ImageKey =
   | "path"
   | "woodland"
   | "grub-crawl"
+  | "runner-gallop"
+  | "ash-ground"
   | "shot-bow"
   | "shot-mortar"
   | "shot-frost"
@@ -23,6 +25,8 @@ export function loadSprites() {
   for (const [key, url] of [
     ["woodland", BATTLEFIELD_ART.ground],
     ["grub-crawl", BATTLEFIELD_ART.grubCrawl],
+    ["runner-gallop", BATTLEFIELD_ART.runnerGallop],
+    ["ash-ground", BATTLEFIELD_ART.ashGround],
   ] as const) {
     if (images[key]) continue;
     const img = new Image();
@@ -59,8 +63,9 @@ export function spr(key: ImageKey): HTMLImageElement | null {
   return img;
 }
 
-export function drawGrubFrame(
+export function drawCrawlFrame(
   ctx: CanvasRenderingContext2D,
+  kind: "grub" | "runner",
   x: number,
   y: number,
   size: number,
@@ -68,11 +73,11 @@ export function drawGrubFrame(
   flip: boolean,
   alpha: number,
 ) {
-  const img = spr("grub-crawl");
+  const img = spr(kind === "grub" ? "grub-crawl" : "runner-gallop");
   if (!img) return false;
   const frame = Math.floor(stride * 10) % 4;
   const width = img.naturalWidth / 4;
-  const top = img.naturalHeight * 0.28;
+  const top = img.naturalHeight * (kind === "grub" ? 0.28 : 0.25);
   const height = img.naturalHeight * 0.5;
   ctx.save();
   ctx.translate(x, y);

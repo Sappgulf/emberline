@@ -52,6 +52,15 @@ function beep(freq: number, dur: number, type: OscillatorType, gain: number, sli
 }
 
 export const sfx = {
+  rallyReady: () => {
+    beep(440, 0.12, "sine", 0.04, 110);
+    setTimeout(() => beep(660, 0.15, "sine", 0.035, 80), 90);
+  },
+  rally: () => {
+    beep(196, 0.2, "triangle", 0.045, 98);
+    setTimeout(() => beep(392, 0.22, "triangle", 0.04, 131), 100);
+    setTimeout(() => beep(587, 0.28, "sine", 0.035, 196), 210);
+  },
   place: () => beep(220, 0.08, "triangle", 0.05),
   upgrade: () => {
     beep(300, 0.08, "triangle", 0.045, 80);
