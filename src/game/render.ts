@@ -1,4 +1,4 @@
-import { AFFIXES, COLS, MAX_UPGRADE, ROWS, towerForm, type PropKind } from "./config.ts";
+import { SHAMAN_HEAL_RADIUS, SHAMAN_SONG_WINDUP, AFFIXES, COLS, MAX_UPGRADE, ROWS, towerForm, type PropKind } from "./config.ts";
 import { type Creep, type EmberEngine, type Tower } from "./engine.ts";
 import { drawCrawlFrame, drawSprite, spr } from "./sprites.ts";
 import { REACTIONS } from "./combat.ts";
@@ -1239,6 +1239,15 @@ function drawCreep(
   const spawnPop = motion && creep.alive ? 0.72 + Math.min(1, creep.spawn) * 0.28 : 1;
   const deathPop = motion && !creep.alive ? 1 + (1 - fade) * 0.4 : 1;
   ctx.save();
+  if (focused && creep.kind === "shaman" && creep.alive) {
+    ctx.strokeStyle = "rgba(180,220,131,0.45)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(px, py, SHAMAN_HEAL_RADIUS * cell, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   ctx.translate(px, py + bob);
   // These are side-view illustrations: keep their feet down on vertical bends.
   if (motion && !creep.alive) ctx.rotate((1 - fade) * 0.25);
@@ -1303,8 +1312,25 @@ function drawCreep(
     ctx.strokeStyle = "rgba(122,90,168,0.55)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, size * (1.35 + Math.sin(creep.healT * 6) * 0.08), 0, Math.PI * 2);
+    ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2);
     ctx.stroke();
+    if (creep.healT <= SHAMAN_SONG_WINDUP) {
+      const charge = Math.max(0, Math.min(1, 1 - creep.healT / SHAMAN_SONG_WINDUP));
+      ctx.strokeStyle = "#b4dc83";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 1.5, -Math.PI / 2, -Math.PI / 2 + charge * Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  if ((creep.healFlash ?? 0) > 0 && creep.alive) {
+    ctx.strokeStyle = "#b4dc83";
+    ctx.globalAlpha = motion ? Math.min(1, (creep.healFlash ?? 0) / 0.3) : 1;
+    ctx.lineWidth = Math.max(1.5, cell * 0.03);
+    ctx.beginPath();
+    ctx.arc(0, 0, size * (motion ? 1.5 + (0.55 - (creep.healFlash ?? 0)) : 1.7), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = fade;
   }
   if (creep.kind === "shell") {
     ctx.fillStyle = "rgba(90,100,80,0.45)";

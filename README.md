@@ -16,6 +16,8 @@ Open `http://localhost:8080`. `npm test` covers the watch engine (build, waves, 
 
 With the local server running, `npm run test:game:browser` runs the installed Chrome browser through six layouts, the opening road, market and camp, defeat/retry, saved endless entry, and all eight campaign routes. It saves screenshots and a verdict in `output/audit/`. An optional local URL can be passed with `npm run test:game:browser -- http://localhost:8080`.
 
+`npm run test:game:support` checks shaman casting, focused heal timing, Witch salt, pause, and desktop/phone geometry through real Pine Cut waves. It seeds an isolated campaign save and requires a local server; pass its URL after `--`. Screenshots and results are saved in `output/support/`.
+
 `npm run test:game:live` checks the public deployment using fresh desktop and phone sessions, two real waves, Rally, the battle ledger, and delivered artwork hashes. It does not seed saves. Pass a local production-preview URL to check it before release.
 
 `npm test` also simulates every campaign wave in normal and hard mode and checks combat, healing, save records, and HUD synchronization. The campaign simulation uses a strengthened test arsenal to verify stability; it is not a difficulty assessment. See [the October audit](docs/game-audit-2026-10-01.md) for findings and verification limits.

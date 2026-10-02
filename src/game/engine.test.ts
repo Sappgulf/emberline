@@ -2589,3 +2589,106 @@ describe("tactical sightlines and targeting", () => {
     assert.equal(e.pickTarget(tower)?.id, healer.id, "out-of-range focus falls back to aim");
   });
 });
+
+describe("enemy support signals", () => {
+  function song() {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [{ kind: "grub", t: 1000 }];
+    for (const kind of ["shaman", "shell", "wisp", "grub"] as const) e.spawn(kind);
+    const [healer, ground, air, distant] = e.creeps;
+    for (const creep of e.creeps) {
+      creep.x = 0.5; creep.y = 5.5; creep.spawn = 1;
+      creep.hp = creep.maxHp - 20;
+    }
+    distant.x = 3;
+    healer.healT = 0.01;
+    return { e, healer, ground, air, distant };
+  }
+
+  it("restores only nearby living ground targets and shows actual capped recovery", () => {
+    const { e, healer, ground, air, distant } = song();
+    ground.hp = ground.maxHp - 3;
+    const airHp = air.hp, farHp = distant.hp;
+    e.step(1 / 60);
+    assert.equal(ground.hp, ground.maxHp);
+    assert.equal(air.hp, airHp);
+    assert.equal(distant.hp, farHp);
+    assert.ok((ground.healFlash ?? 0) > 0);
+    assert.equal(air.healFlash ?? 0, 0);
+    assert.ok(e.floaters.some(f => f.text === "+3"));
+    assert.equal(healer.healT, 1.8);
+  });
+
+  it("halves the song with salt, skips full-health feedback, and freezes with pause", () => {
+    const { e, healer, ground } = song();
+    e.relics.add("salt");
+    healer.hp = healer.maxHp;
+    const hp = ground.hp;
+    e.step(1 / 60);
+    assert.equal(ground.hp - hp, 5);
+    assert.equal(healer.healFlash ?? 0, 0);
+    assert.deepEqual(e.floaters.filter(f => f.text.startsWith("+")).map(f => f.text), ["+5"]);
+    e.focusId = healer.id; e.focusT = 4; e.notify();
+    assert.deepEqual(e.hud().prey?.song, { seconds: 1.8, healing: 5, radius: 1.45 });
+    e.paused = true;
+    const timer = healer.healT, flash = ground.healFlash;
+    e.tick(0.2);
+    assert.equal(healer.healT, timer);
+    assert.equal(ground.healFlash, flash);
+  });
+
+  it("refreshes focused statuses when they expire without a health change", () => {
+    const { e, healer } = song();
+    healer.healT = 1.2;
+    e.focusId = healer.id; e.focusT = 3.5;
+    healer.slowT = 0.02; healer.wardT = 0.02;
+    e.maybeNotify();
+    assert.ok(e.hud().prey?.statuses.includes("Slowed"));
+    assert.ok(e.hud().prey?.statuses.includes("Warded"));
+    e.tick(1 / 60); e.tick(1 / 60);
+    assert.ok(!e.hud().prey?.statuses.includes("Slowed"));
+    assert.ok(!e.hud().prey?.statuses.includes("Warded"));
+  });
+
+  it("does not revive dead targets and expires recovery feedback during combat", () => {
+    const { e, ground, distant } = song();
+    ground.alive = false; ground.hp = 0; ground.death = 1;
+    distant.x = 0.5;
+    const hp = distant.hp;
+    e.step(1 / 60);
+    assert.equal(ground.hp, 0);
+    assert.equal(ground.healFlash ?? 0, 0);
+    assert.equal(distant.hp, hp + 10);
+    for (let i = 0; i < 40; i++) e.step(1 / 60);
+    assert.equal(distant.healFlash, 0);
+  });
+
+  it("focuses the body at the pointer instead of a different enemy at its tile center", () => {
+    const { e, healer, air, ground } = song();
+    ground.x = 3;
+    Object.assign(healer, { x: 0.85, y: 5.5 });
+    Object.assign(air, { x: 0.5, y: 5.5 });
+    assert.equal(e.focusCreepAtPoint(healer.x, healer.y), true);
+    assert.equal(e.focusId, healer.id);
+    e.focusId = -1;
+    assert.equal(e.focusCreepAtCell(0, 5), true);
+    assert.equal(e.focusId, air.id);
+    assert.equal(e.focusCreepAtPoint(NaN, 5), false);
+    e.phase = "ready";
+    assert.equal(e.focusCreepAtPoint(healer.x, healer.y), false);
+  });
+
+  it("honors hollow slow resistance on the Horn while still damaging the enemy", () => {
+    const e = play(); e.startWave(); e.spawn("shell"); e.spawn("shell");
+    const [resistant, normal] = e.creeps;
+    resistant.elite = "hollow"; resistant.slowResist = true;
+    e.focusId = resistant.id; e.focusT = 4;
+    const hp = resistant.hp;
+    e.blowHorn();
+    assert.equal(resistant.slowT, 0);
+    assert.ok(normal.slowT > 0);
+    assert.ok(resistant.hp < hp);
+    assert.ok(e.hud().prey?.statuses.includes("Slow / root immune"));
+  });
+});

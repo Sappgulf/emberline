@@ -23,6 +23,8 @@ import {
   FLARE_DURATION,
   FOCUS_BONUS,
   FOCUS_DURATION,
+  SHAMAN_HEAL_INTERVAL,
+  SHAMAN_HEAL_RADIUS,
   TOWERS,
   TOWER_UNLOCK,
   TOWER_UNLOCK_HINT,
@@ -310,6 +312,7 @@ export interface Creep {
   death: number;
   squash: number;
   healT: number;
+  healFlash?: number;
   dodge: boolean;
   rootT: number;
   markedT: number;
@@ -508,7 +511,7 @@ export interface HudSnap {
   ledger: CombatEntry[];
   waveDuration: number;
   danger: { count: number; livesAtRisk: number };
-  prey: { hp: number; maxHp: number; armor: number; statuses: string[] } | null;
+  prey: { hp: number; maxHp: number; armor: number; statuses: string[]; song: { seconds: number; healing: number; radius: number } | null } | null;
 }
 
 export interface Burn {
@@ -769,6 +772,30 @@ export class EmberEngine {
     return this.creeps.find((c) => c.id === this.focusId && c.alive) ?? null;
   }
 
+  preySnapshot(prey: Creep | null): HudSnap["prey"] {
+    if (!prey) return null;
+    const stats = CREEPS[prey.kind];
+    return {
+      hp: Math.max(0, Math.min(prey.maxHp, Math.ceil(prey.hp))),
+      maxHp: prey.maxHp,
+      armor: stats.armor + (prey.elite ? AFFIXES[prey.elite].armor : 0),
+      statuses: [
+        (prey.chillT ?? 0) > 0 ? "Chilled" : prey.slowT > 0 ? "Slowed" : null,
+        prey.rootT > 0 ? "Rooted" : null,
+        (prey.wardT ?? 0) > 0 ? "Warded" : null,
+        (prey.bleedT ?? 0) > 0 ? "Bleeding" : null,
+        prey.hasteT > 0 ? "Hastened" : null,
+        prey.dodge ? "Dodge" : null,
+        prey.slowResist ? "Slow / root immune" : null,
+      ].filter((status): status is string => status !== null),
+      song: stats.heal > 0 && prey.alive ? {
+        seconds: Math.ceil(Math.max(0, prey.healT) * 10) / 10,
+        healing: stats.heal * (this.relics.has("salt") ? 0.5 : 1),
+        radius: SHAMAN_HEAL_RADIUS,
+      } : null,
+    };
+  }
+
   focusSnapshot(): FocusSnap | null {
     const creep = this.focusedCreep();
     if (this.phase !== "wave" || !creep) return null;
@@ -850,6 +877,8 @@ export class EmberEngine {
           focused: hud.focus?.id === creep.id,
           chilled: (creep.chillT ?? 0) > 0,
           rooted: creep.rootT > 0,
+          song: CREEPS[creep.kind].heal > 0 ? this.preySnapshot(creep)?.song : null,
+          healing: (creep.healFlash ?? 0) > 0,
         })),
       controls: {
         aim: hud.towerAim,
@@ -1158,14 +1187,7 @@ export class EmberEngine {
       ledger: this.ledgerSnapshot(),
       waveDuration: this.waveDuration,
       danger: { count: danger.length, livesAtRisk: danger.reduce((total, creep) => total + leakCost(creep.kind), 0) },
-      prey: prey ? { hp: Math.max(0, Math.min(prey.maxHp, Math.ceil(prey.hp))), maxHp: prey.maxHp, armor: CREEPS[prey.kind].armor + (prey.elite ? AFFIXES[prey.elite].armor : 0), statuses: [
-        (prey.chillT ?? 0) > 0 ? "Chilled" : null,
-        prey.rootT > 0 ? "Rooted" : null,
-        (prey.wardT ?? 0) > 0 ? "Warded" : null,
-        (prey.bleedT ?? 0) > 0 ? "Bleeding" : null,
-        prey.hasteT > 0 ? "Hastened" : null,
-        prey.dodge ? "Dodge" : null,
-      ].filter((status): status is string => status !== null) } : null,
+      prey: this.preySnapshot(prey),
       field: map.profile,
       objective: this.objectiveSnapshot(),
       watchOrder: this.watchOrderSnapshot(),
@@ -1685,7 +1707,7 @@ export class EmberEngine {
     this.hornCd = this.relics.has("oil") ? 10 : HORN_CD;
     for (const c of this.creeps) {
       if (!c.alive) continue;
-      c.slowT = Math.max(c.slowT, 2.4);
+      if (!c.slowResist) c.slowT = Math.max(c.slowT, 2.4);
       this.damageCreep(c, 16, 0, true);
     }
     for (const p of this.path) {
@@ -2299,8 +2321,12 @@ export class EmberEngine {
   }
 
   focusCreepAtCell(c: number, r: number) {
-    if (this.phase !== "wave") return false;
-    const creep = this.creepNear(c, r);
+    return this.focusCreepAtPoint(c + 0.5, r + 0.5);
+  }
+
+  focusCreepAtPoint(x: number, y: number) {
+    if (this.phase !== "wave" || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+    const creep = this.creepNear(x - 0.5, y - 0.5);
     if (!creep) return false;
     if (this.focusId === creep.id && this.focusT > 0) {
       this.markCreep(creep);
@@ -3473,6 +3499,7 @@ export class EmberEngine {
           if (!creep.alive) continue;
         }
       }
+      creep.healFlash = Math.max(0, (creep.healFlash ?? 0) - dt);
       creep.flash = Math.max(0, creep.flash - dt * 6);
       creep.markedT = Math.max(0, creep.markedT - dt);
       creep.spawn = Math.min(1, creep.spawn + dt * 4);
@@ -3485,16 +3512,22 @@ export class EmberEngine {
       if (stats.heal > 0) {
         creep.healT -= dt;
         if (creep.healT <= 0) {
-          creep.healT = 1.8;
+          creep.healT = SHAMAN_HEAL_INTERVAL;
           for (const other of this.creeps) {
             if (!other.alive || CREEPS[other.kind].flying) continue;
             const hx = other.x - creep.x;
             const hy = other.y - creep.y;
-            if (hx * hx + hy * hy <= 1.45 * 1.45) {
+            if (hx * hx + hy * hy <= SHAMAN_HEAL_RADIUS * SHAMAN_HEAL_RADIUS) {
+              const before = other.hp;
               other.hp = Math.min(
                 other.maxHp,
                 other.hp + stats.heal * (this.relics.has("salt") ? 0.5 : 1),
               );
+              const restored = other.hp - before;
+              if (restored > 0) {
+                other.healFlash = 0.55;
+                this.float(other.x, other.y - 0.4, `+${Number(restored.toFixed(1))}`, "#b4dc83");
+              }
             }
           }
           this.ring(creep.x, creep.y, "#7a9a58");
@@ -3834,8 +3867,8 @@ export class EmberEngine {
     const boss = this.bossCreep();
     const bossKey = boss ? `${boss.id}|${Math.ceil(boss.hp)}|${boss.bossPhase}` : "none";
     const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${Math.ceil(this.flareCd)}|${Math.ceil(this.flareT)}|${flared}|${heroKey}|${this.canUndo()}|${this.banner?.text ?? ""}|${this.lastResult?.wave ?? 0}|${this.waveKills}|${this.waveLeaks}|${this.waveEarned}|${this.watchChain}|${objective.current}|${this.markedId}|${marked?.hp ?? 0}|${this.focusId}|${Math.ceil(this.focusT)}|${this.hard}|${this.help}|${this.hall}|${this.marks}|${this.campChoice ?? ""}|${this.endless}|${this.scoutsLeft}|${Math.ceil(ability)}|${this.bestEndless}`;
-    const focusPrey = this.focusedCreep();
-    const nextKey = `${key}|${chargeKey}|${bossKey}|${this.rallyCharge}|${Math.ceil(this.rallyT)}|${Math.floor(this.waveDuration)}|${this.creeps.filter(c => c.alive && c.progress >= this.path.length - 3).length}|${Math.ceil(focusPrey?.hp ?? 0)}|${Object.values(this.combatLedger).map(entry => Math.floor(entry.damage / 10)).join(",")}`;
+    const preyKey = JSON.stringify(this.preySnapshot(this.focusedCreep() ?? this.markedCreep()));
+    const nextKey = `${key}|${chargeKey}|${bossKey}|${this.rallyCharge}|${Math.ceil(this.rallyT)}|${Math.floor(this.waveDuration)}|${this.creeps.filter(c => c.alive && c.progress >= this.path.length - 3).length}|${preyKey}|${Object.values(this.combatLedger).map(entry => Math.floor(entry.damage / 10)).join(",")}`;
     if (nextKey !== this.hudKey) {
       this.hudKey = nextKey;
       this.notify();

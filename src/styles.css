@@ -5829,3 +5829,5 @@
 @media (max-height: 600px) and (orientation: landscape) {
   .threat-panel .arrival-plan { display: none; }
 }
+
+.focus-chip .prey-song { font-size: 9px; line-height: 1.35; color: #b4dc83; }

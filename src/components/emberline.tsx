@@ -430,7 +430,7 @@ export function Emberline() {
     const c = Math.floor((x / rect.width) * COLS);
     const r = Math.floor((y / rect.height) * ROWS);
     if (c < 0 || r < 0 || c >= COLS || r >= ROWS) return null;
-    return { c, r };
+    return { c, r, x: (x / rect.width) * COLS, y: (y / rect.height) * ROWS };
   };
 
   const onMove = (e: React.PointerEvent) => {
@@ -450,6 +450,8 @@ export function Emberline() {
     unlockAudio();
     const pos = toCell(e);
     if (!pos) return;
+    const occupied = engine.towers.some(tower => tower.c === pos.c && tower.r === pos.r);
+    if (engine.movingId == null && !occupied && engine.focusCreepAtPoint(pos.x, pos.y)) return;
     engine.tapCell(pos.c, pos.r);
   };
 
@@ -734,6 +736,10 @@ export function Emberline() {
                     <span style={{ width: `${Math.min(100, hud.prey.hp / hud.prey.maxHp * 100)}%` }} />
                   </span>
                   <span className="prey-readout">{hud.prey.hp}/{hud.prey.maxHp} hp{hud.prey.armor > 0 ? ` · ${hud.prey.armor} armor` : ""}</span>
+                  {hud.prey.song && <span className="prey-song">
+                    Song in {hud.prey.song.seconds.toFixed(1)}s · +{hud.prey.song.healing} hp<br />
+                    Nearby ground · {hud.prey.song.radius} tiles
+                  </span>}
                   {hud.prey.statuses.length > 0 && <span className="prey-statuses">{hud.prey.statuses.join(" · ")}</span>}
                 </>
               )}

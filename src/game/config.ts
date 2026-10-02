@@ -25,6 +25,9 @@ export const FLARE_DURATION = 4;
 export const FLARE_BONUS = 0.22;
 export const FOCUS_DURATION = 4;
 export const FOCUS_BONUS = 0.1;
+export const SHAMAN_HEAL_INTERVAL = 1.8;
+export const SHAMAN_HEAL_RADIUS = 1.45;
+export const SHAMAN_SONG_WINDUP = 0.6;
 
 export const PATH: ReadonlyArray<{ c: number; r: number }> = [
   { c: 0, r: 5 },
