@@ -38,6 +38,11 @@ export function spriteUrl(key: string) {
   return `/assets/sprites/${key}.png?${ASSET_REVISION}`;
 }
 
+export const BATTLEFIELD_ART = {
+  ground: "/assets/tiles/woodland-floor-v1.webp",
+  grubCrawl: "/assets/sprites/grub-crawl-v1.webp",
+} as const;
+
 export const ROUTE_MARKER_REVISION = "v1";
 
 export const ROUTE_MARKER_KEYS = [

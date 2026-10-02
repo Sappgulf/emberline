@@ -1,15 +1,34 @@
-import { SPRITE_KEYS, spriteUrl } from "./assets.ts";
+import { BATTLEFIELD_ART, SPRITE_KEYS, spriteUrl } from "./assets.ts";
 
 const KEYS = SPRITE_KEYS;
 
 export type SpriteKey = (typeof KEYS)[number];
 
-const images: Partial<Record<SpriteKey | "grass" | "path" | "shot-bow" | "shot-mortar" | "shot-frost" | "shot-bramble", HTMLImageElement>> = {};
+type ImageKey =
+  | SpriteKey
+  | "grass"
+  | "path"
+  | "woodland"
+  | "grub-crawl"
+  | "shot-bow"
+  | "shot-mortar"
+  | "shot-frost"
+  | "shot-bramble";
+const images: Partial<Record<ImageKey, HTMLImageElement>> = {};
 
 const SHOTS = ["shot-bow", "shot-mortar", "shot-frost", "shot-bramble"] as const;
 
 export function loadSprites() {
   if (typeof Image === "undefined") return;
+  for (const [key, url] of [
+    ["woodland", BATTLEFIELD_ART.ground],
+    ["grub-crawl", BATTLEFIELD_ART.grubCrawl],
+  ] as const) {
+    if (images[key]) continue;
+    const img = new Image();
+    img.src = url;
+    images[key] = img;
+  }
   for (const key of KEYS) {
     if (images[key]) continue;
     const img = new Image();
@@ -34,10 +53,44 @@ export function loadSprites() {
   }
 }
 
-export function spr(key: SpriteKey | "grass" | "path" | "shot-bow" | "shot-mortar" | "shot-frost" | "shot-bramble"): HTMLImageElement | null {
+export function spr(key: ImageKey): HTMLImageElement | null {
   const img = images[key];
   if (!img || !img.complete || img.naturalWidth < 4) return null;
   return img;
+}
+
+export function drawGrubFrame(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  stride: number,
+  flip: boolean,
+  alpha: number,
+) {
+  const img = spr("grub-crawl");
+  if (!img) return false;
+  const frame = Math.floor(stride * 10) % 4;
+  const width = img.naturalWidth / 4;
+  const top = img.naturalHeight * 0.28;
+  const height = img.naturalHeight * 0.5;
+  ctx.save();
+  ctx.translate(x, y);
+  if (flip) ctx.scale(-1, 1);
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(
+    img,
+    frame * width,
+    top,
+    width,
+    height,
+    -size * 0.75,
+    -size * 0.88,
+    size * 1.5,
+    size,
+  );
+  ctx.restore();
+  return true;
 }
 
 export function drawSprite(

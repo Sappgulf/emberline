@@ -52,11 +52,20 @@ describe("maps and shop", () => {
       assert.ok(map.profile.label.length > 0);
       assert.ok(map.profile.detail.length > 0);
       assert.ok(
-        ["lanterns", "pine-fog", "keep-ash", "river-rain", "emberfall", "glass-tide", "ash-draw", "wicker-draft"].includes(
-          map.profile.ambient,
-        ),
+        [
+          "lanterns",
+          "pine-fog",
+          "keep-ash",
+          "river-rain",
+          "emberfall",
+          "glass-tide",
+          "ash-draw",
+          "wicker-draft",
+        ].includes(map.profile.ambient),
       );
-      assert.ok(["gate", "pine", "keep", "rock", "glass", "ash", "wicker"].includes(map.profile.marker));
+      assert.ok(
+        ["gate", "pine", "keep", "rock", "glass", "ash", "wicker"].includes(map.profile.marker),
+      );
       assert.ok(map.profile.rule.label.length > 0);
       assert.ok(map.profile.rule.objectiveTitle.length > 0);
       assert.ok(map.profile.rule.target > 0);
@@ -141,6 +150,366 @@ describe("maps and shop", () => {
     e.tapCell(secondNearWater.c, secondNearWater.r);
     assert.equal(e.hud().objective.complete, true);
     assert.equal(e.fieldDamageMultiplier(e.towers[1]), 1.12);
+  });
+});
+
+describe("audit regressions", () => {
+  it("consumes each splash projectile after one impact", () => {
+    for (const kind of ["mortar", "frost", "cinder"] as const) {
+      const e = play();
+      e.unlocked = MAPS.length;
+      e.gold = 900;
+      e.chooseCounter(kind);
+      const grass = emptyGrass(e);
+      e.tapCell(grass.c, grass.r);
+      const tower = e.towers[0];
+      tower.dmgLvl = 3;
+      e.phase = "wave";
+      e.wave = 1;
+      e.spawn("grub");
+      const target = e.creeps[0];
+      target.hp = target.maxHp = 1000;
+      e.fire(tower, target);
+      const shot = e.shots[0];
+      assert.ok(shot.splash > 0);
+      shot.x = shot.tx;
+      shot.y = shot.ty;
+      e.towers = [];
+      e.tick(1 / 60);
+      const hp = target.hp;
+      assert.equal(e.shots.length, 0, `${kind} should disappear on impact`);
+      for (let i = 0; i < 8; i++) e.tick(1 / 60);
+      assert.equal(target.hp, hp, `${kind} must not reapply its hit`);
+      assert.equal(e.burns.length, kind === "frost" ? 0 : 1);
+    }
+  });
+
+  it("keeps ground splash from damaging high-flying prey", () => {
+    const e = play();
+    e.gold = 900;
+    e.chooseKind("mortar");
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.phase = "wave";
+    e.spawn("moth");
+    e.spawn("wisp");
+    const [low, high] = e.creeps;
+    high.x = low.x;
+    high.y = low.y;
+    low.hp = low.maxHp = 1000;
+    const hp = high.hp;
+    e.fire(e.towers[0], low);
+    e.impact(e.shots[0], low.x, low.y);
+    assert.ok(low.hp < low.maxHp);
+    assert.equal(high.hp, hp);
+  });
+
+  it("guards loaded abilities in the engine as well as the HUD", () => {
+    for (const kind of ["bow", "mortar", "spark", "pike"] as const) {
+      const e = play();
+      e.unlocked = MAPS.length;
+      e.gold = 900;
+      e.chooseCounter(kind);
+      const grass = emptyGrass(e);
+      e.tapCell(grass.c, grass.r);
+      e.useAbility();
+      const tower = e.towers[0];
+      tower.abilityCd = 0;
+      if (kind === "bow") tower.volt = 1;
+      e.useAbility();
+      assert.equal(tower.abilityCd, 0, `${kind} must not spend a second cooldown`);
+      if (kind === "bow") assert.equal(tower.volt, 1);
+    }
+  });
+
+  it("does not root resistant enemies with Nova or Briar", () => {
+    for (const kind of ["frost", "bramble"] as const) {
+      const e = play();
+      e.gold = 900;
+      e.chooseCounter(kind);
+      const grass = emptyGrass(e);
+      e.tapCell(grass.c, grass.r);
+      e.phase = "wave";
+      e.spawn("grub");
+      const target = e.creeps[0];
+      target.x = grass.c + 0.5;
+      target.y = grass.r + 0.5;
+      target.slowResist = true;
+      e.useAbility();
+      assert.equal(target.slowT, 0);
+      assert.equal(target.rootT, 0);
+      assert.equal(target.chillT ?? 0, 0);
+    }
+  });
+
+  it("applies damage camp preparations to combat and the displayed bonus", () => {
+    const e = play();
+    e.loadMap(1);
+    e.phase = "shop";
+    e.chooseCamp("damage");
+    assert.equal(e.campChoice, "damage");
+    e.phase = "brief";
+    e.dismissBrief();
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.phase = "wave";
+    e.wave = 1;
+    e.spawn("grub");
+    e.fire(e.towers[0], e.creeps[0]);
+    const boosted = e.shots[0].damage;
+    e.campDamage = 1;
+    e.fire(e.towers[0], e.creeps[0]);
+    assert.ok(Math.abs(boosted / e.shots[1].damage - 1.1) < 1e-9);
+    e.campDamage = 1.1;
+    e.notify();
+    assert.ok(Math.abs((e.hud().setBonus?.damage ?? 0) - 0.1) < 1e-9);
+    e.clearField();
+    assert.equal(e.damageMultiplier(), 1, "preparation lasts only one road");
+  });
+
+  it("uses the same omen modifiers in the HUD and actual tower reach", () => {
+    const e = play();
+    e.loadMap(5);
+    e.gold = 900;
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    for (let wave = 0; wave < e.map.waves.length; wave++) {
+      e.wave = wave;
+      e.notify();
+      const omen = e.omenNow();
+      assert.equal(e.hud().fieldBoost?.damage, e.fieldDamageMultiplier(tower) * (omen?.towerDamage ?? 1));
+      assert.equal(e.hud().fieldBoost?.rate, e.fieldRateMultiplier(tower) * (omen?.towerRate ?? 1));
+      assert.equal(e.hud().fieldBoost?.range, e.fieldRangeMultiplier(tower) * (omen?.towerRange ?? 1));
+      assert.ok(Math.abs(e.placementRange("bow", grass.c, grass.r) - e.sightRange(tower)) < 1e-9);
+    }
+  });
+
+  it("suspends combat while Orders or the Bestiary covers the board", () => {
+    for (const overlay of ["help", "codex"] as const) {
+      const e = play();
+      e.startWave();
+      e.spawn("grub");
+      const before = e.renderText();
+      e[overlay] = true;
+      for (let i = 0; i < 60; i++) e.tick(1 / 60);
+      const after = JSON.parse(e.renderText());
+      assert.deepEqual(after.creeps, JSON.parse(before).creeps);
+      e[overlay] = false;
+      e.tick(1 / 60);
+      assert.notDeepEqual(JSON.parse(e.renderText()).creeps, after.creeps);
+      e.paused = true;
+      e[overlay] = true;
+      e[overlay] = false;
+      e.tick(1 / 60);
+      assert.equal(e.paused, true, "closing a guide preserves manual pause");
+    }
+  });
+
+  it("captures the held omen before advancing to the next forecast", () => {
+    const e = play();
+    e.loadMap(3);
+    e.phase = "wave";
+    e.wave = 2;
+    const held = e.omenNow()?.name;
+    e.finishWaveIfClear();
+    assert.notEqual(e.omenNow()?.name, held);
+    assert.equal(e.lastResult?.omen, held);
+  });
+
+  it("rejects malformed build coordinates", () => {
+    const e = play();
+    const grass = emptyGrass(e);
+    for (const [c, r] of [[NaN, grass.r], [grass.c, Infinity], [grass.c + 0.25, grass.r]]) {
+      assert.equal(e.canBuild(c, r), false);
+      e.tapCell(c, r);
+    }
+    assert.equal(e.towers.length, 0);
+    assert.equal(e.gold, e.startGold() + 40);
+  });
+
+  it("allows low-air waves with mortar cover while keeping high-air waves gated", () => {
+    const e = play();
+    e.loadMap(6);
+    e.gold = 900;
+    e.chooseKind("mortar");
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.startWave();
+    assert.equal(e.phase, "wave");
+    e.loadMap(1);
+    e.phase = "ready";
+    e.wave = 0;
+    e.startWave();
+    assert.equal(e.phase, "ready");
+    assert.match(e.banner?.text ?? "", /Air sightline needed/);
+  });
+
+  it("persists an endless record as soon as a night is held", () => {
+    const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    let stored: string | null = null;
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => stored, setItem: (_key: string, value: string) => { stored = value; } },
+    });
+    try {
+      const e = play();
+      e.endless = true;
+      e.phase = "wave";
+      e.wave = 4;
+      e.finishWaveIfClear();
+      const reloaded = new EmberEngine();
+      reloaded.readSave();
+      assert.equal(reloaded.bestEndless, 4);
+    } finally {
+      if (previous) Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous });
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
+
+  it("preserves explicit pause choices when a tab becomes visible", () => {
+    const e = play();
+    e.hideTab(true);
+    assert.equal(e.autoPaused, true);
+    e.togglePause();
+    e.togglePause();
+    e.hideTab(false);
+    assert.equal(e.paused, true);
+    assert.equal(e.autoPaused, false);
+  });
+
+  it("clears farming and placement state on a new road", () => {
+    const e = play();
+    e.farmT = 3;
+    e.hoverC = 4;
+    e.hoverR = 2;
+    e.retryMap();
+    e.dismissBrief();
+    const gold = e.gold;
+    e.tick(0.2);
+    assert.equal(e.gold, gold);
+    assert.equal(e.hoverC, -1);
+    assert.equal(e.hoverR, -1);
+  });
+
+  it("lets mending restore lives granted by the timber rite and camp", () => {
+    for (const preparation of ["rite", "camp"] as const) {
+      const e = new EmberEngine();
+      e.startFromTitle();
+      if (preparation === "rite") e.chooseRite("heart");
+      else e.campChoice = "lives";
+      e.dismissBrief();
+      const full = e.lives;
+      assert.equal(e.maxLives(), full);
+      e.lives -= 1;
+      e.mendKeep();
+      assert.equal(e.lives, full);
+      e.retryMap();
+      e.chooseRite("coin");
+      e.dismissBrief();
+      assert.equal(e.maxLives(), START_LIVES);
+    }
+  });
+
+  it("updates the boss bar when damage changes without kills or gold", () => {
+    const e = play();
+    e.loadMap(3);
+    e.phase = "wave";
+    e.wave = 5;
+    e.spawn("lord");
+    e.maybeNotify();
+    const lord = e.creeps[0];
+    const before = e.hud().boss?.hp;
+    e.damageCreep(lord, 40, 0);
+    e.maybeNotify();
+    assert.ok((e.hud().boss?.hp ?? Infinity) < (before ?? 0));
+    assert.equal(e.hud().boss?.hp, Math.ceil(lord.hp));
+  });
+
+  it("refreshes ability readiness after a waiting charge is used", () => {
+    const e = play();
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.useAbility();
+    const tower = e.towers[0];
+    tower.abilityCd = 0;
+    tower.volt = 1;
+    e.phase = "wave";
+    e.spawn("grub");
+    e.maybeNotify();
+    assert.equal(e.hud().ability?.ready, false);
+    e.fire(tower, e.creeps[0]);
+    e.maybeNotify();
+    assert.equal(e.hud().ability?.ready, true);
+  });
+
+  it("makes Rimebind chill last 50% longer at projectile impact", () => {
+    const chill = (branch: "a" | "b") => {
+      const e = play();
+      e.gold = 900;
+      e.chooseKind("frost");
+      const grass = emptyGrass(e);
+      e.tapCell(grass.c, grass.r);
+      const tower = e.towers[0];
+      tower.dmgLvl = 4;
+      tower.empowered = true;
+      tower.emberlit = branch;
+      e.phase = "wave";
+      e.wave = 1;
+      e.spawn("grub");
+      const target = e.creeps[0];
+      target.hp = target.maxHp = 1000;
+      e.fire(tower, target);
+      e.impact(e.shots[0], target.x, target.y);
+      return target.chillT ?? 0;
+    };
+    assert.ok(Math.abs(chill("b") / chill("a") - 1.5) < 1e-9);
+  });
+
+  it("keeps all campaign waves stable in normal and hard watches", () => {
+    for (const hard of [false, true]) {
+      for (let index = 0; index < MAPS.length; index++) {
+        const e = new EmberEngine();
+        e.hard = hard;
+        e.loadMap(index);
+        e.phase = "brief";
+        e.dismissBrief();
+        e.reducedMotion = true;
+        e.gold = 10000;
+        for (const kind of ["bow", "mortar", "frost", "spark", "bramble", "ward", "pike", "cinder"] as const) {
+          if (!e.towerUnlocked(kind)) continue;
+          const cells = [...e.pathSet].flatMap(key => {
+            const [c, r] = key.split(",").map(Number);
+            return [{c: c + 1, r}, {c: c - 1, r}, {c, r: r + 1}, {c, r: r - 1}];
+          }).filter(p => e.canBuild(p.c, p.r));
+          const cell = cells[Math.floor(cells.length / 2)];
+          assert.ok(cell);
+          e.chooseCounter(kind);
+          e.tapCell(cell.c, cell.r);
+          const tower = e.towers.at(-1)!;
+          tower.dmgLvl = tower.rateLvl = tower.rangeLvl = 4;
+          tower.empowered = true;
+          tower.emberlit = index % 2 ? "a" : "b";
+        }
+        // This is a stability test, not a claim that this arsenal is balanced.
+        e.lives = 1000;
+        for (let wave = 0; wave < e.map.waves.length; wave++) {
+          e.startWave();
+          assert.equal(e.phase, "wave", `${e.map.id} wave ${wave + 1} should start`);
+          for (let i = 0; i < 12000 && e.phase === "wave"; i++) {
+            e.tick(1 / 60);
+            assert.ok(Number.isFinite(e.gold) && e.gold >= 0);
+            assert.ok(Number.isFinite(e.lives) && e.lives >= 0);
+            assert.ok(e.shots.length <= 96 && e.burns.length <= 28);
+            for (const c of e.creeps) assert.ok(Number.isFinite(c.x + c.y + c.hp));
+          }
+          assert.ok(e.phase !== "wave", `${e.map.id} wave ${wave + 1} must terminate`);
+          assert.equal(e.lastResult?.wave, wave + 1);
+        }
+        assert.equal(e.phase, index === MAPS.length - 1 ? "won" : "shop");
+        assert.ok(e.unlocked >= index + 1);
+      }
+    }
   });
 });
 
@@ -401,7 +770,9 @@ describe("EmberEngine", () => {
     assert.equal(e.hud().formName, "Bound");
     assert.ok(e.sightRange(tower) > before);
     assert.equal(tower.upgradeBranch, "range");
-    const text = JSON.parse(e.renderText()) as { selectedTower: { rangeLevel: number; form: string } };
+    const text = JSON.parse(e.renderText()) as {
+      selectedTower: { rangeLevel: number; form: string };
+    };
     assert.equal(text.selectedTower.rangeLevel, 2);
     assert.equal(text.selectedTower.form, "Bound");
   });
@@ -559,9 +930,14 @@ describe("EmberEngine", () => {
       orderPayout: 22,
       orderChain: 1,
       omen: null,
+      reactions: 0,
     });
     assert.ok((e.hud().lastResult?.earned ?? 0) > 0);
-    const text = JSON.parse(e.renderText()) as { coordinateSystem: string; phase: string; wave: { progress: number } };
+    const text = JSON.parse(e.renderText()) as {
+      coordinateSystem: string;
+      phase: string;
+      wave: { progress: number };
+    };
     assert.match(text.coordinateSystem, /origin top-left/);
     assert.equal(text.phase, "ready");
     assert.equal(text.wave.progress, 100);
@@ -918,6 +1294,139 @@ describe("EmberEngine", () => {
     for (let i = 0; i < 90; i++) e.step(1 / 60);
     assert.equal(e.phase, "lost");
     assert.equal(e.lives, 0);
+  });
+});
+
+describe("battlefield reactions", () => {
+  function target(e: EmberEngine) {
+    e.spawn("shell");
+    const creep = e.creeps[e.creeps.length - 1];
+    creep.hp = creep.maxHp = 1000;
+    return creep;
+  }
+
+  it("shatters frost-chilled prey through the actual projectile impact path", () => {
+    const e = play();
+    e.gold = 1000;
+    e.chooseKind("frost");
+    let cell = emptyGrass(e);
+    e.tapCell(cell.c, cell.r);
+    e.chooseKind("mortar");
+    cell = emptyGrass(e);
+    e.tapCell(cell.c, cell.r);
+    const creep = target(e);
+    e.fire(e.towers[0], creep);
+    e.impact(e.shots[0], creep.x, creep.y);
+    assert.ok((creep.chillT ?? 0) > 0);
+    e.fire(e.towers[1], creep);
+    const shot = e.shots[e.shots.length - 1];
+    const before = creep.hp;
+    e.impact(shot, creep.x, creep.y);
+    assert.ok(Math.abs(before - creep.hp - (shot.damage * 1.3 - CREEPS.shell.armor)) < 0.00001);
+    assert.equal(e.waveReactions, 1);
+    assert.equal(e.reactions[0].kind, "shatter");
+  });
+
+  it("shares the per-enemy cooldown across shatter and kindle", () => {
+    const e = play();
+    const creep = target(e);
+    creep.rootT = 10;
+    creep.chillT = 10;
+    e.damageCreep(creep, 20, 0, false, true, "mortar");
+    e.damageCreep(creep, 20, 0, false, true, "cinder");
+    assert.equal(e.waveReactions, 1);
+    e.time = 2;
+    e.damageCreep(creep, 20, 0, false, true, "cinder");
+    assert.equal(e.waveReactions, 2);
+    assert.equal(e.reactions[1].kind, "kindle");
+  });
+
+  it("does not turn ordinary slowing, resisted frost, or burn ticks into reactions", () => {
+    const e = play();
+    const creep = target(e);
+    e.damageCreep(creep, 5, 0.5, false, true, "ward");
+    e.damageCreep(creep, 20, 0, false, true, "mortar");
+    assert.equal(e.waveReactions, 0);
+    creep.slowResist = true;
+    e.damageCreep(creep, 5, 0.5, false, true, "frost");
+    e.damageCreep(creep, 20, 0, false, true, "mortar");
+    assert.equal(creep.chillT, undefined);
+    creep.rootT = 3;
+    e.damageCreep(creep, 5, 0, true, true);
+    assert.equal(e.waveReactions, 0);
+  });
+
+  it("expires frost exposure and preserves movement and effects during pause", () => {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [];
+    const creep = target(e);
+    e.damageCreep(creep, 5, 0.4, false, true, "frost");
+    e.damageCreep(creep, 10, 0, false, true, "mortar");
+    const life = e.reactions[0].life;
+    const chill = creep.chillT;
+    e.togglePause();
+    e.tick(0.1);
+    assert.equal(e.reactions[0].life, life);
+    assert.equal(creep.chillT, chill);
+    e.togglePause();
+    for (let i = 0; i < 100; i++) e.tick(1 / 60);
+    assert.equal(creep.chillT, 0);
+    assert.equal(e.reactions.length, 0);
+    assert.ok((creep.stride ?? 0) > 0);
+  });
+
+  it("counts a reaction kill once and carries its count into the wave recap", () => {
+    const e = play();
+    e.startWave();
+    e.spawnQ = [];
+    const creep = target(e);
+    creep.hp = 10;
+    creep.chillT = 1;
+    e.damageCreep(creep, 100, 0, false, true, "pike");
+    const gold = e.gold;
+    e.damageCreep(creep, 100, 0, false, true, "pike");
+    assert.equal(e.gold, gold);
+    assert.equal(e.waveReactions, 1);
+    // Shell splinters remain part of the same wave.
+    for (const splinter of e.creeps) if (splinter.alive) e.damageCreep(splinter, 1000, 0);
+    e.finishWaveIfClear();
+    assert.equal(e.hud().lastResult?.reactions, 1);
+    assert.equal(JSON.parse(e.renderText()).reactions.triggered, 1);
+    e.startWave();
+    assert.equal(e.waveReactions, 0);
+    e.clearField();
+    assert.equal(e.reactions.length, 0);
+  });
+
+  it("supports frost Nova and bramble Briar as deliberate reaction setups", () => {
+    for (const kind of ["frost", "bramble"] as const) {
+      const e = play();
+      e.chooseKind(kind);
+      const cell = emptyGrass(e);
+      e.tapCell(cell.c, cell.r);
+      const creep = target(e);
+      creep.x = cell.c + 0.5;
+      creep.y = cell.r + 0.5;
+      e.useAbility();
+      e.damageCreep(creep, 20, 0, false, true, kind === "frost" ? "pike" : "cinder");
+      assert.equal(e.reactions[0]?.kind, kind === "frost" ? "shatter" : "kindle");
+    }
+  });
+
+  it("reports coverage only on the current route and grows it with reach", () => {
+    const e = play();
+    for (let i = 0; i < MAPS.length; i++) {
+      e.loadMap(i);
+      const cell = emptyGrass(e);
+      const short = e.roadCoverage(cell.c, cell.r, 1.5);
+      const long = e.roadCoverage(cell.c, cell.r, 3);
+      assert.ok(long.length >= short.length);
+      for (const tile of long) {
+        assert.ok(e.pathSet.has(`${tile.c},${tile.r}`));
+        assert.ok(Math.hypot(tile.c - cell.c, tile.r - cell.r) <= 3);
+      }
+    }
   });
 });
 

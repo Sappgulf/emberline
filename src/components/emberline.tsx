@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { RotateCcw } from "lucide-react";
+import { REACTIONS, REACTION_COOLDOWN } from "@/game/combat";
 import {
   COLS,
   CREEPS,
@@ -15,6 +16,7 @@ import {
   ROWS,
   TOWERS,
   damageAt,
+  emberlitDamageMultiplier,
   rangeAt,
   rateAt,
   towerForm,
@@ -87,8 +89,11 @@ function placementMessage(engine: EmberEngine, hud: HudSnap, hover: HoverCell | 
     const reason = hover ? engine.buildReason(hover.c, hover.r) : null;
     if (reason) return reason;
     if (hud.gold < def.cost) return `Need ${def.cost}g for ${def.short}`;
+    const coverage = hover
+      ? engine.roadCoverage(hover.c, hover.r, engine.placementRange(hud.selectedKind, hover.c, hover.r)).length
+      : 0;
     return hover
-      ? `${def.short} · place here · ${def.cost}g`
+      ? `${def.short} · ${coverage} road tiles in reach · ${def.cost}g`
       : `${def.short} ready · tap a highlighted grass tile`;
   }
 
@@ -230,7 +235,10 @@ export function Emberline() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.defaultPrevented || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if ((e.key === " " || e.code === "Space") &&
+        e.target instanceof HTMLElement && e.target.closest("button, a[href], summary")) return;
       if (e.key === "?" || e.key === "/") {
         e.preventDefault();
         helpRestoreRef.current =
@@ -932,7 +940,10 @@ export function Emberline() {
             <div className="orders-grid w-full text-left">
               {[
                 ["1–8", "Pick a packet. Pike unseals after Keep Stair; Cinder after River Ford."],
-                ["Click a creep", "Focus fire for four seconds. Tap again to mark it for a stronger priority."],
+                [
+                  "Click a creep",
+                  "Focus fire for four seconds. Tap again to mark it for a stronger priority.",
+                ],
                 ["K scout", "Once a wave, mark the toughest body on the road."],
                 [
                   "Q / E / R (ready)",
@@ -950,6 +961,14 @@ export function Emberline() {
                 ],
                 ["Rites", "At the brief: spare purse, spare timber, or first ember."],
                 ["Omens", "Some waves carry an omen. Read the forecast before you send."],
+                [
+                  "Shatter",
+                  "Frost chills prey; Mortar or Pike hits it 30% harder. Once per enemy every two seconds.",
+                ],
+                [
+                  "Kindle",
+                  "Root prey with Briar or upgraded Thorns; Mortar or Cinder hits it 30% harder. Shares Shatter's cooldown.",
+                ],
                 ["Camp", "After a road, choose a preparation for the next one."],
                 ["Elites", "Some prey run shielded, frenzied, warded, or hollow. They pay more."],
                 ["Abilities", "C or the ability button unleashes the selected tower's power."],
@@ -1175,7 +1194,9 @@ export function Emberline() {
                     <b>3</b>
                     <span>
                       <strong>Send and focus</strong>
-                      <small>Tap a body to focus fire; K marks the toughest. Horn if it frays.</small>
+                      <small>
+                        Tap a body to focus fire; K marks the toughest. Horn if it frays.
+                      </small>
                     </span>
                   </li>
                 </ol>
@@ -1582,7 +1603,7 @@ export function Emberline() {
             ) : playing && hud.phase === "ready" ? (
               `Next: ${hud.nextWave}`
             ) : hud.phase === "wave" ? (
-              focusReadout ?? "Tap an enemy to focus fire. Tap again to mark it for +18% power."
+              (focusReadout ?? "Tap an enemy to focus fire. Tap again to mark it for +18% power.")
             ) : (
               "Pick a packet, plant on grass beside the road."
             )}
@@ -1840,6 +1861,8 @@ function towerPower(
   const form = towerForm(damageLevel, rateLevel, rangeLevel);
   return Math.round(
     damageAt(tower.kind, damageLevel) *
+      emberlitDamageMultiplier(tower.kind, tower.emberlit) *
+      (hud.rite === "flame" && hud.previewWave === 1 ? 1.12 : 1) *
       (hud.relics.includes("whet") ? 1.12 : 1) *
       (hud.relics.includes("ember") && tower.kind === "mortar" ? 1.2 : 1) *
       (1 + (form - 1) * 0.06) *
@@ -1856,7 +1879,8 @@ function towerRate(
   rateLevel = tower.rateLvl,
 ) {
   return (
-    rateAt(tower.kind, rateLevel) * (hud.fieldBoost?.rate ?? 1) * (1 + (hud.setBonus?.rate ?? 0))
+    rateAt(tower.kind, rateLevel) * (hud.fieldBoost?.rate ?? 1) *
+      (hud.kindred ? 1.1 : 1) * (1 + (hud.setBonus?.rate ?? 0))
   );
 }
 
@@ -2168,11 +2192,11 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
         {hud.campLabel && <p className="desk-meta">Camp · {hud.campLabel}</p>}
       </section>
       <section className="desk-card">
-        <span className="intel-kicker">Now · wave {hud.previewWave}</span>
+        <span className="intel-kicker">Now · {hud.endless ? "night" : "wave"} {hud.previewWave}</span>
         <DeskWave items={hud.wavePreview} />
         {hud.thenPreview.length > 0 && (
           <>
-            <span className="intel-kicker desk-then">Then · wave {hud.previewWave + 1}</span>
+            <span className="intel-kicker desk-then">Then · {hud.endless ? "night" : "wave"} {hud.previewWave + 1}</span>
             <DeskWave items={hud.thenPreview} />
           </>
         )}
@@ -2193,13 +2217,14 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
           <span className="intel-kicker">Focus fire</span>
           <strong>{hud.focus.name}</strong>
           <p>
-            +{Math.round(hud.focus.bonus * 100)}% tower power · {Math.ceil(hud.focus.seconds)}s remaining
+            +{Math.round(hud.focus.bonus * 100)}% tower power · {Math.ceil(hud.focus.seconds)}s
+            remaining
           </p>
         </section>
       )}
       {hud.phase === "wave" && (
         <section className="desk-card">
-          <span className="intel-kicker">This wave</span>
+          <span className="intel-kicker">This {hud.endless ? "night" : "wave"}</span>
           <div className="desk-stats">
             <span>
               <b>{hud.waveKills}</b> cut
@@ -2213,6 +2238,11 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
             {hud.eliteCount > 0 && (
               <span>
                 <b>{hud.eliteCount}</b> elite
+              </span>
+            )}
+            {hud.reactions > 0 && (
+              <span>
+                <b>{hud.reactions}</b> {hud.reactions === 1 ? "reaction" : "reactions"}
               </span>
             )}
           </div>
@@ -2248,7 +2278,7 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
         )}
       </section>
       {hud.towerCount >= 4 && <p className="desk-next">Overwatch · four towers tithe +1g</p>}
-      {nextRoad && <p className="desk-next">Next road · {nextRoad}</p>}
+      {!hud.endless && nextRoad && <p className="desk-next">Next road · {nextRoad}</p>}
     </aside>
   );
 }
@@ -2419,7 +2449,34 @@ function ThreatPanel({
           {uncoveredAir ? hud.airHint : THREAT_NOTE[hud.threatTier]}
         </p>
       </div>
+      <ReactionGuide count={hud.reactions} />
     </section>
+  );
+}
+
+function ReactionGuide({ count }: { count: number }) {
+  return (
+    <details className="reaction-guide">
+      <summary>
+        <span>Tower reactions</span>
+        <span className="reaction-guide-bonus">
+          {count > 0 ? `${count} triggered` : "+30% power"}
+        </span>
+      </summary>
+      <div className="reaction-guide-body">
+        {Object.entries(REACTIONS).map(([id, reaction]) => (
+          <div key={id} className={`reaction-recipe reaction-${id}`}>
+            <strong>{reaction.name}</strong>
+            <span>{reaction.setup}</span>
+            <p>{reaction.detail}</p>
+          </div>
+        ))}
+        <p className="reaction-guide-note">
+          Overlap both towers' reach on the road. One reaction per enemy every {REACTION_COOLDOWN}s.
+          Root with Briar or upgraded Thorns.
+        </p>
+      </div>
+    </details>
   );
 }
 
@@ -2589,6 +2646,11 @@ function WaveRecap({ result }: { result: NonNullable<HudSnap["lastResult"]> }) {
         <span>
           <b>+{result.earned}g</b> earned
         </span>
+        {result.reactions > 0 && (
+          <span>
+            <b>{result.reactions}</b> {result.reactions === 1 ? "reaction" : "reactions"}
+          </span>
+        )}
       </div>
       <div className={`wave-recap-order ${result.orderHeld ? "" : "wave-recap-order-missed"}`}>
         {result.orderHeld

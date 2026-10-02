@@ -3,6 +3,7 @@ let muted = false;
 let lastHit = 0;
 let lastShot = 0;
 let lastKill = 0;
+let lastReaction = 0;
 
 export function setMuted(value: boolean) {
   muted = value;
@@ -86,6 +87,18 @@ export const sfx = {
     beep(340, 0.1, "triangle", 0.05, 220);
   },
   combo: () => beep(520, 0.12, "triangle", 0.045, 180),
+  reaction: (kind: "shatter" | "kindle") => {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (now - lastReaction < 150) return;
+    lastReaction = now;
+    beep(
+      kind === "shatter" ? 920 : 190,
+      0.16,
+      kind === "shatter" ? "sine" : "triangle",
+      0.04,
+      kind === "shatter" ? -440 : 180,
+    );
+  },
   boss: () => {
     beep(78, 0.24, "sawtooth", 0.055, -12);
     setTimeout(() => beep(116, 0.2, "triangle", 0.05, -18), 100);

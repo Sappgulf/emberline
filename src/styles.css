@@ -188,6 +188,79 @@
   display: block;
   margin-top: 0.55rem;
 }
+
+.reaction-guide {
+  margin-top: 0.65rem;
+  border-top: 1px solid rgba(212, 160, 84, 0.25);
+  color: var(--color-parchment);
+  font-size: 11px;
+}
+.reaction-guide summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+}
+.reaction-guide summary::-webkit-details-marker {
+  display: none;
+}
+.reaction-guide summary::before {
+  content: "+";
+  color: var(--color-copper);
+}
+.reaction-guide[open] summary::before {
+  content: "−";
+}
+.reaction-guide summary:focus-visible {
+  outline: 2px solid var(--color-copper);
+  outline-offset: 2px;
+}
+.reaction-guide summary > span:first-of-type {
+  flex: 1;
+}
+.reaction-guide-bonus {
+  color: var(--color-copper);
+  font-size: 10px;
+}
+.reaction-guide-body {
+  display: grid;
+  gap: 0.45rem;
+  padding-bottom: 0.3rem;
+}
+.reaction-recipe {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.5rem;
+  padding: 0.5rem;
+  border-left: 2px solid #a8e1e8;
+  background: rgba(106, 168, 180, 0.06);
+}
+.reaction-kindle {
+  border-color: #f6bb6c;
+  background: rgba(246, 187, 108, 0.06);
+}
+.reaction-shatter strong {
+  color: #a8e1e8;
+}
+.reaction-kindle strong {
+  color: #f6bb6c;
+}
+.reaction-recipe > span {
+  text-align: right;
+  color: var(--color-dust);
+  font-size: 10px;
+}
+.reaction-recipe p,
+.reaction-guide-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-dust);
+  font-size: 10px;
+  line-height: 1.5;
+}
 .desk-wave,
 .desk-relics {
   margin: 0.35rem 0 0;
@@ -246,7 +319,7 @@
   background:
     radial-gradient(circle at 50% 48%, rgba(90, 122, 72, 0.22), transparent 56%),
     linear-gradient(180deg, rgba(18, 22, 15, 0.2), rgba(10, 12, 9, 0.72)),
-    url("/assets/tiles/grass.jpg") center / cover;
+    url("/assets/tiles/woodland-floor-v1.webp") center / 24rem 24rem repeat;
   border: 1px solid rgba(138, 106, 56, 0.28);
   box-shadow:
     inset 0 20px 40px rgba(18, 22, 15, 0.32),

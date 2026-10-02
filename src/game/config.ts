@@ -129,10 +129,10 @@ export function omenFor(mapIndex: number, wave: number, endless = false): OmenDe
 }
 
 export const PERKS: ReadonlyArray<{ id: PerkId; name: string; detail: string; max: number; costs: number[] }> = [
-  { id: "purse", name: "Keep purse", detail: "+20 starting gold per mark spent.", max: 3, costs: [2, 4, 6] },
-  { id: "wall", name: "Stone wall", detail: "+1 keep life per mark spent.", max: 3, costs: [2, 4, 6] },
-  { id: "whet", name: "Grindstone", detail: "+4% tower damage per mark spent.", max: 3, costs: [2, 4, 6] },
-  { id: "rest", name: "Mend stone", detail: "Mends cost 10g less per mark spent.", max: 3, costs: [2, 4, 6] },
+  { id: "purse", name: "Keep purse", detail: "+20 starting gold per tier.", max: 3, costs: [2, 4, 6] },
+  { id: "wall", name: "Stone wall", detail: "+1 keep life per tier.", max: 3, costs: [2, 4, 6] },
+  { id: "whet", name: "Grindstone", detail: "+4% tower damage per tier.", max: 3, costs: [2, 4, 6] },
+  { id: "rest", name: "Mend stone", detail: "Mends cost 10g less per tier.", max: 3, costs: [2, 4, 6] },
 ];
 
 export const AFFIXES: Record<
@@ -535,6 +535,15 @@ export function upgradeRangeCost(kind: TowerKind, level: number): number {
 
 export function damageAt(kind: TowerKind, level: number): number {
   return TOWERS[kind].damage * (1 + 0.38 * (level - 1));
+}
+
+export function emberlitDamageMultiplier(kind: TowerKind, branch: EmberlitBranch | null): number {
+  if (branch !== "b") return 1;
+  if (kind === "bow" || kind === "spark") return 1.3;
+  if (kind === "mortar") return 1.25;
+  if (kind === "ward") return 1.2;
+  if (kind === "pike") return 1.35;
+  return 1;
 }
 
 export function rateAt(kind: TowerKind, level: number): number {

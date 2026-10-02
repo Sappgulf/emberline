@@ -12,6 +12,12 @@ npm run dev
 
 Open `http://localhost:8080`. `npm test` covers the watch engine (build, waves, relics, leaks) plus the existing auth/app-data checks.
 
+## Test the game
+
+With the local server running, `npm run test:game:browser` runs the installed Chrome browser through six layouts, the opening road, market and camp, defeat/retry, saved endless entry, and all eight campaign routes. It saves screenshots and a verdict in `output/audit/`. An optional local URL can be passed with `npm run test:game:browser -- http://localhost:8080`.
+
+`npm test` also simulates every campaign wave in normal and hard mode and checks combat, healing, save records, and HUD synchronization. The campaign simulation uses a strengthened test arsenal to verify stability; it is not a difficulty assessment. See [the October audit](docs/game-audit-2026-10-01.md) for findings and verification limits.
+
 ## Watch
 
 - **Towers:** Longbow, Mortar, Frost, Spark, Bramble, Ash Ward, Watch Pike, Cinder Brazier. Pike unseals after Keep Stair; Cinder after River Ford.
@@ -24,6 +30,8 @@ Open `http://localhost:8080`. `npm test` covers the watch engine (build, waves, 
 - **Lines:** Pair adjacent Bow + Frost (Windcut), Mortar + Ward (Ashring), Spark + Bramble (Stormroot), or Pike + Cinder (Brand) for +8% damage to both. Two of the same kind beside each other fire 10% faster.
 - **Sets:** Relic pairs unlock set bonuses — Winter vigil, Forge fire, Watchlight, Keepfield, and Bounty belt.
 - **Focus fire:** Tap a live creep during a wave. Towers prioritize it and hit 10% harder for four seconds; tap again to apply the stronger manual Mark priority.
+- **Reactions:** Frost chill followed by Mortar or Pike triggers Shatter; root followed by Mortar or Cinder triggers Kindle. Both deal +30% hit damage, with a shared two-second cooldown per enemy. Use Briar or upgraded Thorns to set up roots. The forecast's Tower reactions guide explains the combinations; wave recaps count triggers.
+- **Placement:** Hover grass to see how many road tiles are in reach. Highlighted road tiles show coverage for both a placement preview and a selected tower.
 - **Mark:** Tap the focused creep again, press K for the scout's toughest target, or use Scout Flare for a four-second road-wide damage window.
 - **Hard watch:** 14 lives, tougher creeps, richer bounties. Shells splinter into a grub. Three hounds run as a pack.
 - **Forge:** Damage, Rate, or Reach. Highest of the three is the form: Timber → Bound → Tempered → Crowned.
@@ -40,3 +48,5 @@ The Bestiary now has two tabs: the field guide and the Chronicle, whose pages op
 ## Stack
 
 TanStack Start, React, Canvas 2D.
+
+Battlefield art and animation provenance: [imagegen prompts](art/imagegen/battlefield-polish-v1.md). The forest texture is cached, and grub crawl frames follow movement distance. Reduced motion disables gait, recoil, and expanding reaction animations while preserving combat feedback.

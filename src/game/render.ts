@@ -1,6 +1,7 @@
-import { AFFIXES, COLS, MAX_UPGRADE, ROWS, rangeAt, towerForm, type PropKind } from "./config.ts";
+import { AFFIXES, COLS, MAX_UPGRADE, ROWS, towerForm, type PropKind } from "./config.ts";
 import { type Creep, type EmberEngine, type Tower } from "./engine.ts";
-import { drawSprite, spr } from "./sprites.ts";
+import { drawGrubFrame, drawSprite, spr } from "./sprites.ts";
+import { REACTIONS } from "./combat.ts";
 
 const PATH_EDGE = "#4a3a22";
 const PARCHMENT = "#e8dcc4";
@@ -82,6 +83,7 @@ function lampGlow() {
 
 export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number, w: number, h: number) {
   const dpr = currentDpr(ctx);
+  const visualTime = engine.reducedMotion ? 0 : engine.time;
   ctx.save();
   const shake = engine.reducedMotion ? 0 : engine.trauma * engine.trauma;
   if (shake > 0.002) {
@@ -90,7 +92,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   }
 
   const pad = 32;
-  const backdropKey = `${engine.map.id}|${cell}|${Math.round(w)}|${Math.round(h)}|${dpr}|${engine.phase}`;
+  const backdropKey = `${engine.map.id}|${cell}|${Math.round(w)}|${Math.round(h)}|${dpr}|${engine.phase}|${spr("woodland")?.naturalWidth ?? 0}|${spr("path")?.naturalWidth ?? 0}`;
   if (!backdropCache || backdropCache.key !== backdropKey) {
     const canvas = makeCanvas((w + pad * 2) * dpr, (h + pad * 2) * dpr);
     const b = ctx2d(canvas);
@@ -112,11 +114,11 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
 
   const spawn = engine.path[0];
   const base = engine.path[engine.path.length - 1];
-  drawPortal(ctx, (spawn.c + 0.5) * cell, (spawn.r + 0.5) * cell, cell, engine.time, engine.phase === "wave");
+  drawPortal(ctx, (spawn.c + 0.5) * cell, (spawn.r + 0.5) * cell, cell, visualTime, engine.phase === "wave");
   if (engine.phase === "ready" && (engine.wavePlan(engine.wave) ?? []).some((entry) => entry.kind === "lord")) {
     const gx = (spawn.c + 0.5) * cell;
     const gy = (spawn.r + 0.5) * cell;
-    const r = cell * (0.78 + Math.sin(engine.time * 2.6) * 0.12);
+    const r = cell * (0.78 + Math.sin(visualTime * 2.6) * 0.12);
     ctx.save();
     ctx.strokeStyle = "rgba(224,120,56,0.6)";
     ctx.lineWidth = Math.max(1.5, cell * 0.03);
@@ -129,7 +131,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     ctx.stroke();
     ctx.restore();
   }
-  drawKeep(ctx, (base.c + 0.5) * cell, (base.r + 0.5) * cell, cell, engine.time, engine.lives);
+  drawKeep(ctx, (base.c + 0.5) * cell, (base.r + 0.5) * cell, cell, visualTime, engine.lives);
   drawRouteTags(ctx, cell, engine);
   const glow = lampGlow();
   for (const prop of engine.props) {
@@ -152,7 +154,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   actorOrder.sort((a, b) => actorSlots[a].y - actorSlots[b].y || actorSlots[a].z - actorSlots[b].z);
   for (let i = 0; i < actorCount; i++) {
     const slot = actorSlots[actorOrder[i]];
-    if (slot.type === 0 && slot.prop) drawProp(ctx, slot.prop.c, slot.prop.r, slot.prop.kind, cell, engine.time);
+    if (slot.type === 0 && slot.prop) drawProp(ctx, slot.prop.c, slot.prop.r, slot.prop.kind, cell, visualTime);
     else if (slot.type === 1 && slot.tower) drawTower(ctx, slot.tower, cell, slot.tower.id === engine.selectedId, engine.time, !engine.reducedMotion);
     else if (slot.creep)
       drawCreep(
@@ -163,6 +165,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
         slot.creep.id === engine.markedId,
         engine.time,
         focus?.id === slot.creep.id,
+        !engine.reducedMotion,
       );
   }
 
@@ -231,6 +234,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
     ctx.restore();
   }
   drawParticles(ctx, engine, cell);
+  drawReactions(ctx, engine, cell);
   drawFloaters(ctx, engine, cell);
   drawBanner(ctx, engine, w, cell);
   if (engine.streak >= 4 && engine.phase === "wave") {
@@ -299,7 +303,18 @@ function drawGroundBase(ctx: CanvasRenderingContext2D, cell: number, engine: Emb
   ctx.fillStyle = engine.map.theme.moss;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
   const grass = spr("grass");
-  if (grass) {
+  const woodland = spr("woodland");
+  if (woodland) {
+    ctx.save();
+    ctx.globalAlpha = 0.62;
+    // Repeating a quiet texture keeps details consistent at every board size.
+    const span = cell * 6;
+    for (let y = 0; y < ROWS * cell; y += span) {
+      for (let x = 0; x < COLS * cell; x += span) ctx.drawImage(woodland, x, y, span, span);
+    }
+    ctx.restore();
+  }
+  if (grass && !woodland) {
     ctx.save();
     ctx.globalAlpha = 0.12;
     ctx.drawImage(grass, 0, 0, COLS * cell, ROWS * cell);
@@ -329,7 +344,7 @@ function drawGroundTufts(ctx: CanvasRenderingContext2D, cell: number, time: numb
       if (engine.blockedSet.has(`${c},${r}`) || (seed !== 0 && seed !== 3)) continue;
       const gx = c * cell + cell * 0.35;
       const gy = r * cell + cell * 0.62;
-      const sway = Math.sin(time * 1.6 + c) * 1.4;
+      const sway = engine.reducedMotion ? 0 : Math.sin(time * 1.6 + c) * 1.4;
       ctx.moveTo(gx, gy);
       ctx.quadraticCurveTo(gx + sway, gy - cell * 0.2, gx + 3 + sway, gy - cell * 0.28);
       drew = true;
@@ -507,7 +522,7 @@ function drawFieldRule(ctx: CanvasRenderingContext2D, cell: number, engine: Embe
       ctx.fill();
     }
   } else if (rule === "glass-tide" && (engine.phase === "ready" || engine.phase === "wave")) {
-    const pulse = 0.07 + Math.sin(engine.time * 2.8) * 0.025;
+    const pulse = 0.07 + (engine.reducedMotion ? 0 : Math.sin(engine.time * 2.8) * 0.025);
     ctx.fillStyle = `rgba(155,230,219,${pulse})`;
     ctx.strokeStyle = "rgba(155,230,219,0.32)";
     ctx.lineWidth = Math.max(1, cell * 0.016);
@@ -583,6 +598,22 @@ function drawPathBase(ctx: CanvasRenderingContext2D, cell: number, engine: Ember
   strokeRoute(ctx, engine, cell);
   ctx.stroke();
   ctx.globalAlpha = 1;
+  // Static road detail is baked with the terrain, never redrawn per frame.
+  ctx.save();
+  for (const key of engine.pathSet) {
+    const [c, r] = key.split(",").map(Number);
+    const seed = c * 37 + r * 61;
+    for (let i = 0; i < 7; i++) {
+      const a = seed + i * 2.4;
+      const x = (c + 0.5 + Math.sin(a) * 0.26) * cell;
+      const y = (r + 0.5 + Math.cos(a * 1.7) * 0.24) * cell;
+      ctx.fillStyle = i % 3 === 0 ? "rgba(238,204,149,0.23)" : "rgba(67,45,26,0.2)";
+      ctx.beginPath();
+      ctx.ellipse(x, y, cell * (i % 3 === 0 ? 0.035 : 0.018), cell * 0.012, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 function drawPathMarquee(ctx: CanvasRenderingContext2D, cell: number, engine: EmberEngine) {
@@ -602,6 +633,7 @@ function drawPathMarquee(ctx: CanvasRenderingContext2D, cell: number, engine: Em
 
 function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
   if (engine.towers.length < 2) return;
+  const time = engine.reducedMotion ? 0 : engine.time;
   ctx.save();
   for (let i = 0; i < engine.towers.length; i++) {
     const a = engine.towers[i];
@@ -623,7 +655,7 @@ function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
       ctx.globalAlpha = bond ? 0.82 : 1;
       ctx.lineWidth = bond ? Math.max(2.2, cell * 0.05) : Math.max(1.4, cell * 0.028);
       ctx.setLineDash(bond ? [cell * 0.15, cell * 0.07] : [5, 6]);
-      ctx.lineDashOffset = bond ? -engine.time * 18 : 0;
+      ctx.lineDashOffset = bond ? -time * 18 : 0;
       ctx.beginPath();
       ctx.moveTo((a.c + 0.5) * cell, (a.r + 0.5) * cell);
       ctx.lineTo((b.c + 0.5) * cell, (b.r + 0.5) * cell);
@@ -631,7 +663,7 @@ function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
       if (bond) {
         ctx.setLineDash([]);
         ctx.fillStyle = bondColor;
-        ctx.globalAlpha = 0.72 + Math.sin(engine.time * 5 + a.id + b.id) * 0.12;
+        ctx.globalAlpha = 0.72 + Math.sin(time * 5 + a.id + b.id) * 0.12;
         ctx.beginPath();
         ctx.arc(((a.c + b.c + 1) / 2) * cell, ((a.r + b.r + 1) / 2) * cell, Math.max(2.5, cell * 0.07), 0, Math.PI * 2);
         ctx.fill();
@@ -642,13 +674,9 @@ function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   ctx.restore();
   for (const t of engine.towers) {
     if (t.kind !== "ward") continue;
-    const range =
-      rangeAt(t.kind, t.rangeLvl) *
-      (engine.relics.has("glass") ? 1.12 : 1) *
-      (t.empowered ? 1.18 : 1) *
-      engine.fieldRangeMultiplier(t);
+    const range = engine.sightRange(t);
     ctx.save();
-    ctx.globalAlpha = 0.1 + Math.sin(engine.time * 3 + t.id) * 0.04;
+    ctx.globalAlpha = 0.1 + Math.sin(time * 3 + t.id) * 0.04;
     ctx.fillStyle = COPPER;
     ctx.beginPath();
     ctx.arc((t.c + 0.5) * cell, (t.r + 0.5) * cell, range * cell, 0, Math.PI * 2);
@@ -766,9 +794,11 @@ function drawRouteTags(ctx: CanvasRenderingContext2D, cell: number, engine: Embe
 }
 
 function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
+  const time = engine.reducedMotion ? 0 : engine.time;
   const selected = engine.selectedTower();
   if (selected) {
     const range = engine.sightRange(selected);
+    drawCoverage(ctx, engine, cell, selected.c, selected.r, range);
     ctx.beginPath();
     ctx.arc((selected.c + 0.5) * cell, (selected.r + 0.5) * cell, range * cell, 0, Math.PI * 2);
     const ink =
@@ -786,7 +816,7 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
     ctx.stroke();
   }
   if (engine.movingId != null && (engine.phase === "ready" || engine.phase === "wave")) {
-    const glow = 0.1 + Math.sin(engine.time * 4) * 0.05;
+    const glow = 0.1 + Math.sin(time * 4) * 0.05;
     ctx.fillStyle = `rgba(106,168,180,${glow})`;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -796,7 +826,7 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
     }
   }
   if (engine.selectedKind && (engine.phase === "ready" || engine.phase === "wave")) {
-    const glow = 0.07 + Math.sin(engine.time * 3.2) * 0.04;
+    const glow = 0.07 + Math.sin(time * 3.2) * 0.04;
     ctx.fillStyle = `rgba(212,160,84,${glow})`;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -810,16 +840,44 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
   ctx.fillStyle = ok ? "rgba(212,160,84,0.22)" : "rgba(196,92,74,0.2)";
   ctx.fillRect(engine.hoverC * cell, engine.hoverR * cell, cell, cell);
   if (ok && engine.selectedKind) {
-    const range = engine.placementRange(engine.selectedKind);
+    const range = engine.placementRange(engine.selectedKind, engine.hoverC, engine.hoverR);
+    drawCoverage(ctx, engine, cell, engine.hoverC, engine.hoverR, range);
     ctx.strokeStyle = "rgba(232,220,196,0.35)";
     ctx.beginPath();
     ctx.arc((engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell, range * cell, 0, Math.PI * 2);
     ctx.stroke();
-    const ghost = 0.42 + Math.sin(engine.time * 4) * 0.12;
+    const ghost = 0.42 + Math.sin(time * 4) * 0.12;
     drawSprite(ctx, engine.selectedKind, (engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell + cell * 0.12, cell * 0.82, {
       alpha: ghost,
     });
   }
+}
+
+function drawCoverage(
+  ctx: CanvasRenderingContext2D,
+  engine: EmberEngine,
+  cell: number,
+  c: number,
+  r: number,
+  range: number,
+) {
+  ctx.save();
+  ctx.fillStyle = "rgba(250,211,138,0.16)";
+  ctx.strokeStyle = "rgba(250,211,138,0.5)";
+  ctx.lineWidth = Math.max(1, cell * 0.025);
+  for (const tile of engine.roadCoverage(c, r, range)) {
+    ctx.beginPath();
+    ctx.roundRect(
+      (tile.c + 0.22) * cell,
+      (tile.r + 0.22) * cell,
+      cell * 0.56,
+      cell * 0.56,
+      cell * 0.13,
+    );
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function easeOutBack(t: number) {
@@ -1056,12 +1114,20 @@ function drawMuzzleFlash(ctx: CanvasRenderingContext2D, tower: Tower, cell: numb
   ctx.restore();
 }
 
-function drawTower(ctx: CanvasRenderingContext2D, tower: Tower, cell: number, selected: boolean, time: number, motion = true) {
+function drawTower(
+  ctx: CanvasRenderingContext2D,
+  tower: Tower,
+  cell: number,
+  selected: boolean,
+  time: number,
+  motion = true,
+) {
+  if (!motion) time = 0;
   const x = (tower.c + 0.5) * cell;
   const y = (tower.r + 0.5) * cell;
-  const pop = easeOutBack(Math.min(1, tower.build));
+  const pop = motion ? easeOutBack(Math.min(1, tower.build)) : 1;
   const form = towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl);
-  const kick = tower.recoil * cell * 0.08;
+  const kick = motion ? tower.recoil * cell * 0.08 : 0;
   ctx.save();
   ctx.translate(x - Math.cos(tower.angle) * kick, y + Math.sin(time * 2.1 + tower.id) * 0.8 - Math.sin(tower.angle) * kick);
   ctx.scale(pop * (1 + form * 0.04), pop * (1 + form * 0.04));
@@ -1124,7 +1190,9 @@ function drawCreep(
   marked = false,
   time = 0,
   focused = false,
+  motion = true,
 ) {
+  if (!motion) time = 0;
   const px = creep.x * cell;
   const py = creep.y * cell;
   const fade = creep.alive ? 1 : Math.max(0, creep.death / 0.28);
@@ -1141,18 +1209,23 @@ function drawCreep(
               ? 0.24
               : creep.kind === "moth"
                 ? 0.18
-                : 0.2) *
-    cell;
-  const bob =
-    creep.kind === "wisp" || creep.kind === "moth"
-      ? Math.sin(creep.progress * 6) * 3
-      : Math.sin(creep.progress * 10) * 1.2;
-  const stretch = 1 + Math.sin(creep.progress * 10) * (creep.kind === "hound" || creep.kind === "ashfang" ? 0.08 : 0.03);
-  const spawnPop = creep.alive ? 0.72 + Math.min(1, creep.spawn) * 0.28 : 1;
-  const deathPop = creep.alive ? 1 : 1 + (1 - fade) * 0.4;
+                : 0.2) * cell;
+  const flying = creep.kind === "wisp" || creep.kind === "moth";
+  const gait = (creep.stride ?? 0) * 14 + creep.id * 1.7;
+  const bob = motion
+    ? flying
+      ? Math.sin(time * 5 + creep.id) * cell * 0.055
+      : Math.sin(gait) * cell * 0.025
+    : 0;
+  const stretch = motion
+    ? 1 + Math.sin(gait) * (creep.kind === "hound" || creep.kind === "ashfang" ? 0.1 : 0.04)
+    : 1;
+  const spawnPop = motion && creep.alive ? 0.72 + Math.min(1, creep.spawn) * 0.28 : 1;
+  const deathPop = motion && !creep.alive ? 1 + (1 - fade) * 0.4 : 1;
   ctx.save();
   ctx.translate(px, py + bob);
-  ctx.rotate(creep.kind === "wisp" ? 0 : creep.facing);
+  // These are side-view illustrations: keep their feet down on vertical bends.
+  if (motion && !creep.alive) ctx.rotate((1 - fade) * 0.25);
   ctx.scale(creep.squash * spawnPop * deathPop, creep.squash * stretch * spawnPop * deathPop);
   ctx.globalAlpha = fade * (creep.alive ? Math.max(0.4, creep.spawn) : 1);
   if (creep.kind === "lord" && creep.alive) {
@@ -1304,7 +1377,19 @@ function drawCreep(
   ctx.beginPath();
   ctx.ellipse(0, size * 0.7, size * 0.85, size * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
-  if (drawSprite(ctx, creep.kind, 0, size * 0.35, size * 2.15, { alpha: fade, flip: Math.cos(creep.facing) < 0 })) {
+  const flip = Math.cos(creep.facing) < 0;
+  const animated =
+    creep.kind === "grub" &&
+    drawGrubFrame(
+      ctx,
+      0,
+      size * 0.35,
+      size * 2.15,
+      motion ? (creep.stride ?? 0) + creep.id * 0.11 : 0,
+      flip,
+      fade,
+    );
+  if (animated || drawSprite(ctx, creep.kind, 0, size * 0.35, size * 2.15, { alpha: fade, flip })) {
     if (creep.alive && creep.kind === "lord") {
       ctx.save();
       ctx.globalAlpha = 0.86 * fade;
@@ -1345,8 +1430,23 @@ function drawCreep(
   ctx.restore();
 }
 
-function loftOf(shot: { x: number; y: number; ox?: number; oy?: number; tx?: number; ty?: number; kind: string }) {
-  if ((shot.kind !== "mortar" && shot.kind !== "cinder") || shot.ox == null || shot.oy == null || shot.tx == null || shot.ty == null) return 0;
+function loftOf(shot: {
+  x: number;
+  y: number;
+  ox?: number;
+  oy?: number;
+  tx?: number;
+  ty?: number;
+  kind: string;
+}) {
+  if (
+    (shot.kind !== "mortar" && shot.kind !== "cinder") ||
+    shot.ox == null ||
+    shot.oy == null ||
+    shot.tx == null ||
+    shot.ty == null
+  )
+    return 0;
   const tot = Math.hypot(shot.tx - shot.ox, shot.ty - shot.oy) || 1;
   const done = Math.min(1, Math.hypot(shot.x - shot.ox, shot.y - shot.oy) / tot);
   return Math.sin(done * Math.PI) * 0.55;
@@ -1384,6 +1484,23 @@ function drawShot(
             ? "shot-bramble"
             : null;
   const img = key ? spr(key) : null;
+  if (shot.kind === "mortar" || shot.kind === "cinder") {
+    ctx.save();
+    ctx.fillStyle = "rgba(15,18,12,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(x, shot.y * cell + cell * 0.08, cell * 0.13, cell * 0.045, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (motion) {
+      ctx.strokeStyle = "rgba(247,166,82,0.5)";
+      ctx.lineWidth = Math.max(2, cell * 0.04);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - Math.cos(ang) * cell * 0.2, y - Math.sin(ang) * cell * 0.2);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   if (motion && shot.kind !== "mortar" && shot.kind !== "cinder") {
     const prevX = shot.px * cell;
     const prevY = shot.py * cell;
@@ -1475,6 +1592,31 @@ function drawShot(
     ctx.fill();
   }
   ctx.restore();
+}
+
+function drawReactions(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
+  for (const fx of engine.reactions) {
+    const progress = 1 - fx.life / 0.65;
+    const radius = cell * (engine.reducedMotion ? 0.45 : 0.2 + progress * 0.7);
+    ctx.save();
+    ctx.translate(fx.x * cell, fx.y * cell);
+    ctx.strokeStyle = REACTIONS[fx.kind].color;
+    ctx.globalAlpha = Math.min(1, fx.life * 3);
+    ctx.lineWidth = Math.max(1.4, cell * 0.04 * (1 - progress));
+    ctx.beginPath();
+    ctx.ellipse(0, 0, radius, radius * 0.65, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * radius * 0.5, Math.sin(a) * radius * 0.5);
+      ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
+      if (fx.kind === "shatter")
+        ctx.lineTo(Math.cos(a + 0.2) * radius * 0.72, Math.sin(a + 0.2) * radius * 0.72);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
 function drawParticles(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
