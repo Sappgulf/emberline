@@ -283,6 +283,7 @@ export const TOWERS: Record<
     slow: number;
     projectileSpeed: number;
     hitsAir: boolean;
+    hitsLow: boolean;
     beam: boolean;
   }
 > = {
@@ -299,6 +300,7 @@ export const TOWERS: Record<
     slow: 0,
     projectileSpeed: 10.4,
     hitsAir: true,
+    hitsLow: true,
     beam: false,
   },
   mortar: {
@@ -314,6 +316,7 @@ export const TOWERS: Record<
     slow: 0,
     projectileSpeed: 6.2,
     hitsAir: false,
+    hitsLow: true,
     beam: false,
   },
   frost: {
@@ -329,6 +332,7 @@ export const TOWERS: Record<
     slow: 0.42,
     projectileSpeed: 7.3,
     hitsAir: true,
+    hitsLow: true,
     beam: false,
   },
   spark: {
@@ -344,6 +348,7 @@ export const TOWERS: Record<
     slow: 0,
     projectileSpeed: 20,
     hitsAir: true,
+    hitsLow: true,
     beam: true,
   },
   bramble: {
@@ -359,6 +364,7 @@ export const TOWERS: Record<
     slow: 0,
     projectileSpeed: 11,
     hitsAir: false,
+    hitsLow: false,
     beam: false,
   },
   ward: {
@@ -374,6 +380,7 @@ export const TOWERS: Record<
     slow: 0.28,
     projectileSpeed: 0,
     hitsAir: true,
+    hitsLow: true,
     beam: false,
   },
   pike: {
@@ -389,6 +396,7 @@ export const TOWERS: Record<
     slow: 0,
     projectileSpeed: 9.4,
     hitsAir: false,
+    hitsLow: true,
     beam: false,
   },
   cinder: {
@@ -404,9 +412,22 @@ export const TOWERS: Record<
     slow: 0,
     projectileSpeed: 6.4,
     hitsAir: false,
+    hitsLow: true,
     beam: false,
   },
 };
+
+const TOWER_KINDS = Object.keys(TOWERS) as TowerKind[];
+export const AIR_TOWER_KINDS = TOWER_KINDS.filter((kind) => TOWERS[kind].hitsAir);
+export const LOW_AIR_TOWER_KINDS = TOWER_KINDS.filter((kind) => TOWERS[kind].hitsLow);
+
+export function towerList(kinds: TowerKind[], conjunction: "and" | "or" = "and"): string {
+  const names = kinds.map((kind) => TOWERS[kind].short);
+  const last = names.pop() ?? "";
+  if (names.length === 0) return last;
+  if (names.length === 1) return `${names[0]} ${conjunction} ${last}`;
+  return `${names.join(", ")}, ${conjunction} ${last}`;
+}
 
 export const TOWER_UNLOCK: Record<TowerKind, number> = {
   bow: 0,

@@ -2557,6 +2557,15 @@ describe("tactical sightlines and targeting", () => {
     assert.equal(e.coversPreview(airPlan).covered, false);
   });
 
+  it("names every tower that can cover each air tier in the hint", () => {
+    const e = play();
+    assert.equal(e.coversPreview(airPlan).hint, "Bow, Frost, Spark, or Ward needs road reach");
+    assert.equal(
+      e.coversPreview(lowPlan).hint,
+      "Bow, Mortar, Frost, Spark, Ward, Pike, or Cinder needs road reach",
+    );
+  });
+
   it("uses real range modifiers for readiness and still distinguishes low and high air", () => {
     const e = play();
     const mortar = plant(e, "mortar", 9, 0);

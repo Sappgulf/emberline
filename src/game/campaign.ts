@@ -1,4 +1,12 @@
-import { CREEPS, type CreepKind, type PropKind, type WaveSpawn } from "./config.ts";
+import {
+  AIR_TOWER_KINDS,
+  CREEPS,
+  type CreepKind,
+  LOW_AIR_TOWER_KINDS,
+  type PropKind,
+  towerList,
+  type WaveSpawn,
+} from "./config.ts";
 
 export type RelicId = "purse" | "timber" | "whet" | "oil" | "cold" | "glass" | "salt" | "ember" | "adze" | "cord" | "flint" | "wick";
 export type WatchRiteId = "coin" | "heart" | "flame";
@@ -403,7 +411,7 @@ export function watchOrderFor(plan: WaveSpawn[] | undefined): WatchOrder | null 
     return {
       id: "veil",
       title: "Clip the veil",
-      detail: `Burn ${target} Moths. Mortar, pike, and cinder can reach the low ones.`,
+      detail: `Burn ${target} Moths. ${towerList(LOW_AIR_TOWER_KINDS)} can reach the low ones.`,
       reward: 30,
       target,
       targetKind: "moth",
@@ -1472,11 +1480,11 @@ export const BESTIARY = [
   { kind: "grub" as const, weak: "Anything. Bows on the bends are enough. A leak costs one life. Shells hatch one when they die." },
   { kind: "runner" as const, weak: "Aim First. Frost and Bramble catch them. A leak costs one life." },
   { kind: "shell" as const, weak: "Mortar and Bramble. Arrows tickle plate. Dies into a grub unless it is already at the gate. A leak costs two lives." },
-  { kind: "wisp" as const, weak: "Longbow, Frost, Spark, and Ward can hit them. Mortar and Bramble go blind. A leak costs one life." },
+  { kind: "wisp" as const, weak: `${towerList(AIR_TOWER_KINDS)} can hit them. Mortar and Bramble go blind. A leak costs one life.` },
   { kind: "shaman" as const, weak: "Kill first. Salt halves the song. Spark the clump. Mark them. A leak costs two lives." },
   { kind: "hound" as const, weak: "Frost and Ash Ward. Three living hounds run as a pack. A leak costs one life." },
   { kind: "lord" as const, weak: "Burn the road. Mix mortar, spark, pike, and a mark. A leak costs three lives." },
-  { kind: "moth" as const, weak: "Low air. Mortar, pike, and cinder can reach them. Spark still bites. A leak costs one life." },
+  { kind: "moth" as const, weak: `Low air. ${towerList(LOW_AIR_TOWER_KINDS)} can reach them. A leak costs one life.` },
   { kind: "knave" as const, weak: "The first shot misses unless Frost, Bramble, or a mark catches them. A leak costs one life." },
   { kind: "ashfang" as const, weak: "The first bite makes it howl — nearby creeps run faster. Frost and Ward catch it. A leak costs two lives." },
 ];

@@ -25,7 +25,7 @@ With the local server running, `npm run test:game:browser` runs the installed Ch
 ## Watch
 
 - **Towers:** Longbow, Mortar, Frost, Spark, Bramble, Ash Ward, Watch Pike, Cinder Brazier. Pike unseals after Keep Stair; Cinder after River Ford.
-- **Prey:** Moths fly low (mortar/pike/cinder can reach them). Knaves dodge the first shot unless Frost, Bramble, or a mark catches them. Ashfangs howl on the first bite and speed the pack.
+- **Prey:** Moths fly low (any air tower, mortar, pike, or cinder can reach them). Knaves dodge the first shot unless Frost, Bramble, or a mark catches them. Ashfangs howl on the first bite and speed the pack.
 - **Bosses:** From the river onward each road has a named boss with a taunt, a half-health second phase, and its own ground effect. Watch the boss bar over the board.
 - **Elites:** From the second road some prey run shielded, frenzied, warded, or hollow, with a colored aura and a richer bounty.
 - **Camps:** After each held road, choose a camp preparation for the next one — gold, lives, damage, cheap horn oil, an extra scout, or a watch mark.

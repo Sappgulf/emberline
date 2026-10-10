@@ -25,8 +25,11 @@ import {
   FOCUS_DURATION,
   SHAMAN_HEAL_INTERVAL,
   SHAMAN_HEAL_RADIUS,
+  AIR_TOWER_KINDS,
+  LOW_AIR_TOWER_KINDS,
   TOWERS,
   TOWER_UNLOCK,
+  towerList,
   TOWER_UNLOCK_HINT,
   damageAt,
   emberlitDamageMultiplier,
@@ -2152,7 +2155,7 @@ export class EmberEngine {
   }
 
   strikesLow(kind: TowerKind) {
-    return TOWERS[kind].hitsAir || kind === "mortar" || kind === "cinder" || kind === "pike";
+    return TOWERS[kind].hitsLow;
   }
 
   coversPreview(plan: MapDef["waves"][number] | undefined) {
@@ -2162,8 +2165,8 @@ export class EmberEngine {
     const sighted = this.towers.filter((tower) => this.reachesRoad(tower.c, tower.r, this.sightRange(tower)));
     const hasHigh = sighted.some((tower) => TOWERS[tower.kind].hitsAir);
     const hasLow = sighted.some((tower) => this.strikesLow(tower.kind));
-    if (needsHigh && !hasHigh) return { covered: false, hint: "Bow or Spark needs road reach" };
-    if (needsLow && !hasLow) return { covered: false, hint: "Mortar or Pike needs road reach" };
+    if (needsHigh && !hasHigh) return { covered: false, hint: `${towerList(AIR_TOWER_KINDS, "or")} needs road reach` };
+    if (needsLow && !hasLow) return { covered: false, hint: `${towerList(LOW_AIR_TOWER_KINDS, "or")} needs road reach` };
     return { covered: true, hint: null as string | null };
   }
 
