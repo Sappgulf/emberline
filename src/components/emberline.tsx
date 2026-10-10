@@ -356,6 +356,11 @@ export function Emberline() {
       const rect = wrap.getBoundingClientRect();
       if (rect.width < 8 || rect.height < 8) return;
       const next = Math.max(16, Math.floor(Math.min(rect.width / COLS, rect.height / ROWS)));
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.style.width = `${COLS * next}px`;
+        canvas.style.height = `${ROWS * next}px`;
+      }
       setCell(next);
     };
     layout();
@@ -1015,6 +1020,10 @@ export function Emberline() {
                 [
                   "Kindle",
                   "Root prey with Briar or upgraded Thorns; Mortar or Cinder hits it 30% harder. Shares Shatter's cooldown.",
+                ],
+                [
+                  "Momentum",
+                  "Each kill within 3.2 seconds of the last extends the streak. From four, every second kill pays +3g. Every sixth pins the nearest other foe for 0.7 seconds. A leak ends it.",
                 ],
                 ["Camp", "After a road, choose a preparation for the next one."],
                 ["Elites", "Some prey run shielded, frenzied, warded, or hollow. They pay more."],
@@ -1725,7 +1734,7 @@ export function Emberline() {
               >
                 {AIMS.map((aim) => <option key={aim} value={aim}>{AIM_LABEL[aim]} · {AIM_DETAIL[aim]}</option>)}
               </select>
-              <span className="command-value" aria-hidden="true">{AIM_LABEL[hud.towerAim]}⌄</span>
+              <span className="command-value" aria-hidden="true">{AIM_LABEL[hud.towerAim]}<svg className="ml-1 inline-block size-2 align-middle" viewBox="0 0 8 8"><path d="M1.5 2.5 4 5l2.5-2.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
             </label>
             <button
               type="button"
@@ -1818,7 +1827,7 @@ export function Emberline() {
             </button>
             <button
               type="button"
-              className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
+              className="pressable packet command-control command-stall min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
               aria-label={stallHint}
               title={stallHint}
               disabled={hud.phase !== "ready" || hud.wave < 1}

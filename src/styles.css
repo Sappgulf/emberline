@@ -1757,6 +1757,9 @@
 .command-control:disabled .command-value {
   color: color-mix(in srgb, var(--color-dust) 72%, transparent);
 }
+.command-stall .command-value {
+  overflow: visible;
+}
 .command-icon {
   width: 1.25rem;
   height: 1.25rem;
@@ -2081,6 +2084,15 @@
 .keep-main .menu-actions {
   width: 100%;
   max-width: none;
+}
+@media (max-width: 640px) {
+  .keep-main .menu-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .keep-main .menu-actions > button:last-child:nth-child(even) {
+    grid-column: 1 / -1;
+  }
 }
 .keep-side {
   display: flex;
@@ -2681,12 +2693,15 @@
     padding: 0.35rem 0.25rem;
   }
 
-  .route-copy {
-    display: none;
+  .streak-chip {
+    top: auto;
+    right: auto;
+    bottom: 0.5rem;
+    left: 0.5rem;
   }
 
-  .route-node[data-state="current"] .route-copy {
-    display: flex;
+  .route-copy {
+    display: none;
   }
 
   .route-node {
@@ -5353,10 +5368,6 @@
     display: none;
   }
 
-  .route-node[data-state="current"] .route-copy {
-    display: flex;
-  }
-
   .route-node {
     gap: 0.1rem;
     padding: 0.05rem 0.1rem;
@@ -5773,11 +5784,22 @@
     top: 0.12rem;
     right: 0.16rem;
     z-index: 2;
-    flex: 0 0 4.15rem;
-    width: 4.15rem;
-    min-width: 4.15rem;
+    flex: 0 0 5.75rem;
+    width: 5.75rem;
+    min-width: 5.75rem;
     padding-inline: 0.12rem !important;
     background: linear-gradient(180deg, rgba(224, 120, 56, 0.98), rgba(139, 61, 34, 0.98));
+  }
+
+  .tray .command-row .command-send {
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.1rem;
+  }
+
+  .tray .command-row .command-send .command-label {
+    flex: none;
+    white-space: nowrap;
   }
 }
 
