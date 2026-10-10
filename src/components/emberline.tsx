@@ -1643,7 +1643,7 @@ export function Emberline() {
             {hud.canUndo && (
               <button
                 type="button"
-                className="text-[11px] text-copper"
+                className="undo-last text-[11px] text-copper"
                 aria-keyshortcuts="Z"
                 aria-label="Undo last plant; press Z while it is briefly available"
                 title="Undo last plant (Z, briefly available)"

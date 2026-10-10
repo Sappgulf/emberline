@@ -69,8 +69,10 @@
       box-shadow 160ms ease-out,
       opacity 160ms ease-out;
   }
-  .pressable:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--color-copper) 55%, var(--color-line));
+  @media (hover: hover) {
+    .pressable:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--color-copper) 55%, var(--color-line));
+    }
   }
   .pressable:active:not(:disabled) {
     transform: scale(0.97);
@@ -383,6 +385,7 @@
   padding: 0.35rem 0.75rem;
   border-left: 1px solid rgba(232, 220, 196, 0.12);
   background: rgba(8, 12, 11, 0.2);
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
   font-variant-numeric: tabular-nums;
 }
@@ -663,6 +666,7 @@
   box-shadow:
     inset 0 1px 0 rgba(232, 220, 196, 0.1),
     0 12px 24px rgba(0, 0, 0, 0.32);
+  -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
 .threat-panel[data-active="true"] {
@@ -789,7 +793,7 @@
 .field-rule-copy {
   overflow: hidden;
   color: var(--color-copper) !important;
-  font-size: 7px !important;
+  font-size: 8px !important;
   letter-spacing: 0.04em;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1225,7 +1229,7 @@
   border-radius: 999px;
   padding: 0.12rem 0.28rem;
   color: var(--color-ember);
-  font-size: 6px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.1em;
   line-height: 1;
@@ -1664,10 +1668,12 @@
   padding: 0.55rem 0.45rem 0.6rem;
   text-align: center;
 }
-.packet:hover:not(:disabled) {
-  background:
-    linear-gradient(180deg, rgba(212, 160, 84, 0.16), rgba(12, 16, 13, 0.56) 78%),
-    rgba(18, 22, 15, 0.72);
+@media (hover: hover) {
+  .packet:hover:not(:disabled) {
+    background:
+      linear-gradient(180deg, rgba(212, 160, 84, 0.16), rgba(12, 16, 13, 0.56) 78%),
+      rgba(18, 22, 15, 0.72);
+  }
 }
 .packet[data-on="true"] {
   box-shadow:
@@ -1690,7 +1696,7 @@
   right: 0.28rem;
   color: var(--color-copper);
   content: "Counter";
-  font-size: 6px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1;
@@ -1829,12 +1835,14 @@
   color: rgba(244, 228, 196, 0.78);
   font-size: 9px;
 }
-.send-flag:hover:not(:disabled) {
-  background:
-    linear-gradient(180deg, rgba(242, 151, 71, 0.92), rgba(158, 68, 37, 0.96)), var(--color-ember);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 240, 197, 0.34),
-    0 8px 20px rgba(224, 120, 56, 0.22);
+@media (hover: hover) {
+  .send-flag:hover:not(:disabled) {
+    background:
+      linear-gradient(180deg, rgba(242, 151, 71, 0.92), rgba(158, 68, 37, 0.96)), var(--color-ember);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 240, 197, 0.34),
+      0 8px 20px rgba(224, 120, 56, 0.22);
+  }
 }
 .btn-wood {
   border: 1px solid rgba(212, 160, 84, 0.32);
@@ -1843,10 +1851,12 @@
     linear-gradient(180deg, rgba(90, 122, 72, 0.46), rgba(30, 47, 28, 0.8)), var(--color-moss);
   color: var(--color-parchment);
 }
-.btn-wood:hover:not(:disabled) {
-  border-color: rgba(212, 160, 84, 0.82);
-  background:
-    linear-gradient(180deg, rgba(111, 146, 86, 0.58), rgba(36, 59, 34, 0.88)), var(--color-moss);
+@media (hover: hover) {
+  .btn-wood:hover:not(:disabled) {
+    border-color: rgba(212, 160, 84, 0.82);
+    background:
+      linear-gradient(180deg, rgba(111, 146, 86, 0.58), rgba(36, 59, 34, 0.88)), var(--color-moss);
+  }
 }
 .upgrade-main,
 .upgrade-preview {
@@ -2658,6 +2668,7 @@
   background:
     radial-gradient(circle at 50% 24%, rgba(212, 160, 84, 0.14), transparent 42%),
     linear-gradient(180deg, rgba(8, 12, 14, 0.42), rgba(8, 11, 10, 0.78));
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
 
@@ -2720,11 +2731,11 @@
     bottom: -0.18rem;
     min-width: 0.82rem;
     padding: 0.06rem 0.12rem;
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .route-state {
-    font-size: 6px;
+    font-size: 8px;
     letter-spacing: 0.11em;
   }
 
@@ -2791,7 +2802,7 @@
 
   .counter-pill {
     padding-block: 0.14rem;
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .counter-pill img {
@@ -2917,7 +2928,7 @@
 
   .watch-overline {
     margin-bottom: 0.2rem;
-    font-size: 7px;
+    font-size: 8px;
     letter-spacing: 0.16em;
   }
 
@@ -2965,7 +2976,7 @@
   }
 
   .watch-stat .u {
-    font-size: 7px;
+    font-size: 8px;
     letter-spacing: 0.1em;
   }
 
@@ -3011,7 +3022,7 @@
   }
 
   .tray .packet-role {
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .tray .send-flag {
@@ -3128,7 +3139,7 @@
     border-radius: 999px;
     background: rgba(8, 11, 10, 0.54);
     color: var(--color-copper);
-    font-size: 7px;
+    font-size: 8px;
     font-weight: 700;
     letter-spacing: 0.06em;
     line-height: 1;
@@ -3148,7 +3159,7 @@
   .intel-quick-actions > .intel-kicker {
     flex: 0 0 auto;
     color: var(--color-copper);
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .counter-pills-quick {
@@ -3161,7 +3172,7 @@
   .counter-pills-quick .counter-pill {
     min-height: 1.45rem;
     padding: 0.1rem 0.26rem 0.1rem 0.16rem;
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .counter-pills-quick .counter-pill img {
@@ -3210,7 +3221,7 @@
 
   .threat-name {
     margin-top: 0.08rem;
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .threat-tag,
@@ -3230,7 +3241,7 @@
 
   .threat-tactics .counter-pill {
     padding: 0.12rem 0.25rem 0.12rem 0.16rem;
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .threat-tactics .counter-pill img {
@@ -3248,7 +3259,7 @@
   }
 
   .command-label {
-    font-size: 7px;
+    font-size: 8px;
     letter-spacing: 0.06em;
   }
 
@@ -3419,7 +3430,7 @@
 
   .field-note-copy > span:nth-of-type(2) {
     display: block;
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .field-rule-copy {
@@ -3437,7 +3448,7 @@
 
   .field-objective-reward {
     margin-top: 0.2rem;
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .threat-items {
@@ -3505,7 +3516,7 @@
   .tower-upgrade-result {
     min-height: 1rem;
     padding: 0.13rem 0.28rem;
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .selected-tower-copy > p:nth-child(2) {
@@ -3567,7 +3578,7 @@
   }
 
   .tray .packet-role {
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .command-row {
@@ -3594,7 +3605,7 @@
   }
 
   .command-label {
-    font-size: 7px;
+    font-size: 8px;
     letter-spacing: 0.06em;
   }
 
@@ -3641,7 +3652,7 @@
 
   .threat-title span,
   .threat-tier {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .threat-items {
@@ -3672,7 +3683,7 @@
 
   .threat-name {
     margin-top: 0;
-    font-size: 7px;
+    font-size: 8px;
   }
 }
 
@@ -3787,7 +3798,7 @@
 
 .watch-ledger > p .intel-kicker {
   color: var(--color-copper);
-  font-size: 7px;
+  font-size: 8px;
 }
 
 .briefing-steps {
@@ -3883,7 +3894,7 @@
 
 .watch-summary span {
   color: var(--color-dust);
-  font-size: 7px;
+  font-size: 8px;
   letter-spacing: 0.09em;
   line-height: 1.1;
   text-transform: uppercase;
@@ -3943,7 +3954,7 @@
   }
 
   .briefing-steps small {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .watch-summary {
@@ -4091,7 +4102,7 @@
 
   .watch-overline {
     margin-bottom: 0.14rem;
-    font-size: 6px;
+    font-size: 8px;
     letter-spacing: 0.16em;
   }
 
@@ -4146,7 +4157,7 @@
 
   .watch-stat .u {
     margin-top: 0;
-    font-size: 7px;
+    font-size: 8px;
     letter-spacing: 0.08em;
   }
 
@@ -4198,7 +4209,7 @@
   }
 
   .tray .packet-role {
-    font-size: 5.5px;
+    font-size: 8px;
   }
 
   .tray .packet > span:last-child {
@@ -4817,7 +4828,8 @@
   }
 
   .emberlit-picker .upgrade-preview {
-    font-size: 6px;
+    font-size: 8px;
+    white-space: normal;
   }
 }
 
@@ -4899,8 +4911,9 @@
   }
 
   .selected-tower-actions .upgrade-preview {
-    font-size: 6px;
+    font-size: 8px;
     letter-spacing: 0.02em;
+    white-space: normal;
   }
 
   .selected-tower-actions .upgrade-main {
@@ -4920,7 +4933,7 @@
 
 @media (max-width: 360px) {
   .selected-tower-actions > button {
-    font-size: 7px !important;
+    font-size: 8px !important;
   }
 }
 
@@ -4959,7 +4972,7 @@
   padding-top: 0.25rem;
   border-top: 1px solid rgba(106, 168, 180, 0.3);
   color: var(--color-frost);
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -5173,7 +5186,7 @@
   }
 
   .dispatch-keep > .dispatch-kicker {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .dispatch-keep > h2 {
@@ -5224,7 +5237,7 @@
   }
 
   .dispatch-keep .keep-whisper {
-    font-size: 7px;
+    font-size: 8px;
     line-height: 1.15;
   }
 
@@ -5239,7 +5252,7 @@
   }
 
   .dispatch-keep .keep-side .intel-kicker {
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .dispatch-keep .keep-routes ol,
@@ -5259,7 +5272,7 @@
   }
 
   .dispatch-keep .keep-routes li small {
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .dispatch-keep .keep-routes li strong {
@@ -5277,7 +5290,7 @@
   }
 
   .dispatch-keep .keep-arsenal li span {
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .watch-bar {
@@ -5292,7 +5305,7 @@
 
   .watch-overline {
     margin-bottom: 0.1rem;
-    font-size: 5.5px;
+    font-size: 8px;
   }
 
   .watch-map-name {
@@ -5315,7 +5328,7 @@
   }
 
   .watch-progress-label {
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .watch-progress-track {
@@ -5339,7 +5352,7 @@
 
   .watch-stat .u {
     margin-top: 0;
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .watch-actions {
@@ -5350,7 +5363,7 @@
   .watch-actions .packet {
     min-height: 1.8rem;
     padding: 0.24rem 0.25rem;
-    font-size: 7px !important;
+    font-size: 8px !important;
   }
 
   .campaign-rail {
@@ -5384,11 +5397,11 @@
   }
 
   .route-state {
-    font-size: 5px;
+    font-size: 8px;
   }
 
   .route-name {
-    font-size: 6.5px;
+    font-size: 8px;
   }
 
   .playfield-shell-live {
@@ -5418,7 +5431,7 @@
     height: 14px;
     overflow: hidden;
     padding: 0.1rem 0.25rem;
-    font-size: 7px;
+    font-size: 8px;
     line-height: 1;
     white-space: nowrap;
   }
@@ -5458,7 +5471,7 @@
   }
 
   .tray .packet > span:last-child {
-    font-size: 7px;
+    font-size: 8px;
     line-height: 1;
   }
 
@@ -5492,7 +5505,7 @@
   }
 
   .tray .command-label {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .tray .command-value,
@@ -5537,7 +5550,7 @@
   .tray .tower-ascension-chip {
     min-height: 0.9rem;
     padding: 0.1rem 0.2rem;
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .tray .selected-tower-actions {
@@ -5549,7 +5562,7 @@
   .tray .selected-tower-actions > button {
     min-height: 2.25rem;
     padding: 0.15rem 0.1rem !important;
-    font-size: 7px !important;
+    font-size: 8px !important;
   }
 
   .tray .selected-tower-actions .upgrade-preview {
@@ -5557,14 +5570,14 @@
   }
 
   .tray .selected-tower-actions .upgrade-main {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .tray .selected-tower-bar > button[aria-keyshortcuts="Z"] {
     position: absolute;
     top: 0.18rem;
     right: 0.28rem;
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .tray .command-row {
@@ -5613,7 +5626,7 @@
   .tray .tower-upgrade-result {
     min-height: 0.9rem;
     padding: 0.1rem 0.2rem;
-    font-size: 6px;
+    font-size: 8px;
   }
 
   .tray .selected-tower-actions {
@@ -5624,7 +5637,7 @@
   .tray .selected-tower-actions > button {
     min-height: 2.2rem;
     padding: 0.12rem 0.04rem !important;
-    font-size: 7px !important;
+    font-size: 8px !important;
     line-height: 1.05;
   }
 
@@ -5633,7 +5646,7 @@
   }
 
   .tray .selected-tower-actions .upgrade-main {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .tray .command-row {
@@ -5685,17 +5698,17 @@
   }
 
   .tray .command-row .command-label {
-    font-size: 6px;
+    font-size: 8px;
     letter-spacing: 0.04em;
   }
 
   .tray .command-row .command-value,
   .tray .command-row .command-send .command-value {
-    font-size: 7px;
+    font-size: 8px;
   }
 
   .tray .command-row .command-send .command-label {
-    font-size: 7px;
+    font-size: 9px;
   }
 
   /* Keep the packet rail above the fixed command bar when no tower is
@@ -5705,7 +5718,7 @@
     height: 16px;
     overflow: hidden;
     padding: 0.1rem 0.25rem;
-    font-size: 7px;
+    font-size: 8px;
     line-height: 1;
     white-space: nowrap;
   }
@@ -5740,7 +5753,7 @@
   }
 
   .tray .packet > span:last-child {
-    font-size: 7px;
+    font-size: 8px;
     line-height: 1;
   }
 
@@ -5853,3 +5866,35 @@
 }
 
 .focus-chip .prey-song { font-size: 9px; line-height: 1.35; color: #b4dc83; }
+
+/* Touch targets: 44px minimum on coarse pointers (WCAG 2.5.5). */
+@media (pointer: coarse) {
+  .watch-actions .packet,
+  .intel-toggle,
+  .counter-pill,
+  .counter-pills-quick .counter-pill,
+  .threat-tactics .counter-pill,
+  .command-control,
+  .command-aim select,
+  .undo-last,
+  .selected-tower-bar > button[aria-keyshortcuts="Z"],
+  .keep-hard,
+  .arrival-plan > summary,
+  .battle-ledger > summary {
+    min-height: 44px;
+  }
+  .watch-actions .packet,
+  .command-control,
+  .command-row > :is(button, .command-aim),
+  .command-aim select {
+    min-width: 44px;
+  }
+  .undo-last,
+  .selected-tower-bar > button[aria-keyshortcuts="Z"] {
+    padding-inline: 0.6rem;
+  }
+  .keep-hard input {
+    width: 28px;
+    height: 28px;
+  }
+}
