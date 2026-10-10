@@ -1935,6 +1935,42 @@ describe("season systems", () => {
     }
   });
 
+  it("ignores a saved watch that is not JSON", () => {
+    const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => "{not json", setItem: () => undefined } satisfies Pick<Storage, "getItem" | "setItem">,
+    });
+    try {
+      const e = new EmberEngine();
+      const before = { unlocked: e.unlocked, marks: e.marks, bestEndless: e.bestEndless };
+      assert.doesNotThrow(() => e.readSave());
+      assert.deepEqual({ unlocked: e.unlocked, marks: e.marks, bestEndless: e.bestEndless }, before);
+    } finally {
+      if (previous) Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous });
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
+
+  it("keeps playing when storage is blocked or full", () => {
+    const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    const blocked = (): never => {
+      throw new Error("storage unavailable");
+    };
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: blocked, setItem: blocked } satisfies Pick<Storage, "getItem" | "setItem">,
+    });
+    try {
+      const e = new EmberEngine();
+      assert.doesNotThrow(() => e.readSave());
+      assert.doesNotThrow(() => e.persist());
+    } finally {
+      if (previous) Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous });
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
+
   it("pays the mark camp only once", () => {
     const e = play();
     e.loadMap(3);
