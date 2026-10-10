@@ -378,6 +378,17 @@ try {
     reports.push({ id: "endless-resume", endless: state.endless, best: state.bestEndless, errors });
     await page.close();
   }
+  // The board's layout shifts ~60 ms after the watch starts; read its box only once it is still.
+  const settledBox = async page => {
+    let last = null;
+    for (let i = 0; i < 40; i++) {
+      const b = await page.locator("canvas").boundingBox();
+      if (b && last && b.x === last.x && b.y === last.y && b.width === last.width && b.height === last.height) return b;
+      last = b;
+      await page.waitForTimeout(50);
+    }
+    throw new Error("board layout never settled");
+  };
   // Exercise range recovery on the first flying road in isolated local saves.
   for (const [width, height] of [[1440, 1000], [390, 844]]) {
     const page = await browser.newPage({ viewport: { width, height } });
@@ -388,7 +399,7 @@ try {
       JSON.stringify({ unlocked: 1, relics: [], marks: 0 })));
     const state = () => page.evaluate(() => JSON.parse(window.render_game_to_text()));
     const cell = async (c, r, click = true) => {
-      const b = await page.locator("canvas").boundingBox();
+      const b = await settledBox(page);
       const x = b.x + (c + 0.5) * b.width / 13, y = b.y + (r + 0.5) * b.height / 9;
       if (click) await page.mouse.click(x, y);
       else await page.mouse.move(x, y);
@@ -477,13 +488,15 @@ try {
     await page.getByRole("button", { name: /^Begin / }).click();
     await page.getByRole("button", { name: "Take the watch", exact: true }).click();
     const state = () => page.evaluate(() => JSON.parse(window.render_game_to_text()));
-    const box = await page.locator("canvas").boundingBox();
+    const box = await settledBox(page);
+    // Flying waves are held until a tower reaches the road, so place one that does.
     for (let r = 0; r < 9 && (await state()).towers.length === 0; r++) {
       for (let c = 0; c < 13 && (await state()).towers.length === 0; c++) {
-        await page.mouse.click(
-          box.x + ((c + 0.5) * box.width) / 13,
-          box.y + ((r + 0.5) * box.height) / 9,
-        );
+        const x = box.x + ((c + 0.5) * box.width) / 13;
+        const y = box.y + ((r + 0.5) * box.height) / 9;
+        await page.mouse.move(x, y);
+        if (/No road in reach/.test(await page.locator("body").innerText())) continue;
+        await page.mouse.click(x, y);
       }
     }
     assert.equal((await state()).towers.length, 1);
