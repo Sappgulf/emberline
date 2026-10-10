@@ -77,6 +77,8 @@ try {
         "portrait wave command is visible before tray scrolling");
     }
     if (reduced) {
+      // Battlefield sprites finish loading after first paint; a late pop-in is not motion.
+      await page.waitForLoadState("networkidle");
       await page.waitForTimeout(600);
       const before = await page.locator("canvas").evaluate(canvas => canvas.toDataURL());
       await advance(1000);
