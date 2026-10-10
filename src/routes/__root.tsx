@@ -1,9 +1,28 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Emberline";
+
+function NotFoundPage() {
+  return (
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-ink px-6 py-16 text-center">
+      <img src="/ui/emberline-crest-v1.png" alt="" className="h-20 w-auto" />
+      <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.28em] text-ember">Off the road</p>
+      <h1 className="font-display text-4xl text-parchment sm:text-5xl">Nothing stands here</h1>
+      <p className="max-w-sm font-sans text-sm leading-6 text-dust">
+        This path leads into the woods. Return to the watch post and hold the ember line.
+      </p>
+      <Link
+        to="/"
+        className="mt-2 rounded-md border border-copper/60 bg-bark px-5 py-2.5 font-sans text-sm font-semibold text-parchment transition-colors hover:bg-moss focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-copper"
+      >
+        Back to the watch
+      </Link>
+    </main>
+  );
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -39,4 +58,5 @@ export const Route = createRootRoute({
       </body>
     </html>
   ),
+  notFoundComponent: NotFoundPage,
 });
