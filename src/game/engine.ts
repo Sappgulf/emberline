@@ -1591,7 +1591,7 @@ export class EmberEngine {
     if (!t) return;
     this.gold += t.spent;
     this.towers = this.towers.filter((x) => x.id !== t.id);
-    this.selectedId = this.towers.at(-1)?.id ?? null;
+    this.selectedId = this.towers[this.towers.length - 1]?.id ?? null;
     this.lastPlaceId = -1;
     this.float(t.c + 0.5, t.r + 0.5, "Taken back", "#d4a054");
     this.burst(t.c + 0.5, t.r + 0.5, "#b7ab90", 8, "smoke");
