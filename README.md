@@ -24,14 +24,14 @@ With the local server running, `npm run test:game:browser` runs the installed Ch
 
 ## Watch
 
-- **Towers:** Longbow, Mortar, Frost, Spark, Bramble, Ash Ward, Watch Pike, Cinder Brazier. Pike unseals after Keep Stair; Cinder after River Ford.
-- **Prey:** Moths fly low (any air tower, mortar, pike, or cinder can reach them). Knaves dodge the first shot unless Frost, Bramble, or a mark catches them. Ashfangs howl on the first bite and speed the pack. Gloams hush the road — towers near one fire 28% slower until it falls; spark the mist.
+- **Towers:** Longbow, Mortar, Frost, Spark, Bramble, Ash Ward, Watch Pike, Cinder Brazier, Pitch Cauldron, Muster Horn. Pike unseals after Keep Stair, Cinder after River Ford, Cauldron after Ember Copse, Horn after Glass Marsh.
+- **Prey:** Moths fly low (any air tower, mortar, pike, or cinder can reach them). Knaves dodge the first shot unless Frost, Bramble, or a mark catches them. Ashfangs howl on the first bite and speed the pack. Gloams hush the road — towers near one fire 28% slower until it falls; spark the mist. Moles ride buried until chill, roots, a mark, flare, or fire digs them up (splash always bites). Mourners wail away every chill, root, and bleed around them — cut the wail or the road dries.
 - **Bosses:** From the river onward each road has a named boss with a taunt, a half-health second phase, and its own ground effect. Watch the boss bar over the board.
 - **Elites:** From the second road some prey run shielded, frenzied, warded, hollow, or verdant, with a colored aura and a richer bounty. Verdant elites mend themselves as they walk.
 - **Camps:** After each held road, choose a camp preparation for the next one — gold, lives, damage, cheap horn oil, an extra scout, or a watch mark.
 - **Rites:** At the brief choose spare purse, spare timber, or first ember.
 - **Scout:** Once a wave, K marks the toughest body.
-- **Lines:** Pair adjacent Bow + Frost (Windcut), Mortar + Ward (Ashring), Spark + Bramble (Stormroot), or Pike + Cinder (Brand) for +8% damage to both. Two of the same kind beside each other fire 10% faster.
+- **Lines:** Pair adjacent Bow + Frost (Windcut), Mortar + Ward (Ashring), Spark + Bramble (Stormroot), Pike + Cinder (Brand), Bow + Muster (Hornline), or Frost + Cauldron (Black ice) for +8% damage to both. Two of the same kind beside each other fire 10% faster.
 - **Sets:** Relic pairs unlock set bonuses — Winter vigil, Forge fire, Watchlight, Keepfield, and Bounty belt.
 - **Focus fire:** Tap a live creep during a wave. Towers prioritize it and hit 10% harder for four seconds; tap again to apply the stronger manual Mark priority.
 - **Reactions:** Frost chill followed by Mortar or Pike triggers Shatter; root followed by Mortar or Cinder triggers Kindle. Both deal +30% hit damage, with a shared two-second cooldown per enemy. Use Briar or upgraded Thorns to set up roots. The forecast's Tower reactions guide explains the combinations; wave recaps count triggers.
@@ -45,7 +45,7 @@ With the local server running, `npm run test:game:browser` runs the installed Ch
 - **Hard watch:** 14 lives, tougher creeps, richer bounties. Shells splinter into a grub. Three hounds run as a pack.
 - **Forge:** Damage, Rate, or Reach. Highest of the three is the form: Timber → Bound → Tempered → Crowned.
 - **Emberlit:** At Crowned, choose one of two awakenings for each tower (C key ability, two branch buttons).
-- **Abilities:** Every tower has an active power on a cooldown — Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm.
+- **Abilities:** Every tower has an active power on a cooldown — Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm, Deluge, Reveille. The Muster Horn never fires; standing in its brass ring makes a tower hit 10%+ harder, its reach upgrades widen the ring.
 - **Watch hall:** Marks earned from held roads and bosses buy permanent perks, including the Hollow lens reach. Hold all eight roads to unlock the endless Long Night.
 - **Long Night:** Every third held night opens a market (and pays a watch mark), every sixth is a midnight hunt paying a third richer, named bands escalate the pack (First watch → Deep night → Howl rise → Ember tempest → Gloam vigil → Blood moon), and bosses walk every fourth night.
 - **Tools:** Horn (burn the road + slow), Scout flare (R during a wave; mark every live enemy for four seconds and deal +22% damage), Mend (lives + drag), Move, Sell. Pause is pause. 1× / 2× / 3× is speed.

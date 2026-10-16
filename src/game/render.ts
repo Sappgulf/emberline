@@ -1,4 +1,4 @@
-import { SHAMAN_HEAL_RADIUS, SHAMAN_SONG_WINDUP, AFFIXES, COLS, GLOAM_HUSH_RANGE, MAX_UPGRADE, ROWS, towerForm, type PropKind } from "./config.ts";
+import { SHAMAN_HEAL_RADIUS, SHAMAN_SONG_WINDUP, AFFIXES, COLS, GLOAM_HUSH_RANGE, MAX_UPGRADE, ROWS, towerForm, type PropKind, type TowerKind } from "./config.ts";
 import { type Creep, type EmberEngine, type Tower } from "./engine.ts";
 import { drawCrawlFrame, drawSprite, spr } from "./sprites.ts";
 import { REACTIONS } from "./combat.ts";
@@ -190,6 +190,7 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
         engine.time,
         focus?.id === slot.creep.id,
         !engine.reducedMotion,
+        (creep) => engine.surfaced(creep),
       );
   }
 
@@ -657,8 +658,26 @@ function drawPathMarquee(ctx: CanvasRenderingContext2D, cell: number, engine: Em
 }
 
 function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: number) {
-  if (engine.towers.length < 2) return;
   const time = engine.reducedMotion ? 0 : engine.time;
+  const muster = engine.towers.find((tower) => tower.kind === "muster");
+  if (muster) {
+    // The call ring: brass, dashed, wide when the Emberlit wide-call branch is taken.
+    const range = engine.sightRange(muster);
+    const cx = (muster.c + 0.5) * cell;
+    const cy = (muster.r + 0.5) * cell;
+    ctx.save();
+    ctx.strokeStyle = "#efbb65";
+    ctx.globalAlpha = muster.hymnT ? 0.5 + Math.sin(time * 6) * 0.2 : 0.3;
+    ctx.lineWidth = Math.max(1.5, cell * 0.03);
+    ctx.setLineDash([cell * 0.22, cell * 0.18]);
+    ctx.lineDashOffset = time * -cell * 0.24;
+    ctx.beginPath();
+    ctx.arc(cx, cy, range * cell, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  if (engine.towers.length < 2) return;
   ctx.save();
   for (let i = 0; i < engine.towers.length; i++) {
     const a = engine.towers[i];
@@ -675,7 +694,11 @@ function drawLines(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
               ? COPPER
               : bond?.id === "brand"
                 ? EMBER
-                : "rgba(212,160,84,0.35)";
+                : bond?.id === "hornline"
+                  ? "#efbb65"
+                  : bond?.id === "blackice"
+                    ? "#6f8a9c"
+                    : "rgba(212,160,84,0.35)";
       ctx.strokeStyle = bond ? bondColor : "rgba(212,160,84,0.35)";
       ctx.globalAlpha = bond ? 0.82 : 1;
       ctx.lineWidth = bond ? Math.max(2.2, cell * 0.05) : Math.max(1.4, cell * 0.028);
@@ -1079,9 +1102,18 @@ function drawHover(ctx: CanvasRenderingContext2D, engine: EmberEngine, cell: num
     ctx.arc((engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell, range * cell, 0, Math.PI * 2);
     ctx.stroke();
     const ghost = 0.42 + Math.sin(time * 4) * 0.12;
-    drawSprite(ctx, engine.selectedKind, (engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell + cell * 0.12, cell * 0.82, {
-      alpha: ghost,
-    });
+    if (engine.selectedKind === "cauldron" || engine.selectedKind === "muster") {
+      ctx.globalAlpha = ghost;
+      ctx.fillStyle = engine.selectedKind === "cauldron" ? "#3a3129" : "#a8813e";
+      ctx.beginPath();
+      ctx.ellipse((engine.hoverC + 0.5) * cell, (engine.hoverR + 0.45) * cell, cell * 0.2, cell * 0.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else {
+      drawSprite(ctx, engine.selectedKind, (engine.hoverC + 0.5) * cell, (engine.hoverR + 0.5) * cell + cell * 0.12, cell * 0.82, {
+        alpha: ghost,
+      });
+    }
   }
 }
 
@@ -1360,6 +1392,95 @@ function drawMuzzleFlash(ctx: CanvasRenderingContext2D, tower: Tower, cell: numb
   ctx.restore();
 }
 
+function drawTowerBody(ctx: CanvasRenderingContext2D, kind: TowerKind, cell: number, size: number, time: number) {
+  const s = size / cell;
+  if (kind === "cauldron") {
+    ctx.globalAlpha = 0.5 + Math.sin(time * 4) * 0.08;
+    ctx.fillStyle = EMBER;
+    ctx.beginPath();
+    ctx.ellipse(0, cell * 0.3, s * 0.3, s * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#2e2622";
+    for (const leg of [-0.16, 0.16]) {
+      ctx.fillRect(cell * (leg - 0.02), cell * 0.22, cell * 0.04, s * 0.14);
+    }
+    ctx.fillStyle = "#3a3129";
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.26, -cell * 0.04);
+    ctx.bezierCurveTo(-cell * 0.3, s * 0.24, cell * 0.3, s * 0.24, cell * 0.26, -cell * 0.04);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#54483c";
+    ctx.lineWidth = Math.max(2, cell * 0.035);
+    ctx.stroke();
+    ctx.fillStyle = "#241c14";
+    ctx.beginPath();
+    ctx.ellipse(0, -cell * 0.04, cell * 0.26, cell * 0.055, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const burp = Math.sin(time * 2.6) * 0.5 + 0.5;
+    ctx.globalAlpha = 0.32 + burp * 0.24;
+    ctx.fillStyle = "#d8cdb4";
+    ctx.beginPath();
+    ctx.ellipse(cell * (burp * 0.1 - 0.04), -cell * (0.1 + burp * 0.08), cell * 0.045, cell * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#1d1712";
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.28, -cell * 0.05);
+    ctx.quadraticCurveTo(0, -cell * 0.12, cell * 0.28, -cell * 0.05);
+    ctx.stroke();
+    return;
+  }
+  if (kind === "muster") {
+    ctx.strokeStyle = "#4a3a26";
+    ctx.lineWidth = Math.max(2.5, cell * 0.055);
+    ctx.beginPath();
+    ctx.moveTo(0, cell * 0.24);
+    ctx.lineTo(0, -cell * 0.26);
+    ctx.stroke();
+    for (let i = 0; i < 3; i++) {
+      ctx.lineWidth = Math.max(2, cell * 0.028);
+      const yy = -cell * (0.04 + i * 0.07);
+      ctx.beginPath();
+      ctx.moveTo(-cell * 0.16, yy);
+      ctx.lineTo(cell * 0.16, yy);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.4 + Math.sin(time * 3) * 0.12;
+    ctx.strokeStyle = "#efbb65";
+    const wave = cell * (0.3 + Math.sin(time * 3) * 0.06);
+    ctx.beginPath();
+    ctx.arc(0, -cell * 0.3, wave, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#a8813e";
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.22, -cell * 0.3);
+    ctx.bezierCurveTo(-cell * 0.05, -cell * 0.42, cell * 0.1, -cell * 0.5, cell * 0.2, -cell * 0.52);
+    ctx.bezierCurveTo(cell * 0.3, -cell * 0.3, cell * 0.28, -cell * 0.16, cell * 0.24, -cell * 0.2);
+    ctx.bezierCurveTo(cell * 0.18, -cell * 0.24, 0, -cell * 0.2, -cell * 0.22, -cell * 0.26);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#6a5230";
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.fillStyle = "#6a5230";
+    ctx.beginPath();
+    ctx.ellipse(cell * 0.25, -cell * 0.36, cell * 0.035, cell * 0.075, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    const flap = Math.sin(time * 2.2) * 0.12;
+    ctx.fillStyle = EMBER;
+    ctx.beginPath();
+    ctx.moveTo(0, -cell * 0.52);
+    ctx.lineTo(-cell * (0.16 + flap * 0.5), -cell * 0.42);
+    ctx.lineTo(0, -cell * 0.32);
+    ctx.closePath();
+    ctx.fill();
+    return;
+  }
+}
+
 function drawTower(
   ctx: CanvasRenderingContext2D,
   tower: Tower,
@@ -1424,7 +1545,11 @@ function drawTower(
     ctx.fill();
     ctx.globalAlpha = 1;
   }
-  drawSprite(ctx, tower.kind, 0, cell * 0.12, size);
+  if (tower.kind === "cauldron" || tower.kind === "muster") {
+    drawTowerBody(ctx, tower.kind, cell, size, time);
+  } else if (!drawSprite(ctx, tower.kind, 0, cell * 0.12, size)) {
+    drawTowerBody(ctx, tower.kind, cell, size, time);
+  }
   drawChargeAura(ctx, tower, cell, time, motion);
   drawMuzzleFlash(ctx, tower, cell, motion);
   drawFormKit(ctx, tower, cell, form, time);
@@ -1456,6 +1581,7 @@ function drawCreep(
   time = 0,
   focused = false,
   motion = true,
+  surfacedFn: (creep: Creep) => boolean = () => true,
 ) {
   if (!motion) time = 0;
   const px = creep.x * cell;
@@ -1466,9 +1592,9 @@ function drawCreep(
       ? 0.4
       : creep.kind === "shell"
         ? 0.3
-        : creep.kind === "ashfang"
-          ? 0.27
-          : creep.kind === "gloam"
+        : creep.kind === "ashfang" || creep.kind === "mourner"
+          ? 0.28
+          : creep.kind === "gloam" || creep.kind === "mole"
             ? 0.26
             : creep.kind === "hound"
               ? 0.23
@@ -1590,6 +1716,143 @@ function drawCreep(
     ctx.stroke();
     ctx.globalAlpha = fade;
   }
+  if (creep.kind === "mole" && creep.alive && !surfacedFn(creep)) {
+    // Buried: a wake of churned grass that tracks the walking body.
+    ctx.globalAlpha = 0.8 * fade;
+    ctx.rotate(-creep.facing);
+    const wake = Math.sin(creep.progress * 8 + creep.id) * 0.05;
+    ctx.fillStyle = "rgba(52,64,40,0.8)";
+    ctx.beginPath();
+    ctx.ellipse(0, size * 0.35, size * 0.95, size * 0.24 + wake * size, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(90,122,72,0.55)";
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.3, size * 0.05, size * 0.34, size * 0.2, -0.1, 0, Math.PI * 2);
+    ctx.ellipse(size * 0.42, size * 0.1, size * 0.3, size * 0.16, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(36,44,26,0.75)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.7, size * 0.36);
+    ctx.quadraticCurveTo(0, size * 0.1 + wake * size * 1.4, size * 0.8, size * 0.4);
+    ctx.stroke();
+    ctx.globalAlpha = fade;
+    ctx.restore();
+    if (creep.alive && creep.hp < creep.maxHp) {
+      ctx.save();
+      ctx.globalAlpha = fade;
+      const barW = size * 1.55;
+      ctx.fillStyle = "rgba(18,22,15,0.72)";
+      ctx.fillRect(px - barW / 2, py - size - 6, barW, 4);
+      ctx.fillStyle = "#8fa3b0";
+      ctx.fillRect(px - barW / 2, py - size - 6, barW * Math.max(0, creep.hp / creep.maxHp), 4);
+      ctx.restore();
+    }
+    return;
+  }
+  if (creep.kind === "mole" && creep.alive) {
+    // Surfaced: a blunt velvet digger with a pink snout.
+    ctx.setLineDash([size * 0.4, size * 0.3]);
+    ctx.strokeStyle = "rgba(184,200,210,0.7)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.45, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#3d3a44";
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.05, size * 0.92, size * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#56535e";
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.1, -size * 0.22, size * 0.5, size * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#2c2930";
+    ctx.beginPath();
+    ctx.ellipse(0, size * 0.4, size * 0.75, size * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#9c948e";
+    ctx.lineWidth = 2;
+    for (const side of [-1, 1]) {
+      for (const claw of [0.34, 0.52]) {
+        ctx.beginPath();
+        ctx.moveTo(side * size * 0.3, size * claw);
+        ctx.lineTo(side * size * 0.52, size * (claw + 0.16));
+        ctx.lineTo(side * size * 0.66, size * (claw + 0.06));
+        ctx.stroke();
+      }
+    }
+    const blink = Math.sin(time * 2 + creep.id) > 0.86 ? 0.08 : 1;
+    ctx.fillStyle = "#1a171c";
+    ctx.beginPath();
+    ctx.arc(-size * 0.22, -size * 0.12, size * 0.07 * blink, 0, Math.PI * 2);
+    ctx.arc(size * 0.22, -size * 0.12, size * 0.07 * blink, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#d8977f";
+    ctx.beginPath();
+    ctx.ellipse(0, size * 0.08, size * 0.16, size * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = fade;
+    ctx.restore();
+    if (creep.alive && creep.hp < creep.maxHp) {
+      ctx.save();
+      ctx.globalAlpha = fade;
+      const barW = size * 1.55;
+      ctx.fillStyle = "rgba(18,22,15,0.72)";
+      ctx.fillRect(px - barW / 2, py - size - 8, barW, 4);
+      ctx.fillStyle = creep.hp / creep.maxHp > 0.4 ? "#7a9a58" : BLOOD;
+      ctx.fillRect(px - barW / 2, py - size - 8, barW * Math.max(0, creep.hp / creep.maxHp), 4);
+      ctx.restore();
+    }
+    return;
+  }
+  if (creep.kind === "mourner" && creep.alive) {
+    // A tall grey veil that sways; the wail dries the road.
+    const sway = motion ? Math.sin(time * 1.8 + creep.id) * 0.05 : 0;
+    ctx.rotate(sway);
+    const pulse = Math.sin(time * 2.4 + creep.id * 0.9) * 0.5 + 0.5;
+    ctx.fillStyle = "#5f6d78";
+    ctx.globalAlpha = 0.32 * fade;
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.4, size * 1.15, size * 1.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = (0.86 + pulse * 0.1) * fade;
+    ctx.fillStyle = "#4a545e";
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.5, size * 0.62);
+    ctx.quadraticCurveTo(-size * 0.62, -size * 0.4, 0, -size * 1.05);
+    ctx.quadraticCurveTo(size * 0.62, -size * 0.4, size * 0.5, size * 0.62);
+    ctx.quadraticCurveTo(0, size * 0.84, -size * 0.5, size * 0.62);
+    ctx.fill();
+    ctx.fillStyle = "#3a424b";
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.52, size * 0.34, size * 0.4, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = "#8fa3b0";
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 0.46, size * 0.2, size * 0.26, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = (0.5 + pulse * 0.4) * fade;
+    ctx.fillStyle = "#b8c8d2";
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.08, -size * 0.5, size * 0.045, size * 0.06, 0, 0, Math.PI * 2);
+    ctx.ellipse(size * 0.08, -size * 0.5, size * 0.045, size * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = fade;
+    ctx.restore();
+    if (creep.alive && creep.hp < creep.maxHp) {
+      ctx.save();
+      ctx.globalAlpha = fade;
+      const barW = size * 1.55;
+      ctx.fillStyle = "rgba(18,22,15,0.72)";
+      ctx.fillRect(px - barW / 2, py - size - 8, barW, 4);
+      ctx.fillStyle = creep.hp / creep.maxHp > 0.4 ? "#7a9a58" : BLOOD;
+      ctx.fillRect(px - barW / 2, py - size - 8, barW * Math.max(0, creep.hp / creep.maxHp), 4);
+      ctx.restore();
+    }
+    return;
+  }
   if (creep.kind === "gloam" && creep.alive) {
     const pulse = Math.sin(time * 2.2 + creep.id * 1.3) * 0.5 + 0.5;
     ctx.globalAlpha = 0.07 * fade;
@@ -1708,7 +1971,12 @@ function drawCreep(
       flip,
       fade,
     );
-  if (creep.kind !== "gloam" && (animated || drawSprite(ctx, creep.kind, 0, size * 0.35, size * 2.15, { alpha: fade, flip }))) {
+  const spriteKind =
+    creep.kind === "gloam" || creep.kind === "mole" || creep.kind === "mourner" ? null : creep.kind;
+  if (
+    animated ||
+    (spriteKind && drawSprite(ctx, spriteKind, 0, size * 0.35, size * 2.15, { alpha: fade, flip }))
+  ) {
     if (creep.alive && creep.kind === "lord") {
       ctx.save();
       ctx.globalAlpha = 0.86 * fade;
@@ -1819,7 +2087,7 @@ function loftOf(shot: {
   kind: string;
 }) {
   if (
-    (shot.kind !== "mortar" && shot.kind !== "cinder") ||
+    (shot.kind !== "mortar" && shot.kind !== "cinder" && shot.kind !== "cauldron") ||
     shot.ox == null ||
     shot.oy == null ||
     shot.tx == null ||
@@ -1863,7 +2131,7 @@ function drawShot(
             ? "shot-bramble"
             : null;
   const img = key ? spr(key) : null;
-  if (shot.kind === "mortar" || shot.kind === "cinder") {
+  if (shot.kind === "mortar" || shot.kind === "cinder" || shot.kind === "cauldron") {
     ctx.save();
     ctx.fillStyle = "rgba(15,18,12,0.3)";
     ctx.beginPath();
@@ -1880,7 +2148,7 @@ function drawShot(
     }
     ctx.restore();
   }
-  if (motion && shot.kind !== "mortar" && shot.kind !== "cinder") {
+  if (motion && shot.kind !== "mortar" && shot.kind !== "cinder" && shot.kind !== "cauldron") {
     const prevX = shot.px * cell;
     const prevY = shot.py * cell;
     const tint = shot.kind === "frost" ? "106,168,180" : "232,197,106";
@@ -1959,6 +2227,16 @@ function drawShot(
     ctx.lineTo(-cell * 0.16, 0);
     ctx.lineTo(-cell * 0.08, cell * 0.08);
     ctx.closePath();
+    ctx.fill();
+  } else if (shot.kind === "cauldron") {
+    // A clot of dark pitch with a wet sheen.
+    ctx.fillStyle = "#241c14";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, cell * 0.13, cell * 0.1, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(216,205,180,0.5)";
+    ctx.beginPath();
+    ctx.ellipse(-cell * 0.03, -cell * 0.03, cell * 0.04, cell * 0.02, 0.3, 0, Math.PI * 2);
     ctx.fill();
   } else {
     ctx.fillStyle = "#4a6a32";

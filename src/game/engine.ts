@@ -213,7 +213,7 @@ export interface PerkSnap {
   canBuy: boolean;
 }
 
-export type TowerBondId = "windcut" | "ashring" | "stormroot" | "brand";
+export type TowerBondId = "windcut" | "ashring" | "stormroot" | "brand" | "hornline" | "blackice";
 
 export interface TowerBondSnap {
   id: TowerBondId;
@@ -235,15 +235,23 @@ const UPGRADE_FX_DURATION: Record<TowerUpgradeBranch, number> = {
   emberlit: 1.45,
 };
 
-const TOWER_BONDS: Record<TowerKind, TowerBondDefinition> = {
-  bow: { id: "windcut", label: "Windcut", partner: "frost" },
-  frost: { id: "windcut", label: "Windcut", partner: "bow" },
-  mortar: { id: "ashring", label: "Ashring", partner: "ward" },
-  ward: { id: "ashring", label: "Ashring", partner: "mortar" },
-  spark: { id: "stormroot", label: "Stormroot", partner: "bramble" },
-  bramble: { id: "stormroot", label: "Stormroot", partner: "spark" },
-  pike: { id: "brand", label: "Brand", partner: "cinder" },
-  cinder: { id: "brand", label: "Brand", partner: "pike" },
+const TOWER_BONDS: Record<TowerKind, TowerBondDefinition[]> = {
+  bow: [
+    { id: "windcut", label: "Windcut", partner: "frost" },
+    { id: "hornline", label: "Hornline", partner: "muster" },
+  ],
+  muster: [{ id: "hornline", label: "Hornline", partner: "bow" }],
+  frost: [
+    { id: "windcut", label: "Windcut", partner: "bow" },
+    { id: "blackice", label: "Black ice", partner: "cauldron" },
+  ],
+  cauldron: [{ id: "blackice", label: "Black ice", partner: "frost" }],
+  mortar: [{ id: "ashring", label: "Ashring", partner: "ward" }],
+  ward: [{ id: "ashring", label: "Ashring", partner: "mortar" }],
+  spark: [{ id: "stormroot", label: "Stormroot", partner: "bramble" }],
+  bramble: [{ id: "stormroot", label: "Stormroot", partner: "spark" }],
+  pike: [{ id: "brand", label: "Brand", partner: "cinder" }],
+  cinder: [{ id: "brand", label: "Brand", partner: "pike" }],
 };
 
 function wavePreviewFor(plan: MapDef["waves"][number] | undefined): WavePreviewSnap[] {
@@ -273,6 +281,8 @@ function threatTierFor(plan: MapDef["waves"][number] | undefined): ThreatTier {
       entry.kind === "hound" ||
       entry.kind === "ashfang" ||
       entry.kind === "gloam" ||
+      entry.kind === "mole" ||
+      entry.kind === "mourner" ||
       CREEPS[entry.kind].flying,
   );
   return total >= 12 || mixed ? "mixed" : "light";
@@ -299,6 +309,7 @@ export interface Tower {
   empowered: boolean;
   emberlit: EmberlitBranch | null;
   abilityCd: number;
+  hymnT?: number;
   volt: number;
   siege: boolean;
   storm: boolean;
@@ -339,6 +350,8 @@ export interface Creep {
   chillT?: number;
   reactionReadyAt?: number;
   stride?: number;
+  surfaceT?: number;
+  sifted?: boolean;
 }
 
 export interface ReactionFx {
@@ -737,8 +750,8 @@ export class EmberEngine {
 
   bondBetween(a: Tower, b: Tower): TowerBondSnap | null {
     if (Math.abs(a.c - b.c) + Math.abs(a.r - b.r) !== 1) return null;
-    const definition = TOWER_BONDS[a.kind];
-    if (definition.partner !== b.kind) return null;
+    const definition = TOWER_BONDS[a.kind].find((bond) => bond.partner === b.kind);
+    if (!definition) return null;
     return { ...definition, bonus: TOWER_BOND_BONUS };
   }
 
@@ -778,6 +791,36 @@ export class EmberEngine {
       if (dx * dx + dy * dy <= GLOAM_HUSH_RANGE * GLOAM_HUSH_RANGE) return true;
     }
     return false;
+  }
+
+  /** Moles stay under the grass until chill, roots, marks, flare, or fire force them up. */
+  surfaced(creep: Creep): boolean {
+    if (creep.kind !== "mole") return true;
+    return (
+      (creep.surfaceT ?? 0) > 0 ||
+      creep.slowT > 0 ||
+      creep.rootT > 0 ||
+      creep.markedT > 0 ||
+      this.markedId === creep.id ||
+      (creep.chillT ?? 0) > 0
+    );
+  }
+
+  /** The Muster Horn buffs damage of towers inside its call ring. */
+  musterMultiplier(tower: Tower) {
+    let bonus = 0;
+    for (const other of this.towers) {
+      if (other.kind !== "muster" || other.id === tower.id) continue;
+      const reach = this.sightRange(other);
+      const dx = other.c + 0.5 - (tower.c + 0.5);
+      const dy = other.r + 0.5 - (tower.r + 0.5);
+      if (dx * dx + dy * dy > reach * reach) continue;
+      let value = 0.1 + 0.02 * (other.dmgLvl - 1);
+      if (other.emberlit === "b") value += 0.08;
+      if ((other.hymnT ?? 0) > 0) value *= 1.5;
+      bonus = Math.max(bonus, value);
+    }
+    return 1 + bonus;
   }
 
   crownedCount() {
@@ -1804,6 +1847,15 @@ export class EmberEngine {
     this.hornCd = this.relics.has("oil") ? 10 : HORN_CD;
     for (const c of this.creeps) {
       if (!c.alive) continue;
+      const resting = c.kind === "mole" && !this.surfaced(c);
+      if (resting) {
+        c.surfaceT = Math.max(c.surfaceT ?? 0, 1.2);
+        if (!c.sifted) {
+          c.sifted = true;
+          this.float(c.x, c.y - 0.4, "Surfaced", "#e07838");
+        }
+        continue;
+      }
       if (!c.slowResist) c.slowT = Math.max(c.slowT, 2.4);
       this.damageCreep(c, 16, 0, true);
     }
@@ -2248,6 +2300,8 @@ export class EmberEngine {
   }
 
   canStrike(tower: Tower, creep: Creep) {
+    if (tower.kind === "muster") return false;
+    if (creep.kind === "mole" && !this.surfaced(creep)) return false;
     const stats = CREEPS[creep.kind];
     if (!stats.flying) return true;
     if (TOWERS[tower.kind].hitsAir) return true;
@@ -2370,6 +2424,33 @@ export class EmberEngine {
       this.burns.push({ x, y, r: 1.5, life: 4.2, tick: 0.2, source: t.kind });
       this.poof(x, y, "#e07838", 1.2);
       this.ring(x, y, "#e07838");
+    } else if (t.kind === "cauldron") {
+      // Deluge — flood the road ahead with a wide, long tarfield.
+      let anchor: Creep | null = null;
+      for (const creep of this.creeps) {
+        if (!creep.alive || !inRange(creep) || !this.canStrike(t, creep)) continue;
+        if (!anchor || creep.progress > anchor.progress) anchor = creep;
+      }
+      const x = anchor?.x ?? cx + Math.cos(t.angle) * Math.min(range, 1.6);
+      const y = anchor?.y ?? cy + Math.sin(t.angle) * Math.min(range, 1.6);
+      this.burns.push({ x, y, r: 2.2, life: 5, tick: 0.2, tar: true, source: "cauldron" });
+      this.poof(x, y, "#4a3f33", 1.8);
+      this.ring(x, y, "#5b6d75");
+      this.burst(x, y, "#4a3a22", 10, "smoke");
+      this.trauma = Math.min(1, this.trauma + 0.1);
+      chargeFx("#5b6d75");
+    } else if (t.kind === "muster") {
+      // Reveille — the call surges: allies inside the ring hit 50% harder for six seconds.
+      t.hymnT = 6;
+      for (const tower of this.towers) {
+        if (tower.id === t.id) continue;
+        const dx = tower.c + 0.5 - cx;
+        const dy = tower.r + 0.5 - cy;
+        if (dx * dx + dy * dy > range * range) continue;
+        this.ring(tower.c + 0.5, tower.r + 0.5, "#efbb65");
+      }
+      chargeFx("#efbb65");
+      sfx.horn();
     } else {
       const slow = t.kind === "ward" ? 0.5 : t.kind === "frost" ? 0.6 : 0;
       const dmg =
@@ -2432,6 +2513,16 @@ export class EmberEngine {
     if (this.phase !== "wave" || !Number.isFinite(x) || !Number.isFinite(y)) return false;
     const creep = this.creepNear(x - 0.5, y - 0.5);
     if (!creep) return false;
+    if (creep.kind === "mole" && !this.surfaced(creep)) {
+      // Focus digs the mole out of the grass — surfaced, it is fair game.
+      creep.surfaceT = Math.max(creep.surfaceT ?? 0, 3);
+      creep.sifted = true;
+      this.float(creep.x, creep.y - 0.4, "Surfaced!", "#8fa3b0");
+      this.ring(creep.x, creep.y, "#8fa3b0");
+      sfx.combo();
+      this.notify();
+      return true;
+    }
     if (this.focusId === creep.id && this.focusT > 0) {
       this.markCreep(creep);
       return true;
@@ -2986,8 +3077,16 @@ export class EmberEngine {
     source?: TowerKind,
     chillMultiplier = 1,
     allowReactions = true,
+    isSplash = false,
   ) {
     if (!creep.alive) return false;
+    if (creep.kind === "mole" && !this.surfaced(creep) && !isSplash) {
+      if (!creep.sifted) {
+        creep.sifted = true;
+        this.float(creep.x, creep.y - 0.4, "Sift", "#8fa3b0");
+      }
+      return false;
+    }
     if (creep.kind === "knave" && creep.dodge) {
       const caught =
         (slow > 0 && !creep.slowResist) ||
@@ -3181,6 +3280,7 @@ export class EmberEngine {
       this.lineBonus(tower) *
       this.bondMultiplier(tower) *
       this.fieldDamageMultiplier(tower) *
+      this.musterMultiplier(tower) *
       (this.focusId === target.id && this.focusT > 0 ? 1 + FOCUS_BONUS : 1) *
       (this.rite === "flame" && this.wave === 1 ? 1.12 : 1);
     dmg *= emberlitDamageMultiplier(tower.kind, tower.emberlit);
@@ -3202,6 +3302,9 @@ export class EmberEngine {
     if (tower.kind === "cinder" && target.kind === "moth") dmg *= 1.28;
     if (tower.kind === "cinder" && target.kind === "grub") dmg *= 1.12;
     if (tower.kind === "spark" && target.kind === "gloam") dmg *= 1.2;
+    if (tower.kind === "cauldron" && target.kind === "grub") dmg *= 1.2;
+    if (tower.kind === "bow" && target.kind === "mourner") dmg *= 1.18;
+    if (tower.kind === "spark" && target.kind === "mourner") dmg *= 1.14;
     if (tower.volley) {
       if (this.relics.has("flint")) dmg *= 1.4;
       tower.volley = false;
@@ -3233,6 +3336,7 @@ export class EmberEngine {
         (tower.empowered && tower.emberlit !== "b" ? 0.08 : 0);
       for (const c of this.creeps) {
         if (!c.alive) continue;
+        if (c.kind === "mole" && !this.surfaced(c)) continue;
         const dx = c.x - (tower.c + 0.5);
         const dy = c.y - (tower.r + 0.5);
         if (dx * dx + dy * dy > range * range) continue;
@@ -3248,9 +3352,11 @@ export class EmberEngine {
           : 0.7
         : tower.kind === "cinder"
           ? def.splash * (form >= 3 ? 1.18 : 1)
-          : def.splash *
-            (siege ? 1.6 : 1) *
-            (tower.emberlit === "b" && tower.kind === "mortar" ? 1.25 : 1);
+          : tower.kind === "cauldron"
+            ? def.splash * (form >= 3 ? 1.15 : 1) * (tower.emberlit === "a" ? 1.3 : 1) * (siege ? 1.5 : 1)
+            : def.splash *
+              (siege ? 1.6 : 1) *
+              (tower.emberlit === "b" && tower.kind === "mortar" ? 1.25 : 1);
     if (def.beam) {
       this.beams.push({
         x1: sx,
@@ -3342,7 +3448,7 @@ export class EmberEngine {
       ox: sx,
       oy: sy,
       empowered: tower.empowered,
-      tar: tower.emberlit === "b" && tower.kind === "cinder",
+      tar: (tower.emberlit === "b" && tower.kind === "cinder") || tower.kind === "cauldron",
       ignoreArmor: tower.kind === "pike" && (tower.emberlit === "a" || brace),
     });
     const spark =
@@ -3350,10 +3456,12 @@ export class EmberEngine {
         ? "#6aa8b4"
         : tower.kind === "mortar" || tower.kind === "cinder"
           ? "#e07838"
-          : "#d4a054";
-    if (tower.kind === "mortar" || tower.kind === "cinder") this.burst(sx, sy, spark, 2, "spark");
+          : tower.kind === "cauldron"
+            ? "#5b6d75"
+            : "#d4a054";
+    if (tower.kind === "mortar" || tower.kind === "cinder" || tower.kind === "cauldron") this.burst(sx, sy, spark, 2, "spark");
     if (tower.kind === "bow" || tower.kind === "pike") sfx.shootBow();
-    else if (tower.kind === "mortar" || tower.kind === "cinder") sfx.shootMortar();
+    else if (tower.kind === "mortar" || tower.kind === "cinder" || tower.kind === "cauldron") sfx.shootMortar();
     else if (tower.kind === "bramble") sfx.shootBramble();
     else sfx.shootFrost();
 
@@ -3403,11 +3511,13 @@ export class EmberEngine {
             ? 400
             : creep.kind === "shaman"
               ? 180
-              : creep.kind === "gloam"
-                ? 140
-                : creep.kind === "ashfang"
-                  ? 90
-                  : 0);
+              : creep.kind === "mourner"
+                ? 160
+                : creep.kind === "gloam"
+                  ? 140
+                  : creep.kind === "ashfang"
+                    ? 90
+                    : 0);
         if (threat > score) {
           score = threat;
           best = creep;
@@ -3417,9 +3527,9 @@ export class EmberEngine {
     return best;
   }
 
-  impactDamage(shot: Shot, prey: Creep, quiet = false) {
+  impactDamage(shot: Shot, prey: Creep, quiet = false, isSplash = false) {
     const hit = this.damageCreep(prey, shot.damage, shot.slow, shot.ignoreArmor,
-      quiet, shot.kind, shot.chillMultiplier);
+      quiet, shot.kind, shot.chillMultiplier, true, isSplash);
     if (!hit || !prey.alive) return;
     const root = shot.rootDuration ?? 0;
     const bleed = shot.bleedDuration ?? 0;
@@ -3452,11 +3562,25 @@ export class EmberEngine {
         const dx = creep.x - x;
         const dy = creep.y - y;
         if (dx * dx + dy * dy <= r2) {
-          this.impactDamage(shot, creep, true);
+          this.impactDamage(shot, creep, true, true);
         }
       }
       this.trauma = Math.min(1, this.trauma + (shot.kind === "mortar" ? 0.05 : 0.1));
       this.hitstop = Math.max(this.hitstop, shot.kind === "mortar" ? 0.02 : 0.035);
+      if (shot.kind === "cauldron") {
+        const form = shot.form || 1;
+        this.burns.push({
+          x,
+          y,
+          r: Math.max(0.8, Math.min(shot.splash, 2.4)),
+          life: (2.2 + form * 0.25) * (shot.empowered ? 1.25 : 1) * (this.omenNow()?.burnLife ?? 1),
+          tick: 0,
+          tar: true,
+          source: "cauldron",
+        });
+        this.trauma = Math.min(1, this.trauma + 0.03);
+        return;
+      }
       if (shot.kind === "mortar" || shot.kind === "cinder") {
         const form = shot.form || 1;
         const fat = (shot.empowered ? 1.18 : 1) * (shot.kind === "cinder" ? 0.92 : 1);
@@ -3617,8 +3741,35 @@ export class EmberEngine {
       creep.healFlash = Math.max(0, (creep.healFlash ?? 0) - dt);
       creep.flash = Math.max(0, creep.flash - dt * 6);
       creep.markedT = Math.max(0, creep.markedT - dt);
+      creep.surfaceT = Math.max(0, (creep.surfaceT ?? 0) - dt);
       creep.spawn = Math.min(1, creep.spawn + dt * 4);
       creep.squash += (1 - creep.squash) * Math.min(1, dt * 10);
+      if (creep.kind === "mourner") {
+        creep.healT -= dt;
+        if (creep.healT <= 0) {
+          creep.healT = 2.6;
+          let cleansed = 0;
+          for (const other of this.creeps) {
+            if (!other.alive || other === creep) continue;
+            const ox = other.x - creep.x;
+            const oy = other.y - creep.y;
+            if (ox * ox + oy * oy > 1.6 * 1.6) continue;
+            if (other.slowT > 0 || other.rootT > 0 || (other.chillT ?? 0) > 0 || (other.bleedT ?? 0) > 0) {
+              other.slowT = 0;
+              other.rootT = 0;
+              other.chillT = 0;
+              other.bleedT = 0;
+              other.bleedTick = 0;
+              other.healFlash = 0.5;
+              cleansed += 1;
+            }
+          }
+          if (cleansed > 0) {
+            this.ring(creep.x, creep.y, "#9fb7c6");
+            this.float(creep.x, creep.y - 0.5, `Cleanse ${cleansed}`, "#9fb7c6");
+          }
+        }
+      }
       if (creep.kind === "lord" && (creep.bossPhase ?? 0) === 0 && creep.hp <= creep.maxHp * 0.5) {
         creep.bossPhase = 1;
         this.triggerBossPhase(creep);
@@ -3712,6 +3863,8 @@ export class EmberEngine {
       tower.abilityCd = Math.max(0, tower.abilityCd - dt * (this.lives <= 5 ? 1.18 : 1));
       tower.recoil = Math.max(0, tower.recoil - dt * 5.5);
       tower.build = Math.min(1, tower.build + dt * 3.4);
+      tower.hymnT = Math.max(0, (tower.hymnT ?? 0) - dt);
+      if (tower.kind === "muster") continue;
       const target = this.pickTarget(tower);
       if (target) {
         tower.angle = Math.atan2(target.y - (tower.r + 0.5), target.x - (tower.c + 0.5));
@@ -3780,6 +3933,16 @@ export class EmberEngine {
           const dx = creep.x - burn.x;
           const dy = creep.y - burn.y;
           if (dx * dx + dy * dy <= burn.r * burn.r) {
+            const resting = creep.kind === "mole" && !this.surfaced(creep);
+            // Fire flushes moles out of the grass — they surface for a beat and eat no damage that tick.
+            if (resting) {
+              creep.surfaceT = Math.max(creep.surfaceT ?? 0, 1.2);
+              if (!creep.sifted) {
+                creep.sifted = true;
+                this.float(creep.x, creep.y - 0.4, "Surfaced", "#e07838");
+              }
+              continue;
+            }
             // Ongoing burns count toward their owner, without repeatedly triggering hit reactions.
             this.damageCreep(creep, this.relics.has("ember") ? 7.2 : 6, burn.tar ? 0.5 : 0, false, true, burn.source, 1, false);
           }

@@ -343,6 +343,13 @@
       center / cover no-repeat;
   border-bottom: 1px solid rgba(212, 160, 84, 0.62);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.26);
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+@media (display-mode: standalone) {
+  .watch-bar {
+    min-height: calc(4.6rem + env(safe-area-inset-top));
+  }
 }
 .watch-bar::after {
   position: absolute;
@@ -1640,10 +1647,10 @@
 
 .packet-row {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(10, minmax(0, 1fr));
   flex: 1 1 auto;
   min-width: 0;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 .packet-row .packet {
   width: 100%;
@@ -5821,7 +5828,7 @@
   }
 
   .tray .command-row .command-label {
-    font-size: 8px;
+    font-size: 9px;
     letter-spacing: 0.04em;
   }
 

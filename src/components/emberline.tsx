@@ -47,6 +47,20 @@ const GLOAM_SPRITE_URL = `data:image/svg+xml,${encodeURIComponent(
 function creepSpriteUrl(kind: CreepKind) {
   return kind === "gloam" ? GLOAM_SPRITE_URL : spriteUrl(kind);
 }
+
+const CAULDRON_SPRITE_URL = `data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 40'><ellipse cx='22' cy='34' rx='15' ry='3' fill='#f07838' opacity='0.4'/><rect x='6' y='26' width='3' height='8' fill='#2e2622'/><rect x='35' y='26' width='3' height='8' fill='#2e2622'/><path d='M4 12 Q2 26 8 30 Q22 36 36 30 Q42 26 40 12 Q30 16 22 16 Q14 16 4 12 Z' fill='#3a3129' stroke='#54483c' stroke-width='1.5'/><ellipse cx='22' cy='12' rx='19' ry='4' fill='#241c14'/><ellipse cx='16' cy='8' rx='3' ry='2' fill='#d8cdb4' opacity='0.6'/></svg>",
+)}`;
+
+const MUSTER_SPRITE_URL = `data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 44'><rect x='18' y='14' width='3.4' height='26' rx='1.6' fill='#4a3a26'/><rect x='10' y='20' width='20' height='1.8' fill='#4a3a26' opacity='0.7'/><rect x='10' y='26' width='20' height='1.8' fill='#4a3a26' opacity='0.7'/><path d='M6 18 Q18 2 30 4 Q34 8 28 14 Q18 16 6 18 Z' fill='#a8813e' stroke='#6a5230'/><path d='M19 2 L19 12 L11 12 Z' fill='#e07838'/></svg>",
+)}`;
+
+function towerSpriteUrl(kind: TowerKind) {
+  if (kind === "cauldron") return CAULDRON_SPRITE_URL;
+  if (kind === "muster") return MUSTER_SPRITE_URL;
+  return spriteUrl(kind);
+}
 const AIM_DETAIL: Record<Aim, string> = {
   first: "Nearest the keep",
   last: "Nearest the gate",
@@ -75,6 +89,8 @@ const COUNTERS: Record<CreepKind, TowerKind[]> = {
   knave: ["frost", "bramble", "pike"],
   ashfang: ["frost", "ward", "bramble", "pike"],
   gloam: ["spark", "frost"],
+  mole: ["frost", "cauldron", "bramble"],
+  mourner: ["bow", "spark", "mortar"],
 };
 
 type HoverCell = { c: number; r: number };
@@ -889,7 +905,7 @@ export function Emberline() {
                         {b.kind === "gloam" ? (
                           <span className="bestiary-mist" aria-hidden="true" />
                         ) : (
-                          <img src={spriteUrl(b.kind)} alt="" />
+                          <img src={creepSpriteUrl(b.kind)} alt="" />
                         )}
                       </div>
                       <div className="bestiary-copy">
@@ -910,7 +926,7 @@ export function Emberline() {
                           <div className="counter-pills">
                             {COUNTERS[b.kind].slice(0, 3).map((kind) => (
                               <span key={kind} className={`counter-pill counter-${kind}`}>
-                                <img src={spriteUrl(kind)} alt="" />
+                                <img src={towerSpriteUrl(kind)} alt="" />
                                 {TOWERS[kind].short}
                               </span>
                             ))}
@@ -1053,12 +1069,13 @@ export function Emberline() {
                 ["Aim / middle click", "Choose First (nearest keep), Last (nearest gate), Near (nearest tower), or Tough (bosses, healers, and high health). This changes only the selected tower. With no tower selected, choose the default for new plants. Focus and marks take priority."],
                 ["Air sightline", "An air-capable tower must reach the road before sending flying prey. Move it closer or forge Reach. Coverage is a sightline check, not a promise that a wave will be held."],
                 ["Pairing", "Two of one kind beside each other fire 10% faster."],
-                [
-                  "Bonds",
-                  "Pair Bow + Frost, Mortar + Ward, Spark + Bramble, or Pike + Cinder for +8% power.",
-                ],
+                ["Bonds", "Pair Bow + Frost, Mortar + Ward, Spark + Bramble, Pike + Cinder, Bow + Muster (Hornline), or Frost + Cauldron (Black ice) for +8% power."],
                 ["Rites", "At the brief: spare purse, spare timber, or first ember."],
                 ["Omens", "Some waves carry an omen. Read the forecast before you send."],
+                ["Pitch Cauldron", "Lobs wide tar that holds and slows. Fires slow; Emberlit pipes up the tar or the splash. Deluge (C) floods the road."],
+                ["Muster Horn", "No shot. Nearby towers hit 10%+ harder in its brass ring. Reveille (C) surges the call — allies hit 50% harder for six seconds."],
+                ["Moles", "Buried until chill, roots, a mark, or fire digs them up. Splash hits buried moles."],
+                ["Mourners", "The wail strips chill, roots, and bleed from the pack. Cut the mourning before the hounds arrive."],
                 [
                   "Shatter",
                   "Frost chills prey; Mortar or Pike hits it 30% harder. Once per enemy every two seconds.",
@@ -1602,6 +1619,17 @@ export function Emberline() {
                     <span className="tower-ascension-chip">Emberlit</span>
                   )}
                   {hud.kindred && <span className="tower-form-chip">Kindred +10% rate</span>}
+                  {hud.bond && (
+                    <span className="tower-form-chip" data-bond={hud.bond.id}>
+                      Bond · {hud.bond.label} +{Math.round(hud.bond.bonus * 100)}%
+                    </span>
+                  )}
+                  <span
+                    className="tower-form-chip"
+                    aria-label={`Aim ${AIM_LABEL[hud.towerAim]}`}
+                  >
+                    Aim · {AIM_LABEL[hud.towerAim]}
+                  </span>
                   <span
                     className="tower-form-chip"
                     aria-label={`Power ${hud.selectedTower.dmgLvl}, tempo ${hud.selectedTower.rateLvl}, reach ${hud.selectedTower.rangeLvl}`}
@@ -1830,16 +1858,18 @@ export function Emberline() {
                   className={`pressable packet ${locked || hud.gold < def.cost ? "opacity-40" : ""}`}
                 >
                   <span className="key">{i + 1}</span>
-                  <img className="packet-sprite" src={spriteUrl(kind)} alt="" />
+                  <img className="packet-sprite" src={towerSpriteUrl(kind)} alt="" />
                   <span className="mt-1 block text-[12px] font-semibold">{def.short}</span>
                   <span className="packet-role">
                     {locked
                       ? "Sealed"
-                      : kind === "pike" || kind === "cinder"
-                        ? "Low air"
-                        : def.hitsAir
-                          ? "Air"
-                          : "Ground"}
+                      : kind === "muster"
+                        ? "Ally buff"
+                        : kind === "pike" || kind === "cinder"
+                          ? "Low air"
+                          : def.hitsAir
+                            ? "Air"
+                            : "Ground"}
                   </span>
                   <span className="block text-[10px] text-copper">
                     {locked ? "—" : `${def.cost}g`}
@@ -2067,6 +2097,10 @@ function towerPower(
   rateLevel = tower.rateLvl,
   rangeLevel = tower.rangeLvl,
 ) {
+  if (tower.kind === "muster") {
+    // The horn does not shoot — its "power" is the call: +10% per base, +2% per level.
+    return Math.round((0.1 + 0.02 * (damageLevel - 1)) * 100);
+  }
   const form = towerForm(damageLevel, rateLevel, rangeLevel);
   return Math.round(
     damageAt(tower.kind, damageLevel) *
@@ -2193,7 +2227,7 @@ function KeepArsenal({ arsenal }: { arsenal: HudSnap["arsenal"] }) {
       <ul>
         {arsenal.map((item) => (
           <li key={item.kind} data-sealed={!item.unlocked}>
-            <img src={spriteUrl(item.kind)} alt="" />
+            <img src={towerSpriteUrl(item.kind)} alt="" />
             <span>{TOWERS[item.kind].short}</span>
           </li>
         ))}
@@ -2652,6 +2686,9 @@ function ThreatPanel({
                 {creep.flying && !creep.low && <span className="threat-tag">Air</span>}
                 {item.kind === "knave" && <span className="threat-tag">Dodge</span>}
                 {item.kind === "ashfang" && <span className="threat-tag">Howl</span>}
+                {item.kind === "gloam" && <span className="threat-tag">Hush</span>}
+                {item.kind === "mole" && <span className="threat-tag">Buried</span>}
+                {item.kind === "mourner" && <span className="threat-tag">Cleanse</span>}
                 {!creep.flying && creep.armor > 0 && <span className="threat-tag">Armor</span>}
               </div>
             );
@@ -2722,7 +2759,7 @@ function BattleLedger({ entries, duration, rallies = 0 }: { entries: CombatEntry
           <ol className="ledger-entries">
             {entries.map(entry => (
               <li key={entry.source}>
-                <span className="ledger-source">{entry.source === "watch" ? <span className="ledger-watch" aria-hidden="true">✦</span> : <img src={spriteUrl(entry.source)} alt="" />}<strong>{entry.source === "watch" ? "Watch / field" : TOWERS[entry.source].short}</strong></span>
+                <span className="ledger-source">{entry.source === "watch" ? <span className="ledger-watch" aria-hidden="true">✦</span> : <img src={towerSpriteUrl(entry.source)} alt="" />}<strong>{entry.source === "watch" ? "Watch / field" : TOWERS[entry.source].short}</strong></span>
                 <span className="ledger-score">{Math.round(entry.damage).toLocaleString()} dmg · {entry.kills} kills</span>
                 <span className="ledger-bar" aria-hidden="true"><span style={{ width: `${total > 0 ? entry.damage / total * 100 : 0}%` }} /></span>
               </li>
@@ -2784,7 +2821,7 @@ function CounterPills({
           title={`Choose ${TOWERS[kind].short} counter`}
           onClick={() => onSelect(kind)}
         >
-          <img src={spriteUrl(kind)} alt="" />
+          <img src={towerSpriteUrl(kind)} alt="" />
           {TOWERS[kind].short}
         </button>
       ))}
@@ -2990,7 +3027,7 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
   const rate = towerRate(hud, tower);
   const bondText = hud.bond
     ? `Bonded with ${TOWERS[hud.bond.partner].short} · ${hud.bond.label} +${Math.round(hud.bond.bonus * 100)}% power`
-    : "No bond · pair Windcut, Ashring, Stormroot, or Brand";
+    : "No bond · pair Windcut, Ashring, Stormroot, Brand, Hornline, or Black ice";
   return (
     <section className="tower-intel" aria-label={`${def.name} selected tower details`}>
       <div className="tower-intel-heading">
@@ -3011,16 +3048,16 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
       </div>
       <div className="tower-intel-body">
         <div className="tower-intel-art">
-          <img src={spriteUrl(tower.kind)} alt="" />
+          <img src={towerSpriteUrl(tower.kind)} alt="" />
         </div>
         <dl className="tower-stats">
           <div>
-            <dt>Power</dt>
-            <dd>{power}</dd>
+            <dt>{tower.kind === "muster" ? "Call" : "Power"}</dt>
+            <dd>{tower.kind === "muster" ? `+${power}%` : power}</dd>
           </div>
           <div>
             <dt>Rate</dt>
-            <dd>{rate.toFixed(2)}×</dd>
+            <dd>{tower.kind === "muster" ? "—" : `${rate.toFixed(2)}×`}</dd>
           </div>
           <div>
             <dt>Reach</dt>

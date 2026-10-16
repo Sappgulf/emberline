@@ -88,7 +88,17 @@ export interface FieldRule {
   reward: number;
 }
 
-export type WatchOrderId = "clean" | "sky" | "song" | "crown" | "veil" | "knife" | "howl" | "hush";
+export type WatchOrderId =
+  | "clean"
+  | "sky"
+  | "song"
+  | "crown"
+  | "veil"
+  | "knife"
+  | "howl"
+  | "hush"
+  | "flush"
+  | "mourning";
 
 export interface WatchOrder {
   id: WatchOrderId;
@@ -415,6 +425,32 @@ export function watchOrderFor(plan: WaveSpawn[] | undefined): WatchOrder | null 
       reward: 36,
       target,
       targetKind: "gloam",
+    };
+  }
+
+  const moleCount = countFor("mole");
+  if (moleCount > 0) {
+    const target = Math.min(3, moleCount);
+    return {
+      id: "flush",
+      title: "Flush the warren",
+      detail: `Dig out ${target} ${target === 1 ? "Mole" : "Moles"} with chill, roots, marks, or fire.`,
+      reward: 32,
+      target,
+      targetKind: "mole",
+    };
+  }
+
+  const mournerCount = countFor("mourner");
+  if (mournerCount > 0) {
+    const target = Math.min(2, mournerCount);
+    return {
+      id: "mourning",
+      title: "Answer the wail",
+      detail: `Drop ${target} ${target === 1 ? "mourner" : "mourners"} before the song dries the road.`,
+      reward: 34,
+      target,
+      targetKind: "mourner",
     };
   }
 
@@ -1175,12 +1211,13 @@ export const MAPS: MapDef[] = [
         { kind: "ashfang", count: 4, gap: 0.36, delay: 3.2 },
       ],
       [
-        { kind: "wisp", count: 14, gap: 0.2, delay: 0 },
-        { kind: "shaman", count: 4, gap: 0.85, delay: 2.4 },
-        { kind: "runner", count: 10, gap: 0.22, delay: 4 },
+        { kind: "mole", count: 5, gap: 0.5, delay: 0 },
+        { kind: "wisp", count: 10, gap: 0.22, delay: 1.2 },
+        { kind: "grub", count: 8, gap: 0.3, delay: 2.4 },
       ],
       [
         { kind: "shell", count: 10, gap: 0.4, delay: 0 },
+        { kind: "mole", count: 4, gap: 0.55, delay: 1.4 },
         { kind: "wisp", count: 12, gap: 0.22, delay: 1.8 },
         { kind: "lord", count: 1, gap: 1, delay: 4 },
         { kind: "hound", count: 10, gap: 0.22, delay: 5.5 },
@@ -1189,7 +1226,7 @@ export const MAPS: MapDef[] = [
     briefing: {
       speaker: "Captain Sera Venn",
       role: "Watch-captain",
-      line: "The marsh is a mirror with teeth. Set towers beside the water, keep the sky covered, and do not let the Emberlord find a clean reflection.",
+      line: "The marsh is a mirror with teeth. Set towers beside the water, keep the sky covered, and do not let the Emberlord find a clean reflection. Moles ride the reeds — they are buried until frost, roots, a mark, or fire digs them up.",
     },
     victory: {
       speaker: "Lumen Quill",
@@ -1222,6 +1259,7 @@ export const MAPS: MapDef[] = [
       "Plate on the mirror road.",
       "Wisps above the reeds. Keep Spark close.",
       "Hounds and shell in the same reflection.",
+      "A warren under the glass. Chill or burn them out.",
       "The cloaks will hide in the glare.",
       "The Emberlord has found the water.",
     ],
@@ -1307,6 +1345,7 @@ export const MAPS: MapDef[] = [
         { kind: "moth", count: 12, gap: 0.22, delay: 1.6 },
         { kind: "knave", count: 8, gap: 0.3, delay: 3.2 },
         { kind: "gloam", count: 2, gap: 1, delay: 2 },
+        { kind: "mourner", count: 1, gap: 1, delay: 4.2 },
       ],
       [
         { kind: "moth", count: 16, gap: 0.2, delay: 0 },
@@ -1352,6 +1391,7 @@ export const MAPS: MapDef[] = [
       "Moths in the draw. Low enough to burn.",
       "Do not sell the pike.",
       "A hush in the mist. Spark the gloam.",
+      "A mourning on the split. Cut the wail.",
       "Plate and knives together.",
       "He walks the hollow. Burn the road.",
     ],
@@ -1436,6 +1476,7 @@ export const MAPS: MapDef[] = [
         { kind: "hound", count: 10, gap: 0.24, delay: 3.6 },
         { kind: "ashfang", count: 4, gap: 0.34, delay: 4.8 },
         { kind: "gloam", count: 3, gap: 0.9, delay: 3 },
+        { kind: "mourner", count: 2, gap: 1, delay: 5.6 },
       ],
       [
         { kind: "knave", count: 12, gap: 0.28, delay: 0 },
@@ -1487,6 +1528,7 @@ export const MAPS: MapDef[] = [
       "Moths in the pull. Burn low.",
       "Do not sell the frost.",
       "A hush under the span. Spark the gloam.",
+      "The wail dries the road. Answer it first.",
       "Plate and veil together.",
       "He walks the span. Hold the dawn.",
     ],
@@ -1505,6 +1547,8 @@ export const BESTIARY = [
   { kind: "knave" as const, weak: "The first shot misses unless Frost, Bramble, or a mark catches them. A leak costs one life." },
   { kind: "ashfang" as const, weak: "The first bite makes it howl — nearby creeps run faster. Frost and Ward catch it. A leak costs two lives." },
   { kind: "gloam" as const, weak: "A mist that hushes towers near it — they fire slower while it lives. Spark bites through. A leak costs two lives." },
+  { kind: "mole" as const, weak: "Buried until chill, roots, a mark, flare, or fire digs it up. Splash hits buried moles anyway. A leak costs one life." },
+  { kind: "mourner" as const, weak: "The wail dries the road — it strips chill, roots, and bleed from the pack. Spark and bows bite it first. A leak costs two lives." },
 ];
 
 export function describePlan(waves: WaveSpawn[][], index: number): string {
@@ -1529,6 +1573,8 @@ export function endlessWave(n: number): WaveSpawn[] {
     ["shaman", "ashfang"],
     ["gloam", "runner"],
     ["moth", "runner"],
+    ["shell", "mole"],
+    ["mourner", "knave"],
   ];
   const pick = mixes[(n - 1) % mixes.length];
   const plan: WaveSpawn[] = pick.map((kind, i) => ({
@@ -1541,8 +1587,8 @@ export function endlessWave(n: number): WaveSpawn[] {
     [],
     ["moth"],
     ["gloam"],
-    ["hound", "moth"],
-    ["gloam", "knave"],
+    ["hound", "moth", "mole"],
+    ["gloam", "knave", "mourner"],
   ];
   const escort = escorts[Math.min(tier, escorts.length - 1)];
   escort.forEach((kind, i) => {
@@ -1578,7 +1624,7 @@ export function endlessGoldBoost(n: number): number {
 
 export function leakCost(kind: CreepKind): number {
   if (kind === "lord") return 3;
-  if (kind === "shaman" || kind === "shell" || kind === "ashfang" || kind === "gloam") return 2;
+  if (kind === "shaman" || kind === "shell" || kind === "ashfang" || kind === "gloam" || kind === "mourner") return 2;
   return 1;
 }
 

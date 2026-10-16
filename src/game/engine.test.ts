@@ -2995,3 +2995,152 @@ describe("long night arc", () => {
     }
   });
 });
+
+describe("new arms and burrowed prey", () => {
+  it("seals the cauldron until Ember Copse and the horn until Glass Marsh", () => {
+    const e = play();
+    e.chooseKind("cauldron");
+    assert.equal(e.selectedKind, "bow", "cauldron sealed early");
+    e.unlocked = 4;
+    e.loadMap(4);
+    e.chooseKind("cauldron");
+    assert.equal(e.selectedKind, "cauldron");
+    e.chooseKind("muster");
+    assert.equal(e.selectedKind, "cauldron", "horn sealed until glass — earlier pick stays");
+    e.unlocked = 5;
+    e.loadMap(5);
+    e.chooseKind("muster");
+    assert.equal(e.selectedKind, "muster");
+  });
+
+  it("muster buffs towers in its ring and boosts fire with Reveille", () => {
+    const e = play();
+    e.unlocked = 7;
+    e.loadMap(7);
+    e.clearField();
+    e.phase = "ready";
+    e.gold = 999;
+    e.selectedKind = "muster";
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const muster = e.towers.find((t) => t.kind === "muster")!;
+    // place a bow beside the horn
+    e.selectedKind = "bow";
+    const near = [
+      { c: grass.c + 1, r: grass.r },
+      { c: grass.c - 1, r: grass.r },
+      { c: grass.c, r: grass.r + 1 },
+      { c: grass.c, r: grass.r - 1 },
+    ].find((p) => e.canBuild(p.c, p.r));
+    assert.ok(near, "adjacent grass exists");
+    e.tapCell(near.c, near.r);
+    const bow = e.towers.find((t) => t.kind === "bow")!;
+    e.phase = "wave";
+    e.spawn("grub");
+    const grub = e.creeps[0];
+    grub.x = near.c + 1.2;
+    grub.y = near.r + 0.5;
+    e.fire(bow, grub);
+    const buffed = e.shots[0].damage;
+    const bare = TOWERS.bow.damage;
+    assert.ok(buffed > bare, `muster buff should raise bow damage, saw ${buffed} vs ${bare}`);
+    assert.ok(Math.abs(e.musterMultiplier(bow) - 1.1) < 1e-9);
+    muster.hymnT = 6;
+    assert.ok(Math.abs(e.musterMultiplier(bow) - 1.15) < 1e-9, "Reveille boosts the call by half");
+  });
+
+  it("digs moles out with focus and leaves buried ones standing", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("mole");
+    const mole = e.creeps[0];
+    mole.x = 5.5;
+    mole.y = 3.5;
+    assert.equal(e.surfaced(mole), false);
+    e.damageCreep(mole, 50, 0, true);
+    assert.equal(mole.alive, true, "buried moles shrug off direct hits");
+    assert.equal(mole.sifted, true);
+    assert.equal(e.focusCreepAtCell(5, 3), true, "focus surfaces the mole");
+    assert.equal(e.surfaced(mole), true);
+    assert.ok((mole.surfaceT ?? 0) > 0);
+  });
+
+  it("surfaces moles on chill, roots, marks, and burns", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("mole");
+    const mole = e.creeps[0];
+    mole.slowT = 0.4;
+    assert.equal(e.surfaced(mole), true);
+    mole.slowT = 0;
+    mole.surfaceT = 0;
+    e.markCreep(mole);
+    assert.equal(e.surfaced(mole), true, "marking digs it up");
+  });
+
+  it("cleanses stray chill and roots with the mourner wail", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("mourner");
+    e.spawn("grub");
+    const grub = e.creeps[1];
+    grub.slowT = 2;
+    grub.chillT = 2;
+    grub.rootT = 1;
+    grub.bleedT = 2;
+    grub.hp = grub.maxHp - 10;
+    for (let i = 0; i < 200; i++) e.step(1 / 60);
+    assert.equal(grub.chillT, 0, "the wail dries the road");
+    assert.ok(grub.bleedT === undefined || grub.bleedT === 0);
+  });
+
+  it("lobs wide tar from the cauldron that holds and slows the road", () => {
+    const e = play();
+    e.unlocked = 4;
+    e.loadMap(4);
+    e.clearField();
+    e.phase = "ready";
+    e.gold = 999;
+    e.selectedKind = "cauldron";
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const cauldron = e.towers[0];
+    e.phase = "wave";
+    e.spawn("grub");
+    const grub = e.creeps[0];
+    grub.x = grass.c + 1.4;
+    grub.y = grass.r + 0.6;
+    e.fire(cauldron, grub);
+    const shot = e.shots.at(-1);
+    assert.ok(shot);
+    assert.equal(shot.tar, true);
+    assert.ok(shot.splash > TOWERS.cinder.splash, "pitch splashes wider than coals");
+    // Deliver it and read the tar patch
+    for (let i = 0; i < 40; i++) e.step(1 / 60);
+    const patch = e.burns.find((burn) => burn.tar);
+    assert.ok(patch, "cauldron leaves a tar burn");
+    assert.ok(patch.r > 1, "the pitch spreads wide");
+  });
+
+  it("floods a wide tarfield with Deluge and keeps buried moles on top", () => {
+    const e = play();
+    e.unlocked = 4;
+    e.loadMap(4);
+    e.clearField();
+    e.phase = "ready";
+    e.gold = 999;
+    e.selectedKind = "cauldron";
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    e.phase = "wave";
+    e.spawn("grub");
+    e.creeps[0].x = grass.c + 1;
+    e.creeps[0].y = grass.r + 0.5;
+    e.notify();
+    e.useAbility();
+    const deluge = e.burns.find((burn) => burn.tar);
+    assert.ok(deluge);
+    assert.ok(deluge.r >= 2, `Deluge spreads wide, saw ${deluge.r}`);
+    assert.ok(e.towers[0].abilityCd > 0);
+  });
+});

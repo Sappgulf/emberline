@@ -43,7 +43,17 @@ export const PATH: ReadonlyArray<{ c: number; r: number }> = [
 export const GLOAM_HUSH_RANGE = 1.9;
 export const GLOAM_HUSH_RATE = 0.72;
 
-export type TowerKind = "bow" | "mortar" | "frost" | "spark" | "bramble" | "ward" | "pike" | "cinder";
+export type TowerKind =
+  | "bow"
+  | "mortar"
+  | "frost"
+  | "spark"
+  | "bramble"
+  | "ward"
+  | "pike"
+  | "cinder"
+  | "cauldron"
+  | "muster";
 export type CreepKind =
   | "grub"
   | "runner"
@@ -55,7 +65,9 @@ export type CreepKind =
   | "moth"
   | "knave"
   | "ashfang"
-  | "gloam";
+  | "gloam"
+  | "mole"
+  | "mourner";
 export type Aim = "first" | "last" | "close" | "strong";
 export type PropKind = "pine" | "oak" | "rock" | "stump" | "reed" | "lamp" | "shroom" | "cart" | "fence";
 export type AffixId = "shielded" | "frenzied" | "warded" | "hollow" | "verdant";
@@ -263,6 +275,14 @@ export const EMBERLIT: Record<TowerKind, { a: { name: string; detail: string }; 
     a: { name: "Clung coals", detail: "Coals cling and burn longer." },
     b: { name: "Tarfire", detail: "Coals slow everything they burn." },
   },
+  cauldron: {
+    a: { name: "Deep tar", detail: "The splash widens and the tar holds 50% longer." },
+    b: { name: "Serpent splash", detail: "Shots hit 25% harder." },
+  },
+  muster: {
+    a: { name: "Wide call", detail: "The call reaches half a tile farther." },
+    b: { name: "Drumbeat", detail: "The call grants 8% more damage." },
+  },
 };
 
 export const ABILITIES: Record<TowerKind, { name: string; detail: string; cd: number }> = {
@@ -274,6 +294,8 @@ export const ABILITIES: Record<TowerKind, { name: string; detail: string; cd: nu
   ward: { name: "Sanctum", detail: "Blast and chill every creep in reach.", cd: 15 },
   pike: { name: "Brace", detail: "Next spear ignores plate and pins.", cd: 12 },
   cinder: { name: "Firestorm", detail: "Set a wide burn on the road ahead.", cd: 14 },
+  cauldron: { name: "Deluge", detail: "Flood the road with tar that holds and slows.", cd: 16 },
+  muster: { name: "Reveille", detail: "The call surges — nearby towers hit 50% harder for six seconds.", cd: 18 },
 };
 
 export const PROPS: ReadonlyArray<{ c: number; r: number; kind: PropKind }> = [
@@ -456,11 +478,44 @@ export const TOWERS: Record<
     hitsLow: true,
     beam: false,
   },
+  cauldron: {
+    id: "cauldron",
+    name: "Pitch Cauldron",
+    short: "Pitch",
+    blurb: "Lobs tar wide. Ground only. Slows everything in the pitch. Emberlit fattens the tar or the splash.",
+    cost: 100,
+    range: 2.1,
+    damage: 20,
+    fireRate: 0.55,
+    splash: 1.7,
+    slow: 0.5,
+    projectileSpeed: 5.6,
+    hitsAir: false,
+    hitsLow: false,
+    beam: false,
+  },
+  muster: {
+    id: "muster",
+    name: "Muster Horn",
+    short: "Muster",
+    blurb: "No shot. Nearby towers hit 10%+ harder while it stands. Reach widens the ring. The call can surge.",
+    cost: 80,
+    range: 1.9,
+    damage: 0,
+    fireRate: 0,
+    splash: 0,
+    slow: 0,
+    projectileSpeed: 0,
+    hitsAir: false,
+    hitsLow: false,
+    beam: false,
+  },
 };
 
 const TOWER_KINDS = Object.keys(TOWERS) as TowerKind[];
 export const AIR_TOWER_KINDS = TOWER_KINDS.filter((kind) => TOWERS[kind].hitsAir);
 export const LOW_AIR_TOWER_KINDS = TOWER_KINDS.filter((kind) => TOWERS[kind].hitsLow);
+export const SUPPORT_TOWER_KINDS: TowerKind[] = TOWER_KINDS.filter((kind) => TOWERS[kind].damage === 0);
 
 export function towerList(kinds: TowerKind[], conjunction: "and" | "or" = "and"): string {
   const names = kinds.map((kind) => TOWERS[kind].short);
@@ -479,6 +534,8 @@ export const TOWER_UNLOCK: Record<TowerKind, number> = {
   ward: 0,
   pike: 2,
   cinder: 3,
+  cauldron: 4,
+  muster: 5,
 };
 
 export const TOWER_UNLOCK_HINT: Record<TowerKind, string> = {
@@ -490,6 +547,8 @@ export const TOWER_UNLOCK_HINT: Record<TowerKind, string> = {
   ward: "",
   pike: "Hold Keep Stair to unseal the pike.",
   cinder: "Hold River Ford to unseal the brazier.",
+  cauldron: "Hold Ember Copse to unseal the cauldron.",
+  muster: "Hold Glass Marsh to unseal the horn.",
 };
 
 export const CREEPS: Record<
@@ -516,6 +575,8 @@ export const CREEPS: Record<
   knave: { hp: 54, speed: 1.55, gold: 15, armor: 1, name: "Knaves", flying: false, low: false, heal: 0 },
   ashfang: { hp: 78, speed: 1.82, gold: 18, armor: 2, name: "Ashfangs", flying: false, low: false, heal: 0 },
   gloam: { hp: 66, speed: 0.98, gold: 26, armor: 3, name: "Gloams", flying: false, low: false, heal: 0 },
+  mole: { hp: 70, speed: 1.35, gold: 20, armor: 2, name: "Moles", flying: false, low: false, heal: 0 },
+  mourner: { hp: 96, speed: 0.9, gold: 26, armor: 1, name: "Mourners", flying: false, low: false, heal: 0 },
 };
 
 export type WaveSpawn = { kind: CreepKind; count: number; gap: number; delay: number };
@@ -609,6 +670,7 @@ export function emberlitDamageMultiplier(kind: TowerKind, branch: EmberlitBranch
   if (kind === "mortar") return 1.25;
   if (kind === "ward") return 1.2;
   if (kind === "pike") return 1.35;
+  if (kind === "cauldron") return 1.25;
   return 1;
 }
 
