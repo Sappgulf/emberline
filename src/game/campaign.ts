@@ -1537,8 +1537,43 @@ export function endlessWave(n: number): WaveSpawn[] {
     gap: Math.max(0.18, 0.42 - tier * 0.015),
     delay: i * 1.4,
   }));
-  if (n % 4 === 0) plan.push({ kind: "lord", count: 1 + Math.floor(tier / 3), gap: 1.4, delay: 2.8 });
+  const escorts: CreepKind[][] = [
+    [],
+    ["moth"],
+    ["gloam"],
+    ["hound", "moth"],
+    ["gloam", "knave"],
+  ];
+  const escort = escorts[Math.min(tier, escorts.length - 1)];
+  escort.forEach((kind, i) => {
+    const count = 2 + tier * 2 + i * 3;
+    const existing = plan.find((entry) => entry.kind === kind);
+    if (existing) {
+      existing.count += count;
+      return;
+    }
+    plan.push({ kind, count, gap: Math.max(0.24, 0.5 - tier * 0.02), delay: 2.4 + i * 1.7 });
+  });
+  if (n % 4 === 0) plan.push({ kind: "lord", count: 1 + Math.floor(tier / 3), gap: 1.4, delay: 3.6 + tier * 0.4 });
   return plan;
+}
+
+const NIGHT_BANDS = ["First watch", "Deep night", "Howl rise", "Ember tempest", "Gloam vigil", "Blood moon"];
+
+/** Names the stretch of nights a Long Night wave belongs to. */
+export function nightBand(n: number): string {
+  const tier = Math.floor((n - 1) / 4);
+  return tier < NIGHT_BANDS.length ? NIGHT_BANDS[tier] : "Long watch";
+}
+
+/** True when the held night opens a full night market with relic and camp trading. */
+export function endlessMarketNight(n: number): boolean {
+  return n > 0 && n % 3 === 0;
+}
+
+/** Gold multiplier for a Long Night wave — midnight hunts pay far richer. */
+export function endlessGoldBoost(n: number): number {
+  return n > 0 && n % 6 === 0 ? 1.35 : 1;
 }
 
 export function leakCost(kind: CreepKind): number {

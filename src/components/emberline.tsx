@@ -40,6 +40,13 @@ const AIM_LABEL: Record<Aim, string> = {
   close: "Near",
   strong: "Tough",
 };
+const GLOAM_SPRITE_URL = `data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 44'><ellipse cx='14' cy='16' rx='7' ry='10' fill='#8fa3b0' opacity='0.4'/><ellipse cx='26' cy='16' rx='7' ry='10' fill='#8fa3b0' opacity='0.4'/><path d='M4 30 L8 12 Q20 0 32 12 L36 30 Q28 26 20 32 Q12 26 4 30 Z' fill='#5b6d75'/><circle cx='15' cy='18' r='3' fill='#b8c8d2'/><circle cx='25' cy='18' r='3' fill='#b8c8d2'/></svg>",
+)}`;
+
+function creepSpriteUrl(kind: CreepKind) {
+  return kind === "gloam" ? GLOAM_SPRITE_URL : spriteUrl(kind);
+}
 const AIM_DETAIL: Record<Aim, string> = {
   first: "Nearest the keep",
   last: "Nearest the gate",
@@ -144,6 +151,13 @@ export function Emberline() {
   const titleHelpTriggerRef = useRef<HTMLButtonElement>(null);
   const headerHelpTriggerRef = useRef<HTMLButtonElement>(null);
   const helpRestoreRef = useRef<{ current: HTMLButtonElement | null }>(headerHelpTriggerRef);
+  const campaignActionRef = useRef<HTMLButtonElement>(null);
+  const hallFirstPerkRef = useRef<HTMLButtonElement>(null);
+  const settingsSoundRef = useRef<HTMLButtonElement>(null);
+  const settingsAimRef = useRef<HTMLSelectElement>(null);
+  const marketActionRef = useRef<HTMLButtonElement>(null);
+  const defeatRetryRef = useRef<HTMLButtonElement>(null);
+  const dawnNightRef = useRef<HTMLButtonElement>(null);
   const hud = useHud();
   const [cell, setCell] = useState(40);
   const [hoverCell, setHoverCell] = useState<HoverCell | null>(null);
@@ -571,12 +585,19 @@ export function Emberline() {
       </p>
       <header className="watch-bar flex shrink-0 items-stretch" data-phase={hud.phase}>
         <div className="watch-title flex min-w-0 flex-1 flex-col justify-center px-4 py-2">
-          <span className="watch-overline">Duskward watch</span>
+          <span className="watch-overline">
+            {hud.endless && hud.nightBand ? `Duskward watch · ${hud.nightBand}` : "Duskward watch"}
+          </span>
           <p className="watch-map-name font-display text-xl leading-none text-copper">
             {hud.phase === "title" ? "Emberline" : hud.mapName}
             {hud.endless && (
               <span className="ml-2 font-sans text-[10px] tracking-[0.18em] text-ember">
                 LONG NIGHT
+              </span>
+            )}
+            {hud.endless && hud.bestEndless > 0 && (
+              <span className="ml-2 font-sans text-[10px] tracking-[0.18em] text-dust">
+                BEST {hud.bestEndless}
               </span>
             )}
             {hud.hard && (
@@ -816,6 +837,7 @@ export function Emberline() {
             title={codexTab === "bestiary" ? "Bestiary" : "Chronicle"}
             onClose={closeCodex}
             close="Close"
+            initialFocusRef={codexTab === "bestiary" ? codexBestiaryRef : codexChronicleRef}
           >
             <div className="codex-tabs" role="tablist" aria-label="Codex sections">
               <button
@@ -932,6 +954,8 @@ export function Emberline() {
             onClose={closeCampaign}
             action={`Begin ${hud.mapName}`}
             onAction={() => engine.startSelectedMap()}
+            actionRef={campaignActionRef}
+            initialFocusRef={campaignActionRef}
             actionDock
           >
             <div className="campaign-map-surface">
@@ -1074,6 +1098,7 @@ export function Emberline() {
             close="Close"
             onClose={closeHall}
             size="wide"
+            initialFocusRef={hallFirstPerkRef}
           >
             <div className="hall-grid">
               <section className="hall-card plaque" aria-label="Watch marks">
@@ -1103,11 +1128,11 @@ export function Emberline() {
                 ) : (
                   <p>Hold all eight roads to open the endless night.</p>
                 )}
-                <p>Every wave grows heavier. Bosses walk every fourth night.</p>
+                <p>Every wave grows heavier. Bosses walk every fourth night, and every third held night opens a night market.</p>
               </section>
             </div>
             <div className="hall-perks" aria-label="Watch perks">
-              {hud.perkOptions.map((perk) => (
+              {hud.perkOptions.map((perk, index) => (
                 <article
                   key={perk.id}
                   className="hall-perk plaque"
@@ -1123,6 +1148,7 @@ export function Emberline() {
                   </div>
                   <p>{perk.detail}</p>
                   <button
+                    ref={index === 0 ? hallFirstPerkRef : undefined}
                     type="button"
                     className="pressable stamp min-h-9 px-3 text-[11px] text-copper disabled:opacity-40"
                     disabled={!perk.canBuy}
@@ -1142,9 +1168,10 @@ export function Emberline() {
         )}
 
         {hud.settings && (
-          <Overlay kicker="The watch board" title="Settings" close="Back" onClose={closeSettings} size="card">
+          <Overlay kicker="The watch board" title="Settings" close="Back" onClose={closeSettings} size="card" initialFocusRef={settingsSoundRef}>
             <div className="settings-grid w-full text-left">
               <button
+                ref={settingsSoundRef}
                 type="button"
                 className="pressable stamp min-h-10 w-full px-4 text-xs text-copper"
                 data-on={hud.muted}
@@ -1167,6 +1194,23 @@ export function Emberline() {
                 />
                 <span className="settings-value">{hud.muted ? "muted" : `${Math.round(hud.volume * 100)}%`}</span>
               </label>
+              <label className="plaque settings-row" htmlFor="settings-aim">
+                <span className="intel-kicker">New-plant aim</span>
+                <select
+                  id="settings-aim"
+                  ref={settingsAimRef}
+                  className="settings-select"
+                  value={hud.aim}
+                  aria-label="Default aim for new towers"
+                  onChange={(e) => engine.setDefaultAim(e.target.value as Aim)}
+                >
+                  {AIMS.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {AIM_LABEL[mode]}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="plaque settings-row" htmlFor="settings-motion">
                 <span className="intel-kicker">Bolder motion</span>
                 <select
@@ -1184,7 +1228,7 @@ export function Emberline() {
                   <option value="off">Full ember and shake</option>
                 </select>
               </label>
-              <p className="text-[11px] text-dust">Sound and motion persist between watches. Volume shapes every horn and shot.</p>
+              <p className="text-[11px] text-dust">Sound and motion persist between watches. Volume shapes every horn and shot. New towers pick up the default aim.</p>
             </div>
           </Overlay>
         )}
@@ -1372,10 +1416,12 @@ export function Emberline() {
         {(hud.phase === "shop" || hud.phase === "stall") && (
           <Overlay
             size="wide"
-            kicker="Brother Ash"
-            title={hud.phase === "shop" ? "Night market" : "Roadside stall"}
+            kicker={hud.endless ? hud.nightBand ? `Brother Ash · Night ${hud.wave} · ${hud.nightBand}` : `Brother Ash · Night ${hud.wave}` : "Brother Ash"}
+            title={hud.phase === "shop" ? (hud.endless ? "Night market of held nights" : "Night market") : "Roadside stall"}
             action={hud.phase === "shop" ? "March on" : "Back to the road"}
             onAction={() => (hud.phase === "shop" ? engine.leaveShop() : engine.closeStall())}
+            actionRef={marketActionRef}
+            initialFocusRef={marketActionRef}
             actionDock
           >
             {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
@@ -1444,6 +1490,7 @@ export function Emberline() {
             kicker={hud.endless ? "Long Night" : "Breach"}
             title={hud.endless ? "The night took the line" : "The keep fell"}
             emblem
+            initialFocusRef={defeatRetryRef}
           >
             {hud.endless ? (
               <p className="text-sm text-dust">
@@ -1475,10 +1522,11 @@ export function Emberline() {
               </span>
             </div>
             <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="defeat-actions flex flex-wrap justify-center gap-2">
               <button
+                ref={defeatRetryRef}
                 type="button"
-                className="pressable min-h-11 bg-copper px-6 text-sm font-semibold text-ink"
+                className="pressable send-flag min-h-11 px-6 text-sm"
                 onClick={() => engine.retryMap()}
               >
                 {hud.endless ? "Walk again" : "Hold this map"}
@@ -1489,7 +1537,7 @@ export function Emberline() {
         )}
 
         {hud.phase === "won" && (
-          <Overlay kicker="Dawn" title="The line held" surface="dawn" emblem>
+          <Overlay kicker="Dawn" title="The line held" surface="dawn" emblem initialFocusRef={dawnNightRef}>
             {hud.story ? (
               <StoryLine story={hud.story} />
             ) : (
@@ -1498,7 +1546,7 @@ export function Emberline() {
             {hud.grade && <p className="text-xs text-ember">{hud.grade}</p>}
             <WatchSummary hud={hud} />
             <BattleLedger entries={hud.ledger} duration={hud.waveDuration} rallies={hud.rally.uses} />
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="defeat-actions flex flex-wrap justify-center gap-2">
               <button
                 type="button"
                 className="pressable stamp min-h-11 px-5 text-sm text-copper"
@@ -1507,6 +1555,7 @@ export function Emberline() {
                 March again with relics
               </button>
               <button
+                ref={dawnNightRef}
                 type="button"
                 className="pressable send-flag min-h-11 px-5 text-sm"
                 onClick={() => {
@@ -1722,13 +1771,15 @@ export function Emberline() {
             {hud.canUndo && (
               <button
                 type="button"
-                className="undo-last text-[11px] text-copper"
+                className="pressable undo-last"
+                data-on="true"
                 aria-keyshortcuts="Z"
                 aria-label="Undo last plant; press Z while it is briefly available"
                 title="Undo last plant (Z, briefly available)"
                 onClick={() => engine.undoLast()}
               >
-                Undo last plant · Z
+                <span className="undo-label">Undo last plant</span>
+                <span className="undo-key" aria-hidden="true">Z</span>
               </button>
             )}
           </div>
@@ -2196,7 +2247,10 @@ function RitePicker({ rite }: { rite: WatchRiteId }) {
 function BriefWave({ hud }: { hud: HudSnap }) {
   return (
     <div className="brief-wave" aria-label={`First wave on ${hud.mapName}`}>
-      <span className="intel-kicker">Wave {hud.previewWave}</span>
+      <span className="intel-kicker">
+        Wave {hud.previewWave}
+        {hud.nightBand ? ` · ${hud.nightBand}` : ""}
+      </span>
       <DeskWave items={hud.wavePreview} />
       <p>{hud.opening}</p>
     </div>
@@ -2226,10 +2280,16 @@ function WatchLedger({ hud }: { hud: HudSnap }) {
           <strong>{hud.marks}</strong>
           <small>Watch marks</small>
         </span>
+        {hud.unlocked >= hud.mapTotal && (
+          <span>
+            <strong>{hud.bestEndless}</strong>
+            <small>Best night</small>
+          </span>
+        )}
       </div>
       <p>
         <span className="intel-kicker">Next road</span>
-        {nextRoute ?? "All roads held"}
+        {nextRoute ?? (hud.bestEndless > 0 ? `Long Night record ${hud.bestEndless}` : "All roads held")}
       </p>
     </div>
   );
@@ -2308,7 +2368,7 @@ function DeskWave({ items }: { items: HudSnap["wavePreview"] }) {
     <ul className="desk-wave">
       {items.map((item) => (
         <li key={item.kind}>
-          <img src={spriteUrl(item.kind)} alt="" />
+          <img src={creepSpriteUrl(item.kind)} alt="" />
           <span>
             {item.count} {CREEPS[item.kind].name}
             {CREEPS[item.kind].low ? " · low" : CREEPS[item.kind].flying ? " · air" : ""}
@@ -2350,7 +2410,10 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
         {hud.campLabel && <p className="desk-meta">Camp · {hud.campLabel}</p>}
       </section>
       <section className="desk-card">
-        <span className="intel-kicker">Now · {hud.endless ? "night" : "wave"} {hud.previewWave}</span>
+        <span className="intel-kicker">
+          Now · {hud.endless ? "night" : "wave"} {hud.previewWave}
+          {hud.nightBand ? ` · ${hud.nightBand}` : ""}
+        </span>
         <DeskWave items={hud.wavePreview} />
         {hud.thenPreview.length > 0 && (
           <>
@@ -2582,7 +2645,7 @@ function ThreatPanel({
                 className="threat-item"
                 aria-label={`${item.count} ${creep.name}${creep.flying ? ", flying" : ""}`}
               >
-                <img src={spriteUrl(item.kind)} alt="" />
+                <img src={creepSpriteUrl(item.kind)} alt="" />
                 <span className="threat-count">{item.count}</span>
                 <span className="threat-name">{creep.name}</span>
                 {creep.low && <span className="threat-tag">Low</span>}
@@ -2633,7 +2696,7 @@ function ArrivalPlan({ hud }: { hud: HudSnap }) {
               const creep = CREEPS[group.kind];
               return (
                 <li key={group.kind}>
-                  <img src={spriteUrl(group.kind)} alt="" />
+                  <img src={creepSpriteUrl(group.kind)} alt="" />
                   <span><strong>{group.count} {creep.name}</strong><small>{creep.flying ? creep.low ? "Low air" : "Air" : creep.armor > 0 ? "Armored ground" : "Ground"}</small></span>
                   <span className="arrival-time">{live ? "in " : "at "}{time}</span>
                 </li>
@@ -3000,6 +3063,7 @@ function Overlay({
   initialFocusRef,
   surface,
   actionDock,
+  actionRef,
 }: {
   children?: React.ReactNode;
   wide?: boolean;
@@ -3015,6 +3079,7 @@ function Overlay({
   initialFocusRef?: RefObject<HTMLElement | null>;
   surface?: "campaign" | "dawn";
   actionDock?: boolean;
+  actionRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const layout = size ?? (wide ? "wide" : "card");
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -3091,6 +3156,7 @@ function Overlay({
         {actionDock ? <div className="dispatch-body">{children}</div> : children}
         {action && onAction && (
           <button
+            ref={actionRef}
             type="button"
             className="pressable send-flag min-h-11 px-7 text-sm"
             onClick={onAction}

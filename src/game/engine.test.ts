@@ -15,7 +15,17 @@ import {
   pathCells,
   blockedCells,
 } from "./config.ts";
-import { MAPS, endlessWave, leakCost, pathCellsOf, planHasAir, shopFor, watchOrderFor } from "./campaign.ts";
+import {
+  MAPS,
+  endlessWave,
+  leakCost,
+  nightBand,
+  endlessMarketNight,
+  pathCellsOf,
+  planHasAir,
+  shopFor,
+  watchOrderFor,
+} from "./campaign.ts";
 import { EmberEngine } from "./engine.ts";
 
 function play(): EmberEngine {
@@ -2864,5 +2874,124 @@ describe("enemy support signals", () => {
     assert.ok(normal.slowT > 0);
     assert.ok(resistant.hp < hp);
     assert.ok(e.hud().prey?.statuses.includes("Slow / root immune"));
+  });
+});
+
+describe("long night arc", () => {
+  it("names each stretch of the endless night", () => {
+    assert.equal(nightBand(1), "First watch");
+    assert.equal(nightBand(4), "First watch");
+    assert.equal(nightBand(5), "Deep night");
+    assert.equal(nightBand(13), "Ember tempest");
+    assert.equal(nightBand(41), "Long watch");
+  });
+
+  it("walks heavier escorts into every band of the Long Night", () => {
+    assert.equal(endlessWave(1).some((entry) => entry.kind === "moth"), false, "band one stays calm");
+    assert.ok(endlessWave(5).some((entry) => entry.kind === "moth"), "band two flies low");
+    assert.ok(endlessWave(9).some((entry) => entry.kind === "gloam"), "band three hushes the road");
+    const late = endlessWave(17);
+    assert.ok(late.some((entry) => entry.kind === "gloam") && late.some((entry) => entry.kind === "knave"), "late bands hush and swipe");
+    assert.equal(endlessMarketNight(3), true);
+    assert.equal(endlessMarketNight(4), false);
+    assert.equal(endlessMarketNight(9), true);
+    assert.ok((endlessWave(4) ?? []).some((entry) => entry.kind === "lord"), "boss nights hold");
+    assert.equal(endlessWave(20).find((entry) => entry.kind === "lord")?.count, 2, "late boss nights walk two lords");
+  });
+
+  it("opens a night market every third held night and pays a mark", () => {
+    const e = play();
+    e.endless = true;
+    e.phase = "wave";
+    e.wave = 3;
+    e.spawnQ = [];
+    e.creeps = [];
+    const marksBefore = e.marks;
+    e.finishWaveIfClear();
+    assert.equal(e.phase, "shop");
+    assert.equal(e.marks, marksBefore + 1, "holding a market night earns a mark");
+    const mapIndexBefore = e.mapIndex;
+    e.leaveShop();
+    assert.equal(e.phase, "ready");
+    assert.equal(e.endless, true);
+    assert.equal(e.mapIndex, mapIndexBefore, "night markets never march the road");
+  });
+
+  it("keeps held nights off the market between markets", () => {
+    const e = play();
+    e.endless = true;
+    e.phase = "wave";
+    e.wave = 4;
+    e.spawnQ = [];
+    e.creeps = [];
+    e.finishWaveIfClear();
+    assert.equal(e.phase, "ready");
+  });
+
+  it("pays a midnight-hunt richer bounty every sixth night", () => {
+    const e = play();
+    e.endless = true;
+    e.wave = 6;
+    const base = 1 + (6 - 1) * 0.02;
+    const omen = e.omenNow()?.gold ?? 1;
+    assert.ok(Math.abs(e.goldMult() - base * 1.35 * omen) < 1e-9);
+    e.wave = 7;
+    assert.ok(Math.abs(e.goldMult() - (1 + 6 * 0.02) * (e.omenNow()?.gold ?? 1)) < 1e-9);
+  });
+
+  it("keeps the night band on the forecast", () => {
+    const e = play();
+    e.endless = true;
+    e.phase = "ready";
+    e.notify();
+    assert.equal(e.hud().nightBand, "First watch");
+    e.wave = 4;
+    e.notify();
+    assert.equal(e.hud().nightBand, "Deep night");
+    assert.equal(JSON.parse(e.renderText()).longNight.band, "Deep night");
+    assert.equal(JSON.parse(e.renderText()).longNight.marketNight, false);
+  });
+
+  it("persists the new-plant aim default from settings", () => {
+    const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    const saved: string[] = [];
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => null,
+        setItem: (_key: string, value: string) => {
+          saved.push(value);
+        },
+      } satisfies Pick<Storage, "getItem" | "setItem">,
+    });
+    try {
+      const e = new EmberEngine();
+      e.readSave();
+      e.phase = "title";
+      e.setDefaultAim("strong");
+      assert.equal(e.aim, "strong");
+      const round = JSON.parse(saved[0]) as { aim?: string };
+      assert.equal(round.aim, "strong");
+
+      Object.defineProperty(globalThis, "localStorage", {
+        configurable: true,
+        value: {
+          getItem: () => saved[saved.length - 1],
+          setItem: () => undefined,
+        } satisfies Pick<Storage, "getItem" | "setItem">,
+      });
+      const fresh = new EmberEngine();
+      fresh.readSave();
+      assert.equal(fresh.aim, "strong");
+      fresh.startFromTitle();
+      fresh.dismissBrief();
+      const grass = emptyGrass(fresh);
+      fresh.selectedKind = "bow";
+      fresh.tapCell(grass.c, grass.r);
+      assert.equal(fresh.towers[0].aim, "strong", "new towers inherit the saved default aim");
+    } finally {
+      if (previous) Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous });
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
   });
 });

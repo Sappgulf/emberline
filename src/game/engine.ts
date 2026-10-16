@@ -60,6 +60,9 @@ import {
   describePlan,
   endlessWave,
   leakCost,
+  nightBand,
+  endlessMarketNight,
+  endlessGoldBoost,
   pathCellsOf,
   planHasAir,
   shopFor,
@@ -102,6 +105,8 @@ function blockedCellsFrom(map: MapDef) {
 }
 export type Phase = "title" | "brief" | "ready" | "wave" | "shop" | "stall" | "won" | "lost";
 export type ThreatTier = "light" | "mixed" | "severe";
+
+const AIMS_LIST: Aim[] = ["first", "last", "close", "strong"];
 
 export interface RouteNodeSnap {
   id: string;
@@ -514,6 +519,7 @@ export interface HudSnap {
   perkOptions: PerkSnap[];
   bestEndless: number;
   endless: boolean;
+  nightBand: string | null;
   eliteCount: number;
   reactions: number;
   rally: { charge: number; max: number; seconds: number; ready: boolean; rate: number; uses: number };
@@ -664,6 +670,7 @@ export class EmberEngine {
       bestEndless?: number;
       volume?: number;
       motion?: boolean | null;
+      aim?: string;
     };
       const num = (value: unknown, fallback = 0) =>
         typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -683,6 +690,9 @@ export class EmberEngine {
         setMuted(true);
       }
       this.volume = Math.max(0, Math.min(1, typeof data.volume === "number" && Number.isFinite(data.volume) ? data.volume : 0.8));
+      if (typeof data.aim === "string" && (AIMS_LIST as readonly string[]).includes(data.aim)) {
+        this.aim = data.aim as Aim;
+      }
       if (typeof data.motion === "boolean") {
         this.motionOverride = data.motion;
         this.reducedMotion = data.motion;
@@ -708,6 +718,7 @@ export class EmberEngine {
           bestEndless: this.bestEndless,
           volume: this.volume,
           motion: this.motionOverride,
+          aim: this.aim,
         }),
       );
     } catch {
@@ -796,7 +807,7 @@ export class EmberEngine {
 
   goldMult() {
     const endless = this.endless ? 1 + Math.max(0, this.wave - 1) * 0.02 : 1;
-    return (this.hard ? HARD_GOLD : 1) * endless * (this.omenNow()?.gold ?? 1);
+    return (this.hard ? HARD_GOLD : 1) * endless * (this.omenNow()?.gold ?? 1) * (this.endless ? endlessGoldBoost(this.wave) : 1);
   }
 
   markedCreep(): Creep | null {
@@ -866,6 +877,7 @@ export class EmberEngine {
       keep: { lives: hud.lives, maxLives: hud.maxLives },
       gold: hud.gold,
       settings: { open: hud.settings, muted: hud.muted, volume: hud.volume, motion: hud.motionOverride },
+      longNight: { on: hud.endless, best: hud.bestEndless, band: hud.nightBand, marketNight: this.endless && endlessMarketNight(hud.previewWave) },
       selectedPacket: hud.selectedKind,
       selectedTower: hud.selectedTower
         ? {
@@ -1424,6 +1436,7 @@ export class EmberEngine {
       })(),
       bestEndless: this.bestEndless,
       endless: this.endless,
+      nightBand: this.endless ? nightBand(Math.max(1, previewIndex + 1)) : null,
       eliteCount: this.creeps.filter((c) => c.alive && c.elite).length,
       reactions: this.waveReactions,
     };
@@ -1645,6 +1658,15 @@ export class EmberEngine {
     const t = this.selectedTower();
     if (t) t.aim = aim;
     else this.aim = aim;
+    this.notify();
+  }
+
+  setDefaultAim(aim: Aim) {
+    if (!(AIMS_LIST as Aim[]).includes(aim)) return;
+    this.aim = aim;
+    const t = this.selectedTower();
+    if (!this.playing() && t) t.aim = aim;
+    this.persist();
     this.notify();
   }
 
@@ -2133,6 +2155,12 @@ export class EmberEngine {
 
   leaveShop() {
     if (this.phase !== "shop") return;
+    if (this.endless) {
+      this.applyCamp();
+      this.phase = "ready";
+      this.notify();
+      return;
+    }
     if (this.mapIndex >= MAPS.length - 1) {
       this.phase = "won";
       this.unlocked = Math.max(this.unlocked, MAPS.length);
@@ -2712,10 +2740,12 @@ export class EmberEngine {
     const aside = this.map.asides[this.wave - 1];
     if (this.towers.length === 0) {
       this.banner = { text: "The road is bare", life: 1.8, max: 1.8 };
+    } else if (this.endless && this.wave % 6 === 0) {
+      this.banner = { text: "Midnight hunt · the hunt pays a third richer", life: 2.3, max: 2.3 };
     } else if (this.wave % 4 === 0) {
       this.banner = { text: "Night run — they come fast", life: 2.3, max: 2.3 };
     } else {
-      this.banner = { text: aside ?? `Wave ${this.wave}`, life: 2, max: 2 };
+      this.banner = { text: this.endless ? `${nightBand(this.wave)} · ${aside ?? `Night ${this.wave}`}` : aside ?? `Wave ${this.wave}`, life: 2, max: 2 };
     }
     if (this.wave >= 2) {
       const roll = this.wave % 3;
@@ -3827,13 +3857,18 @@ export class EmberEngine {
         this.banner = { text: `Watch order held · +${orderPayout}g`, life: 2.2, max: 2.2 };
       }
     } else {
-      this.phase = "ready";
       const reward = 42 + this.wave * 7 + this.mapIndex * 8 + (this.endless ? this.wave * 3 : 0);
       this.gold += reward;
       this.waveEarned += reward;
       if (this.endless) {
         this.bestEndless = Math.max(this.bestEndless, this.wave);
-        this.persist();
+        if (endlessMarketNight(this.wave)) {
+          this.phase = "shop";
+          this.earnMarks(1);
+          this.float(COLS / 2, 0.32, "+1 mark", "#e8dcc4");
+        } else {
+          this.persist();
+        }
       }
       const interest = Math.floor(this.gold * 0.03);
       if (interest > 0) {
@@ -3841,13 +3876,16 @@ export class EmberEngine {
         this.waveEarned += interest;
         this.float(COLS / 2, 0.55, `Interest +${interest}`, "#d4a054");
       }
+      if (this.phase !== "shop") this.phase = "ready";
       this.banner = {
         text:
-          orderHeld && order
-            ? `Wave ${this.wave} held · Order +${orderPayout}g`
-            : hold === "clean"
-              ? `Wave ${this.wave} held`
-              : `Wave ${this.wave} held · ${hold === "frayed" ? "line frayed" : "keep shaken"}`,
+          this.phase === "shop"
+            ? `Night ${this.wave} held · the market opens below`
+            : orderHeld && order
+              ? `Wave ${this.wave} held · Order +${orderPayout}g`
+              : hold === "clean"
+                ? `Wave ${this.wave} held`
+                : `Wave ${this.wave} held · ${hold === "frayed" ? "line frayed" : "keep shaken"}`,
         life: 1.6,
         max: 1.6,
       };

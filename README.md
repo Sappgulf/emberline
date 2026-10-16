@@ -47,8 +47,9 @@ With the local server running, `npm run test:game:browser` runs the installed Ch
 - **Emberlit:** At Crowned, choose one of two awakenings for each tower (C key ability, two branch buttons).
 - **Abilities:** Every tower has an active power on a cooldown — Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm.
 - **Watch hall:** Marks earned from held roads and bosses buy permanent perks, including the Hollow lens reach. Hold all eight roads to unlock the endless Long Night.
+- **Long Night:** Every third held night opens a market (and pays a watch mark), every sixth is a midnight hunt paying a third richer, named bands escalate the pack (First watch → Deep night → Howl rise → Ember tempest → Gloam vigil → Blood moon), and bosses walk every fourth night.
 - **Tools:** Horn (burn the road + slow), Scout flare (R during a wave; mark every live enemy for four seconds and deal +22% damage), Mend (lives + drag), Move, Sell. Pause is pause. 1× / 2× / 3× is speed.
-- **Settings:** Sound, master volume, and a bolder-motion override at the title (O). Saved between watches.
+- **Settings:** Sound, master volume, new-plant aim default, and a bolder-motion override at the title (O). Saved between watches.
 - **Relics** persist between maps (including Watch cord, Gate flint, and Lantern wick). Stall prices drop each wave.
 
 ## Chronicle
