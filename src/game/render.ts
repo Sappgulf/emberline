@@ -1,4 +1,4 @@
-import { SHAMAN_HEAL_RADIUS, SHAMAN_SONG_WINDUP, AFFIXES, COLS, MAX_UPGRADE, ROWS, towerForm, type PropKind } from "./config.ts";
+import { SHAMAN_HEAL_RADIUS, SHAMAN_SONG_WINDUP, AFFIXES, COLS, GLOAM_HUSH_RANGE, MAX_UPGRADE, ROWS, towerForm, type PropKind } from "./config.ts";
 import { type Creep, type EmberEngine, type Tower } from "./engine.ts";
 import { drawCrawlFrame, drawSprite, spr } from "./sprites.ts";
 import { REACTIONS } from "./combat.ts";
@@ -162,13 +162,24 @@ export function drawWorld(ctx: CanvasRenderingContext2D, engine: EmberEngine, ce
   for (const prop of engine.props) actor(prop.r + 0.55, -1, 0).prop = prop;
   for (const t of engine.towers) actor(t.r + 0.5, 0, 1).tower = t;
   for (const c of engine.creeps) actor(c.y, 1, 2).creep = c;
+  let hushSet: Set<number> | null = null;
+  for (const c of engine.creeps) {
+    if (!c.alive || c.kind !== "gloam") continue;
+    if (!hushSet) hushSet = new Set();
+    for (const t of engine.towers) {
+      const dx = c.x - (t.c + 0.5);
+      const dy = c.y - (t.r + 0.5);
+      if (dx * dx + dy * dy <= GLOAM_HUSH_RANGE * GLOAM_HUSH_RANGE) hushSet.add(t.id);
+    }
+  }
   actorOrder.length = actorCount;
   for (let i = 0; i < actorCount; i++) actorOrder[i] = i;
   actorOrder.sort((a, b) => actorSlots[a].y - actorSlots[b].y || actorSlots[a].z - actorSlots[b].z);
   for (let i = 0; i < actorCount; i++) {
     const slot = actorSlots[actorOrder[i]];
     if (slot.type === 0 && slot.prop) drawProp(ctx, slot.prop.c, slot.prop.r, slot.prop.kind, cell, visualTime);
-    else if (slot.type === 1 && slot.tower) drawTower(ctx, slot.tower, cell, slot.tower.id === engine.selectedId, engine.time, !engine.reducedMotion);
+    else if (slot.type === 1 && slot.tower)
+      drawTower(ctx, slot.tower, cell, slot.tower.id === engine.selectedId, engine.time, !engine.reducedMotion, hushSet?.has(slot.tower.id) ?? false);
     else if (slot.creep)
       drawCreep(
         ctx,
@@ -704,40 +715,245 @@ function drawProp(ctx: CanvasRenderingContext2D, c: number, r: number, kind: Pro
   const y = (r + 0.72) * cell;
   ctx.save();
   ctx.translate(x, y);
+  const sway = Math.sin(time * 1.3 + c * 1.7 + r) * (cell * 0.012);
   ctx.fillStyle = "rgba(18,22,15,0.32)";
   ctx.beginPath();
   ctx.ellipse(0, cell * 0.08, cell * 0.22, cell * 0.08, 0, 0, Math.PI * 2);
   ctx.fill();
-  if ((kind === "pine" || kind === "oak") && drawSprite(ctx, "pine", 0, cell * 0.1, cell * 1.02)) {
+  if (kind === "pine" && !drawSprite(ctx, "pine", sway, cell * 0.1, cell * 1.02)) {
+    ctx.strokeStyle = "#2c3a26";
+    ctx.lineWidth = Math.max(2, cell * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(0, cell * 0.08);
+    ctx.lineTo(0, -cell * 0.16);
+    ctx.stroke();
+    ctx.fillStyle = "#33492e";
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, -cell * (0.14 + i * 0.18));
+      ctx.lineTo(-cell * (0.12 - i * 0.03), -cell * (0.32 + i * 0.18));
+      ctx.lineTo(cell * (0.12 - i * 0.03), -cell * (0.32 + i * 0.18));
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
     return;
   }
-  if ((kind === "rock" || kind === "stump") && drawSprite(ctx, "rock", 0, cell * 0.08, cell * 0.62)) {
+  if (kind === "pine") {
+    ctx.restore();
+    return;
+  }
+  if (kind === "oak") {
+    ctx.strokeStyle = "#3c3022";
+    ctx.lineWidth = Math.max(2.5, cell * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(0, cell * 0.08);
+    ctx.quadraticCurveTo(sway, -cell * 0.08, sway, -cell * 0.24);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(94,128,68,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(sway * 1.6, -cell * 0.02, cell * 0.3, cell * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const [ox, oy, rad, tone] of [
+      [-cell * 0.14, -cell * 0.34, cell * 0.17, 0],
+      [cell * 0.15, -cell * 0.4, cell * 0.19, -4],
+      [0, -cell * 0.56, cell * 0.2, 8],
+    ] as const) {
+      ctx.fillStyle = `rgb(${60 + tone},${84 + tone + 2},${56 + tone})`;
+      ctx.beginPath();
+      ctx.arc(sway + ox, oy, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "rgba(150,178,116,0.4)";
+    ctx.beginPath();
+    ctx.arc(sway + cell * 0.1 - cell * 0.03, -cell * 0.6, cell * 0.08, 0, Math.PI * 2);
+    ctx.arc(sway - cell * 0.17, -cell * 0.46, cell * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  if (kind === "rock" && !drawSprite(ctx, "rock", 0, cell * 0.08, cell * 0.62)) {
+    ctx.fillStyle = STONE;
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.2, cell * 0.08);
+    ctx.quadraticCurveTo(-cell * 0.16, -cell * 0.18, 0, -cell * 0.2);
+    ctx.quadraticCurveTo(cell * 0.17, -cell * 0.16, cell * 0.21, cell * 0.08);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = STONE_LIT;
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.1, -cell * 0.02);
+    ctx.quadraticCurveTo(0, -cell * 0.16, cell * 0.08, -cell * 0.02);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  if (kind === "rock") {
+    ctx.restore();
+    return;
+  }
+  if (kind === "stump") {
+    ctx.fillStyle = "#4a3a26";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, cell * 0.17, cell * 0.13, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(-cell * 0.15, -cell * 0.16, cell * 0.3, cell * 0.16);
+    ctx.fillStyle = "#6a5238";
+    ctx.beginPath();
+    ctx.ellipse(0, -cell * 0.16, cell * 0.17, cell * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#4a3a26";
+    ctx.lineWidth = 1;
+    for (const ring of [0.06, 0.11]) {
+      ctx.beginPath();
+      ctx.ellipse(0, -cell * 0.16, cell * ring, cell * ring * 0.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "#3a2c1e";
+    ctx.lineWidth = 2;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * cell * 0.14, cell * 0.04);
+      ctx.quadraticCurveTo(side * cell * 0.24, cell * 0.06, side * cell * 0.26, cell * 0.02);
+      ctx.stroke();
+    }
     ctx.restore();
     return;
   }
   if (kind === "lamp") {
-    ctx.fillStyle = STONE;
-    ctx.fillRect(-2, -cell * 0.28, 4, cell * 0.34);
+    ctx.strokeStyle = STONE;
+    ctx.lineWidth = Math.max(2.5, cell * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(0, cell * 0.08);
+    ctx.lineTo(0, -cell * 0.3);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(2, cell * 0.04);
+    ctx.beginPath();
+    ctx.arc(0, -cell * 0.34, cell * 0.09, Math.PI * 0.15, Math.PI * 0.85, false);
+    ctx.stroke();
     ctx.fillStyle = COPPER;
     ctx.beginPath();
-    ctx.arc(0, -cell * 0.32, 5, 0, Math.PI * 2);
+    ctx.roundRect(-cell * 0.07, -cell * 0.44, cell * 0.14, cell * 0.14, 2);
     ctx.fill();
-    ctx.globalAlpha = 0.35 + Math.sin(time * 3 + c) * 0.1;
+    ctx.fillStyle = STONE;
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.09, -cell * 0.44);
+    ctx.lineTo(cell * 0.09, -cell * 0.44);
+    ctx.lineTo(0, -cell * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    const flicker = 0.5 + Math.sin(time * 3 + c * 2.1) * 0.18;
+    ctx.globalAlpha = flicker;
     ctx.fillStyle = EMBER;
     ctx.beginPath();
-    ctx.arc(0, -cell * 0.32, 10, 0, Math.PI * 2);
+    ctx.roundRect(-cell * 0.045, -cell * 0.42, cell * 0.09, cell * 0.1, 2);
     ctx.fill();
-  } else if (kind === "cart") {
+    ctx.globalAlpha = 0.3 + flicker * 0.24;
+    ctx.beginPath();
+    ctx.arc(0, -cell * 0.37, cell * 0.19, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    return;
+  }
+  if (kind === "cart") {
     ctx.fillStyle = "#5a3a22";
-    ctx.fillRect(-cell * 0.2, -cell * 0.08, cell * 0.4, cell * 0.16);
-  } else if (kind === "reed" || kind === "shroom" || kind === "fence") {
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.28, 0);
+    ctx.lineTo(-cell * 0.24, -cell * 0.2);
+    ctx.lineTo(cell * 0.16, -cell * 0.22);
+    ctx.lineTo(cell * 0.24, -cell * 0.02);
+    ctx.lineTo(cell * 0.2, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#4a2e1a";
+    ctx.beginPath();
+    ctx.ellipse(-cell * 0.02, -cell * 0.24, cell * 0.2, cell * 0.05, -0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#6a5238";
+    ctx.lineWidth = 1.4;
+    for (const plank of [-0.13, -0.07]) {
+      ctx.beginPath();
+      ctx.moveTo(-cell * 0.22, -cell * plank + cell * 0.01);
+      ctx.lineTo(cell * 0.18, -cell * plank + cell * 0.01);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "#36240f";
+    ctx.beginPath();
+    ctx.moveTo(cell * 0.24, -cell * 0.06);
+    ctx.lineTo(cell * 0.34, cell * 0.04);
+    ctx.stroke();
+    for (const w of [-0.17, 0.12]) {
+      ctx.strokeStyle = "#2c1d0e";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cell * w, cell * 0.03, cell * 0.06, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI + Math.PI / 4;
+        ctx.moveTo(cell * w, cell * 0.03);
+        ctx.lineTo(cell * w + Math.cos(a) * cell * 0.05, cell * 0.03 + Math.sin(a) * cell * 0.05);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+  if (kind === "reed") {
     ctx.strokeStyle = "#4a6a3a";
     ctx.lineWidth = 2;
+    for (const [ox, h, lean] of [
+      [-cell * 0.08, 0.24, 3],
+      [cell * 0.04, 0.3, 1.4],
+      [cell * 0.12, 0.2, -2],
+    ] as const) {
+      ctx.beginPath();
+      ctx.moveTo(ox, 4);
+      ctx.quadraticCurveTo(ox + lean, -cell * h * 0.6, ox + lean * 2, -cell * h);
+      ctx.stroke();
+      ctx.fillStyle = "#5a4a30";
+      ctx.beginPath();
+      ctx.ellipse(ox + lean * 2, -cell * h, 1.8, cell * 0.05, lean * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+  if (kind === "shroom") {
+    ctx.fillStyle = "#d8cdb4";
+    ctx.fillRect(-cell * 0.025, -cell * 0.1, cell * 0.05, cell * 0.12);
+    ctx.fillStyle = "#8a5a48";
     ctx.beginPath();
-    ctx.moveTo(0, 4);
-    ctx.quadraticCurveTo(4, -cell * 0.12, 1, -cell * 0.22);
+    ctx.moveTo(-cell * 0.12, -cell * 0.1);
+    ctx.quadraticCurveTo(0, -cell * 0.28, cell * 0.12, -cell * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(232,220,196,0.65)";
+    ctx.beginPath();
+    ctx.arc(-cell * 0.04, -cell * 0.16, cell * 0.018, 0, Math.PI * 2);
+    ctx.arc(cell * 0.05, -cell * 0.14, cell * 0.014, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  if (kind === "fence") {
+    ctx.fillStyle = "#4a3a24";
+    ctx.fillRect(-cell * 0.03, -cell * 0.22, cell * 0.06, cell * 0.3);
+    ctx.fillRect(cell * 0.25, -cell * 0.2, cell * 0.06, cell * 0.28);
+    ctx.strokeStyle = "#4a3a24";
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.12, -cell * 0.14);
+    ctx.lineTo(cell * 0.36, -cell * 0.16);
     ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-cell * 0.12, -cell * 0.05);
+    ctx.lineTo(cell * 0.36, -cell * 0.06);
+    ctx.stroke();
+    ctx.restore();
+    return;
   }
   ctx.restore();
 }
@@ -1151,6 +1367,7 @@ function drawTower(
   selected: boolean,
   time: number,
   motion = true,
+  hushed = false,
 ) {
   if (!motion) time = 0;
   const x = (tower.c + 0.5) * cell;
@@ -1171,6 +1388,24 @@ function drawTower(
     ctx.beginPath();
     roundedRectPath(ctx, -cell * 0.4, -cell * 0.48, cell * 0.8, cell * 0.8, 6);
     ctx.stroke();
+  }
+  if (hushed) {
+    const mist = 0.16 + Math.sin(time * 2.4 + tower.id) * 0.05;
+    ctx.globalAlpha = motion ? mist : mist * 0.8;
+    ctx.fillStyle = "#5b6d75";
+    ctx.beginPath();
+    ctx.arc(0, 0, cell * 0.46, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = Math.min(1, mist + 0.35);
+    ctx.strokeStyle = "#8a99a4";
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([4, 5]);
+    ctx.lineDashOffset = motion ? -time * 9 : 0;
+    ctx.beginPath();
+    ctx.arc(0, 0, cell * 0.33, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
   }
   drawFormAura(ctx, tower, cell, form, time);
   const size = cell * (0.82 + form * 0.08 + (tower.empowered ? 0.06 : 0));
@@ -1233,13 +1468,15 @@ function drawCreep(
         ? 0.3
         : creep.kind === "ashfang"
           ? 0.27
-          : creep.kind === "hound"
-            ? 0.23
-            : creep.kind === "shaman" || creep.kind === "knave"
-              ? 0.24
-              : creep.kind === "moth"
-                ? 0.18
-                : 0.2) * cell;
+          : creep.kind === "gloam"
+            ? 0.26
+            : creep.kind === "hound"
+              ? 0.23
+              : creep.kind === "shaman" || creep.kind === "knave"
+                ? 0.24
+                : creep.kind === "moth"
+                  ? 0.18
+                  : 0.2) * cell;
   const flying = creep.kind === "wisp" || creep.kind === "moth";
   const gait = (creep.stride ?? 0) * 14 + creep.id * 1.7;
   const bob = motion
@@ -1307,6 +1544,13 @@ function drawCreep(
     ctx.textAlign = "center";
     ctx.fillText(affix.tag.toUpperCase(), 0, -size * 1.75);
     ctx.globalAlpha = fade;
+    if (affix.regen) {
+      ctx.strokeStyle = `rgba(124,164,107,${0.34 + Math.sin(time * 3.1 + creep.id) * 0.14})`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, size * (1.1 + Math.sin(time * 3.1 + creep.id) * 0.08), 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
   if (creep.wardT && creep.wardT > 0 && creep.alive) {
     ctx.strokeStyle = `rgba(150,220,230,${0.5 + Math.sin(time * 5) * 0.2})`;
@@ -1344,6 +1588,24 @@ function drawCreep(
     ctx.beginPath();
     ctx.arc(0, 0, size * (motion ? 1.5 + (0.55 - (creep.healFlash ?? 0)) : 1.7), 0, Math.PI * 2);
     ctx.stroke();
+    ctx.globalAlpha = fade;
+  }
+  if (creep.kind === "gloam" && creep.alive) {
+    const pulse = Math.sin(time * 2.2 + creep.id * 1.3) * 0.5 + 0.5;
+    ctx.globalAlpha = 0.07 * fade;
+    ctx.fillStyle = "#7d93a2";
+    ctx.beginPath();
+    ctx.arc(0, 0, GLOAM_HUSH_RANGE * cell, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = (0.3 + pulse * 0.2) * fade;
+    ctx.strokeStyle = "#7d93a2";
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([cell * 0.3, cell * 0.4]);
+    ctx.lineDashOffset = creep.progress * -cell * 0.35;
+    ctx.beginPath();
+    ctx.arc(0, 0, GLOAM_HUSH_RANGE * cell * 0.96, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
     ctx.globalAlpha = fade;
   }
   if (creep.kind === "shell") {
@@ -1446,7 +1708,7 @@ function drawCreep(
       flip,
       fade,
     );
-  if (animated || drawSprite(ctx, creep.kind, 0, size * 0.35, size * 2.15, { alpha: fade, flip })) {
+  if (creep.kind !== "gloam" && (animated || drawSprite(ctx, creep.kind, 0, size * 0.35, size * 2.15, { alpha: fade, flip }))) {
     if (creep.alive && creep.kind === "lord") {
       ctx.save();
       ctx.globalAlpha = 0.86 * fade;
@@ -1492,6 +1754,49 @@ function drawCreep(
         ctx.fillStyle = creep.rootT > 0 ? "#a4c477" : COPPER;
         ctx.fillRect(px - barW / 2, py - size - 2, barW, 2);
       }
+      ctx.restore();
+    }
+    return;
+  }
+  if (creep.kind === "gloam") {
+    const sway = Math.sin(creep.progress * 9 + creep.id) * 0.06;
+    ctx.rotate(sway);
+    const pulse = Math.sin(time * 2.2 + creep.id * 1.3) * 0.5 + 0.5;
+    ctx.globalAlpha = (0.5 + pulse * 0.14) * fade;
+    ctx.fillStyle = "#5b6d75";
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.8, -size * 0.1);
+    ctx.quadraticCurveTo(-size * 0.55, -size * 1.25, 0, -size * 0.95);
+    ctx.quadraticCurveTo(size * 0.55, -size * 1.25, size * 0.8, -size * 0.1);
+    ctx.quadraticCurveTo(size * 0.4, size * 0.5 + pulse * size * 0.22, 0, size * 0.62);
+    ctx.quadraticCurveTo(-size * 0.4, size * 0.5 + pulse * size * 0.22, -size * 0.8, -size * 0.1);
+    ctx.fill();
+    ctx.globalAlpha = 0.34 * fade;
+    ctx.fillStyle = "#8fa3b0";
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.3, -size * 0.45, size * 0.26, size * 0.4, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(size * 0.3, -size * 0.45, size * 0.26, size * 0.4, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = (0.55 + pulse * 0.35) * fade;
+    ctx.fillStyle = "#b8c8d2";
+    ctx.beginPath();
+    ctx.arc(-size * 0.22, -size * 0.18, size * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(size * 0.22, -size * 0.18, size * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = fade;
+    ctx.restore();
+    if (creep.alive && creep.hp < creep.maxHp) {
+      ctx.save();
+      ctx.globalAlpha = fade;
+      const barW = size * 1.55;
+      ctx.fillStyle = "rgba(18,22,15,0.72)";
+      ctx.fillRect(px - barW / 2, py - size - 8, barW, 4);
+      ctx.fillStyle = creep.hp / creep.maxHp > 0.4 ? "#7a9a58" : BLOOD;
+      ctx.fillRect(px - barW / 2, py - size - 8, barW * Math.max(0, creep.hp / creep.maxHp), 4);
       ctx.restore();
     }
     return;

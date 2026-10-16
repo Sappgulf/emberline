@@ -88,7 +88,7 @@ export interface FieldRule {
   reward: number;
 }
 
-export type WatchOrderId = "clean" | "sky" | "song" | "crown" | "veil" | "knife" | "howl";
+export type WatchOrderId = "clean" | "sky" | "song" | "crown" | "veil" | "knife" | "howl" | "hush";
 
 export interface WatchOrder {
   id: WatchOrderId;
@@ -402,6 +402,19 @@ export function watchOrderFor(plan: WaveSpawn[] | undefined): WatchOrder | null 
       reward: 34,
       target,
       targetKind: "shaman",
+    };
+  }
+
+  const gloamCount = countFor("gloam");
+  if (gloamCount > 0) {
+    const target = Math.min(3, gloamCount);
+    return {
+      id: "hush",
+      title: "Still the hush",
+      detail: `Drop ${target} ${target === 1 ? "Gloam" : "Gloams"} before they hush the watch.`,
+      reward: 36,
+      target,
+      targetKind: "gloam",
     };
   }
 
@@ -1293,6 +1306,7 @@ export const MAPS: MapDef[] = [
         { kind: "shell", count: 10, gap: 0.4, delay: 0 },
         { kind: "moth", count: 12, gap: 0.22, delay: 1.6 },
         { kind: "knave", count: 8, gap: 0.3, delay: 3.2 },
+        { kind: "gloam", count: 2, gap: 1, delay: 2 },
       ],
       [
         { kind: "moth", count: 16, gap: 0.2, delay: 0 },
@@ -1304,7 +1318,7 @@ export const MAPS: MapDef[] = [
     briefing: {
       speaker: "Brother Ash",
       role: "Keep steward",
-      line: "The hollow wants fire. Plant a brazier on the bank. Moths fly low — mortar and pike can still take them. Knaves dodge the first bite unless you chill or mark them.",
+      line: "The hollow wants fire. Plant a brazier on the bank. Moths fly low — mortar and pike can still take them. Knaves dodge the first bite unless you chill or mark them. And mind the hush: gloams still nearby towers while they live.",
     },
     victory: {
       speaker: "Captain Sera Venn",
@@ -1337,6 +1351,7 @@ export const MAPS: MapDef[] = [
       "Knaves on the split. Mark the first.",
       "Moths in the draw. Low enough to burn.",
       "Do not sell the pike.",
+      "A hush in the mist. Spark the gloam.",
       "Plate and knives together.",
       "He walks the hollow. Burn the road.",
     ],
@@ -1420,6 +1435,7 @@ export const MAPS: MapDef[] = [
         { kind: "shaman", count: 3, gap: 0.85, delay: 2.2 },
         { kind: "hound", count: 10, gap: 0.24, delay: 3.6 },
         { kind: "ashfang", count: 4, gap: 0.34, delay: 4.8 },
+        { kind: "gloam", count: 3, gap: 0.9, delay: 3 },
       ],
       [
         { kind: "knave", count: 12, gap: 0.28, delay: 0 },
@@ -1437,7 +1453,7 @@ export const MAPS: MapDef[] = [
     briefing: {
       speaker: "Captain Sera Venn",
       role: "Watch-captain",
-      line: "Last arch. The draft steals moths and knaves unless you pin them. Frost or bramble on the rail. If this span holds, Emberford keeps the dawn.",
+      line: "Last arch. The draft steals moths and knaves unless you pin them. Frost or bramble on the rail. Gloams will hush the road — still them before they settle. If this span holds, Emberford keeps the dawn.",
     },
     victory: {
       speaker: "Lumen Quill",
@@ -1470,6 +1486,7 @@ export const MAPS: MapDef[] = [
       "Knives on the wicker.",
       "Moths in the pull. Burn low.",
       "Do not sell the frost.",
+      "A hush under the span. Spark the gloam.",
       "Plate and veil together.",
       "He walks the span. Hold the dawn.",
     ],
@@ -1487,6 +1504,7 @@ export const BESTIARY = [
   { kind: "moth" as const, weak: `Low air. ${towerList(LOW_AIR_TOWER_KINDS)} can reach them. A leak costs one life.` },
   { kind: "knave" as const, weak: "The first shot misses unless Frost, Bramble, or a mark catches them. A leak costs one life." },
   { kind: "ashfang" as const, weak: "The first bite makes it howl — nearby creeps run faster. Frost and Ward catch it. A leak costs two lives." },
+  { kind: "gloam" as const, weak: "A mist that hushes towers near it — they fire slower while it lives. Spark bites through. A leak costs two lives." },
 ];
 
 export function describePlan(waves: WaveSpawn[][], index: number): string {
@@ -1509,6 +1527,7 @@ export function endlessWave(n: number): WaveSpawn[] {
     ["hound", "wisp"],
     ["shell", "knave"],
     ["shaman", "ashfang"],
+    ["gloam", "runner"],
     ["moth", "runner"],
   ];
   const pick = mixes[(n - 1) % mixes.length];
@@ -1524,7 +1543,7 @@ export function endlessWave(n: number): WaveSpawn[] {
 
 export function leakCost(kind: CreepKind): number {
   if (kind === "lord") return 3;
-  if (kind === "shaman" || kind === "shell" || kind === "ashfang") return 2;
+  if (kind === "shaman" || kind === "shell" || kind === "ashfang" || kind === "gloam") return 2;
   return 1;
 }
 

@@ -40,14 +40,28 @@ export const PATH: ReadonlyArray<{ c: number; r: number }> = [
   { c: 12, r: 3 },
 ];
 
+export const GLOAM_HUSH_RANGE = 1.9;
+export const GLOAM_HUSH_RATE = 0.72;
+
 export type TowerKind = "bow" | "mortar" | "frost" | "spark" | "bramble" | "ward" | "pike" | "cinder";
-export type CreepKind = "grub" | "runner" | "shell" | "wisp" | "shaman" | "hound" | "lord" | "moth" | "knave" | "ashfang";
+export type CreepKind =
+  | "grub"
+  | "runner"
+  | "shell"
+  | "wisp"
+  | "shaman"
+  | "hound"
+  | "lord"
+  | "moth"
+  | "knave"
+  | "ashfang"
+  | "gloam";
 export type Aim = "first" | "last" | "close" | "strong";
 export type PropKind = "pine" | "oak" | "rock" | "stump" | "reed" | "lamp" | "shroom" | "cart" | "fence";
-export type AffixId = "shielded" | "frenzied" | "warded" | "hollow";
+export type AffixId = "shielded" | "frenzied" | "warded" | "hollow" | "verdant";
 export type EmberlitBranch = "a" | "b";
-export type PerkId = "purse" | "wall" | "whet" | "rest";
-export type OmenId = "bitter-wind" | "blood-tide" | "hollow-moon" | "ash-fall";
+export type PerkId = "purse" | "wall" | "whet" | "rest" | "reach";
+export type OmenId = "bitter-wind" | "blood-tide" | "hollow-moon" | "ash-fall" | "doused-pitch";
 
 export interface OmenDef {
   id: OmenId;
@@ -121,9 +135,23 @@ export const OMENS: Record<OmenId, OmenDef> = {
     towerRange: 0.94,
     burnLife: 1.35,
   },
+  "doused-pitch": {
+    id: "doused-pitch",
+    name: "Doused pitch",
+    detail: "Burns gutter early; the bold pack runs 5% faster and pays 6% more.",
+    color: "#5b6d75",
+    rgb: "91,109,117",
+    creepHp: 1,
+    creepSpeed: 1.05,
+    gold: 1.06,
+    towerDamage: 1,
+    towerRate: 1,
+    towerRange: 1,
+    burnLife: 0.7,
+  },
 };
 
-const OMEN_ORDER: OmenId[] = ["bitter-wind", "blood-tide", "hollow-moon", "ash-fall"];
+const OMEN_ORDER: OmenId[] = ["bitter-wind", "blood-tide", "hollow-moon", "ash-fall", "doused-pitch"];
 
 export function omenFor(mapIndex: number, wave: number, endless = false): OmenDef | null {
   if (!endless && mapIndex < 2) return null;
@@ -136,11 +164,12 @@ export const PERKS: ReadonlyArray<{ id: PerkId; name: string; detail: string; ma
   { id: "wall", name: "Stone wall", detail: "+1 keep life per tier.", max: 3, costs: [2, 4, 6] },
   { id: "whet", name: "Grindstone", detail: "+4% tower damage per tier.", max: 3, costs: [2, 4, 6] },
   { id: "rest", name: "Mend stone", detail: "Mends cost 10g less per tier.", max: 3, costs: [2, 4, 6] },
+  { id: "reach", name: "Hollow lens", detail: "Towers reach 3% farther per tier.", max: 3, costs: [2, 4, 6] },
 ];
 
 export const AFFIXES: Record<
   AffixId,
-  { id: AffixId; name: string; tag: string; detail: string; color: string; hpMult: number; speedMult: number; gold: number; armor: number; slowResist?: boolean }
+  { id: AffixId; name: string; tag: string; detail: string; color: string; hpMult: number; speedMult: number; gold: number; armor: number; slowResist?: boolean; regen?: number }
 > = {
   shielded: {
     id: "shielded",
@@ -186,6 +215,18 @@ export const AFFIXES: Record<
     speedMult: 1,
     gold: 2,
     armor: 0,
+  },
+  verdant: {
+    id: "verdant",
+    name: "Verdant",
+    tag: "Verdant",
+    detail: "Sap runs fast — it mends itself 9 hp every second it walks.",
+    color: "#7ca46b",
+    hpMult: 1.05,
+    speedMult: 0.96,
+    gold: 3,
+    armor: 1,
+    regen: 9,
   },
 };
 
@@ -474,6 +515,7 @@ export const CREEPS: Record<
   moth: { hp: 22, speed: 1.95, gold: 11, armor: 0, name: "Moths", flying: true, low: true, heal: 0 },
   knave: { hp: 54, speed: 1.55, gold: 15, armor: 1, name: "Knaves", flying: false, low: false, heal: 0 },
   ashfang: { hp: 78, speed: 1.82, gold: 18, armor: 2, name: "Ashfangs", flying: false, low: false, heal: 0 },
+  gloam: { hp: 66, speed: 0.98, gold: 26, armor: 3, name: "Gloams", flying: false, low: false, heal: 0 },
 };
 
 export type WaveSpawn = { kind: CreepKind; count: number; gap: number; delay: number };

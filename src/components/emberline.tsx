@@ -67,6 +67,7 @@ const COUNTERS: Record<CreepKind, TowerKind[]> = {
   moth: ["cinder", "pike", "mortar", "spark"],
   knave: ["frost", "bramble", "pike"],
   ashfang: ["frost", "ward", "bramble", "pike"],
+  gloam: ["spark", "frost"],
 };
 
 type HoverCell = { c: number; r: number };
@@ -138,6 +139,7 @@ export function Emberline() {
   const campaignTriggerRef = useRef<HTMLButtonElement>(null);
   const codexTriggerRef = useRef<HTMLButtonElement>(null);
   const hallTriggerRef = useRef<HTMLButtonElement>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const titleStartRef = useRef<HTMLButtonElement>(null);
   const titleHelpTriggerRef = useRef<HTMLButtonElement>(null);
   const headerHelpTriggerRef = useRef<HTMLButtonElement>(null);
@@ -196,6 +198,10 @@ export function Emberline() {
     engine.toggleHall();
     restoreOverlayTrigger(hallTriggerRef);
   }, [restoreOverlayTrigger]);
+  const closeSettings = useCallback(() => {
+    engine.toggleSettings(false);
+    restoreOverlayTrigger(settingsTriggerRef);
+  }, [restoreOverlayTrigger]);
   const openHelp = useCallback((target: { current: HTMLButtonElement | null }) => {
     helpRestoreRef.current = target;
     engine.toggleHelp();
@@ -212,12 +218,15 @@ export function Emberline() {
     type GameWindow = Window & {
       render_game_to_text?: () => string;
       advanceTime?: (ms: number) => void;
+      emberlineEngine?: EmberEngine;
     };
     const host = window as GameWindow;
     const previousRender = host.render_game_to_text;
     const previousAdvance = host.advanceTime;
+    const previousEngine = host.emberlineEngine;
     try {
       host.render_game_to_text = () => engine.renderText();
+      host.emberlineEngine = engine;
       host.advanceTime = (ms) => {
         if (!Number.isFinite(ms) || ms < 0) return;
         const steps = Math.max(1, Math.round((ms / 1000) * 60));
@@ -233,6 +242,8 @@ export function Emberline() {
       else host.render_game_to_text = previousRender;
       if (host.advanceTime === previousAdvance) delete host.advanceTime;
       else host.advanceTime = previousAdvance;
+      if (host.emberlineEngine === previousEngine) delete host.emberlineEngine;
+      else host.emberlineEngine = previousEngine;
     };
   }, []);
 
@@ -241,7 +252,7 @@ export function Emberline() {
     engine.readSave();
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const apply = () => {
-      engine.reducedMotion = mq.matches;
+      engine.reducedMotion = engine.motionOverride ?? mq.matches;
     };
     apply();
     mq.addEventListener("change", apply);
@@ -282,6 +293,10 @@ export function Emberline() {
       }
       if (engine.codex) {
         if (e.key === "Escape") closeCodex();
+        return;
+      }
+      if (engine.settings) {
+        if (e.key === "Escape") closeSettings();
         return;
       }
       if (engine.campaignOpen) {
@@ -344,10 +359,13 @@ export function Emberline() {
       if (e.key === "g" || e.key === "G") {
         if (engine.phase === "title") engine.toggleHall();
       }
+      if (e.key === "o" || e.key === "O") {
+        if (engine.phase === "title") engine.toggleSettings();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeCampaign, closeCodex, closeHall, closeHelp]);
+  }, [closeCampaign, closeCodex, closeHall, closeHelp, closeSettings]);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -532,6 +550,7 @@ export function Emberline() {
     hud.campaign ||
     hud.help ||
     hud.hall ||
+    hud.settings ||
     hud.phase === "title" ||
     hud.phase === "brief" ||
     hud.phase === "shop" ||
@@ -845,7 +864,11 @@ export function Emberline() {
                   return (
                     <article key={b.kind} className="bestiary-card plaque">
                       <div className="bestiary-art">
-                        <img src={spriteUrl(b.kind)} alt="" />
+                        {b.kind === "gloam" ? (
+                          <span className="bestiary-mist" aria-hidden="true" />
+                        ) : (
+                          <img src={spriteUrl(b.kind)} alt="" />
+                        )}
                       </div>
                       <div className="bestiary-copy">
                         <div className="bestiary-heading">
@@ -893,8 +916,7 @@ export function Emberline() {
                     <span className="intel-kicker">{entry.kicker}</span>
                     <strong>{entry.unlocked ? entry.title : "Sealed"}</strong>
                     <p>{entry.unlocked ? entry.body : "Walk more roads to open this page."}</p>
-                  </article>
-                ))}
+                  </article>                ))}
               </div>
             )}
           </Overlay>
@@ -1026,7 +1048,8 @@ export function Emberline() {
                   "Each kill within 3.2 seconds of the last extends the streak. From four, every second kill pays +3g. Every sixth pins the nearest other foe for 0.7 seconds. A leak ends it.",
                 ],
                 ["Camp", "After a road, choose a preparation for the next one."],
-                ["Elites", "Some prey run shielded, frenzied, warded, or hollow. They pay more."],
+                ["Elites", "Some prey run shielded, frenzied, warded, hollow, or verdant. They pay more."],
+                ["Gloams", "Mist that hushes the road — nearby towers fire 28% slower. Spark the mist."],
                 ["Abilities", "C or the ability button unleashes the selected tower's power."],
                 ["Ashfangs", "The first bite howls. Nearby creeps run. Frost and Ward catch them."],
                 ["Lanterns", "Towers in the glow fire faster. Wick makes every road glow."],
@@ -1118,7 +1141,55 @@ export function Emberline() {
           </Overlay>
         )}
 
-        {hud.phase === "title" && !hud.codex && !hud.campaign && !hud.help && !hud.hall && (
+        {hud.settings && (
+          <Overlay kicker="The watch board" title="Settings" close="Back" onClose={closeSettings} size="card">
+            <div className="settings-grid w-full text-left">
+              <button
+                type="button"
+                className="pressable stamp min-h-10 w-full px-4 text-xs text-copper"
+                data-on={hud.muted}
+                onClick={() => engine.toggleMute()}
+              >
+                {hud.muted ? "Sound — off. Tap to sound the watch." : "Sound — on. Tap to mute."}
+              </button>
+              <label className="plaque settings-row" htmlFor="settings-volume">
+                <span className="intel-kicker">Volume</span>
+                <input
+                  id="settings-volume"
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={10}
+                  value={Math.round(hud.volume * 100)}
+                  aria-label="Master volume"
+                  disabled={hud.muted}
+                  onChange={(e) => engine.setVolume(Number(e.target.value) / 100)}
+                />
+                <span className="settings-value">{hud.muted ? "muted" : `${Math.round(hud.volume * 100)}%`}</span>
+              </label>
+              <label className="plaque settings-row" htmlFor="settings-motion">
+                <span className="intel-kicker">Bolder motion</span>
+                <select
+                  id="settings-motion"
+                  className="settings-select"
+                  value={hud.motionOverride === null ? "auto" : hud.motionOverride ? "on" : "off"}
+                  aria-label="Reduced motion"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    engine.setMotionOverride(value === "auto" ? null : value === "on");
+                  }}
+                >
+                  <option value="auto">Follow the system</option>
+                  <option value="on">Calm the road (reduced)</option>
+                  <option value="off">Full ember and shake</option>
+                </select>
+              </label>
+              <p className="text-[11px] text-dust">Sound and motion persist between watches. Volume shapes every horn and shot.</p>
+            </div>
+          </Overlay>
+        )}
+
+        {hud.phase === "title" && !hud.codex && !hud.campaign && !hud.help && !hud.hall && !hud.settings && (
           <Overlay
             kicker="Keep watch"
             title="Emberline"
@@ -1198,6 +1269,14 @@ export function Emberline() {
                   >
                     Watch hall
                     {hud.marks > 0 && <span className="hall-badge">{hud.marks}</span>}
+                  </button>
+                  <button
+                    ref={settingsTriggerRef}
+                    type="button"
+                    className="pressable stamp min-h-11 px-5 text-sm text-dust"
+                    onClick={() => engine.toggleSettings()}
+                  >
+                    Settings
                   </button>
                   {hud.unlocked >= hud.mapTotal && (
                     <button

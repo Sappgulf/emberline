@@ -5,6 +5,8 @@ import {
   towerForm,
   MAX_UPGRADE,
   REFUND_RATE,
+  GLOAM_HUSH_RANGE,
+  GLOAM_HUSH_RATE,
   ROWS,
   START_GOLD,
   START_LIVES,
@@ -75,7 +77,7 @@ import {
   type WatchRiteId,
   watchOrderFor,
 } from "./campaign.ts";
-import { sfx, setMuted } from "./audio.ts";
+import { sfx, setMuted, setVolume } from "./audio.ts";
 import {
   REACTIONS,
   REACTION_BONUS,
@@ -265,6 +267,7 @@ function threatTierFor(plan: MapDef["waves"][number] | undefined): ThreatTier {
       entry.kind === "shaman" ||
       entry.kind === "hound" ||
       entry.kind === "ashfang" ||
+      entry.kind === "gloam" ||
       CREEPS[entry.kind].flying,
   );
   return total >= 12 || mixed ? "mixed" : "light";
@@ -471,6 +474,9 @@ export interface HudSnap {
   hard: boolean;
   help: boolean;
   hall: boolean;
+  settings: boolean;
+  volume: number;
+  motionOverride: boolean | null;
   marked: {
     name: string;
     kind: CreepKind;
@@ -609,7 +615,10 @@ export class EmberEngine {
   rite: WatchRiteId = "coin";
   scoutReady = true;
   marks = 0;
-  perks: Record<PerkId, number> = { purse: 0, wall: 0, whet: 0, rest: 0 };
+  perks: Record<PerkId, number> = { purse: 0, wall: 0, whet: 0, rest: 0, reach: 0 };
+  settings = false;
+  volume = 0.8;
+  motionOverride: boolean | null = null;
   bestEndless = 0;
   endless = false;
   campChoice: CampEffectId | null = null;
@@ -650,10 +659,12 @@ export class EmberEngine {
         relics?: RelicId[];
         unlocked?: number;
         muted?: boolean;
-        marks?: number;
-        perks?: Partial<Record<PerkId, number>>;
-        bestEndless?: number;
-      };
+      marks?: number;
+      perks?: Partial<Record<PerkId, number>>;
+      bestEndless?: number;
+      volume?: number;
+      motion?: boolean | null;
+    };
       const num = (value: unknown, fallback = 0) =>
         typeof value === "number" && Number.isFinite(value) ? value : fallback;
       this.unlocked = Math.max(0, Math.min(MAPS.length, Math.floor(num(data.unlocked))));
@@ -670,6 +681,13 @@ export class EmberEngine {
       if (data.muted) {
         this.muted = true;
         setMuted(true);
+      }
+      this.volume = Math.max(0, Math.min(1, typeof data.volume === "number" && Number.isFinite(data.volume) ? data.volume : 0.8));
+      if (typeof data.motion === "boolean") {
+        this.motionOverride = data.motion;
+        this.reducedMotion = data.motion;
+      } else {
+        this.motionOverride = null;
       }
       this.notify();
     } catch {
@@ -688,6 +706,8 @@ export class EmberEngine {
           marks: this.marks,
           perks: this.perks,
           bestEndless: this.bestEndless,
+          volume: this.volume,
+          motion: this.motionOverride,
         }),
       );
     } catch {
@@ -737,6 +757,18 @@ export class EmberEngine {
     return towerForm(tower.dmgLvl, tower.rateLvl, tower.rangeLvl);
   }
 
+  hushed(tower: Tower): boolean {
+    const cx = tower.c + 0.5;
+    const cy = tower.r + 0.5;
+    for (const creep of this.creeps) {
+      if (!creep.alive || creep.kind !== "gloam") continue;
+      const dx = creep.x - cx;
+      const dy = creep.y - cy;
+      if (dx * dx + dy * dy <= GLOAM_HUSH_RANGE * GLOAM_HUSH_RANGE) return true;
+    }
+    return false;
+  }
+
   crownedCount() {
     let n = 0;
     for (const tower of this.towers) {
@@ -748,6 +780,7 @@ export class EmberEngine {
   sightRange(tower: Tower) {
     return (
       rangeAt(tower.kind, tower.rangeLvl) *
+      (1 + this.perks.reach * 0.03) *
       (this.relics.has("glass") ? 1.12 : 1) *
       (tower.empowered ? 1.18 : 1) *
       (tower.emberlit === "b" && tower.kind === "ward" ? 1.12 : 1) *
@@ -832,6 +865,7 @@ export class EmberEngine {
       },
       keep: { lives: hud.lives, maxLives: hud.maxLives },
       gold: hud.gold,
+      settings: { open: hud.settings, muted: hud.muted, volume: hud.volume, motion: hud.motionOverride },
       selectedPacket: hud.selectedKind,
       selectedTower: hud.selectedTower
         ? {
@@ -1080,7 +1114,7 @@ export class EmberEngine {
   }
 
   rallyWatch() {
-    if (this.phase !== "wave" || this.paused || this.help || this.codex || this.campaignOpen || this.hall) return;
+    if (this.phase !== "wave" || this.paused || this.help || this.codex || this.campaignOpen || this.hall || this.settings) return;
     if (this.rallyCharge < RALLY_MAX || this.rallyT > 0) return;
     this.rallyCharge = 0;
     this.rallyT = RALLY_DURATION;
@@ -1294,6 +1328,9 @@ export class EmberEngine {
       hard: this.hard,
       help: this.help,
       hall: this.hall,
+      settings: this.settings,
+      volume: this.volume,
+      motionOverride: this.motionOverride,
       marked: (() => {
         const marked = this.markedCreep();
         if (!marked) return null;
@@ -1622,6 +1659,7 @@ export class EmberEngine {
     this.campaignOpen = false;
     this.help = false;
     this.hall = false;
+    this.settings = false;
     this.notify();
   }
 
@@ -1631,6 +1669,7 @@ export class EmberEngine {
     this.codex = false;
     this.help = false;
     this.hall = false;
+    this.settings = false;
     this.notify();
   }
 
@@ -1641,6 +1680,7 @@ export class EmberEngine {
       this.campaignOpen = false;
       this.hall = false;
     }
+    this.settings = false;
     this.notify();
   }
 
@@ -1652,6 +1692,38 @@ export class EmberEngine {
       this.campaignOpen = false;
       this.help = false;
     }
+    this.settings = false;
+    this.notify();
+  }
+
+  toggleSettings(force?: boolean) {
+    if (this.phase !== "title" && this.phase !== "won" && this.phase !== "lost") return;
+    this.settings = typeof force === "boolean" ? force : !this.settings;
+    if (this.settings) {
+      this.codex = false;
+      this.campaignOpen = false;
+      this.help = false;
+      this.hall = false;
+    }
+    this.notify();
+  }
+
+  setVolume(value: number) {
+    const next = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0.8));
+    this.volume = next;
+    if (next > 0 && this.muted) {
+      this.muted = false;
+      setMuted(false);
+    }
+    setVolume(next);
+    this.persist();
+    this.notify();
+  }
+
+  setMotionOverride(value: boolean | null) {
+    this.motionOverride = value;
+    this.reducedMotion = value ?? false;
+    this.persist();
     this.notify();
   }
 
@@ -1903,6 +1975,7 @@ export class EmberEngine {
     this.help = false;
     this.markedId = -1;
     this.hall = false;
+    this.settings = false;
     this.campDamage = 1;
     this.campOil = false;
     this.campLabel = null;
@@ -2672,7 +2745,7 @@ export class EmberEngine {
     if (kind === "lord" || this.wave < 2) return null;
     const roll = (this.wave * 5 + this.spawnCount * 3 + this.mapIndex) % 9;
     if (roll !== 0) return null;
-    const order: AffixId[] = ["shielded", "frenzied", "warded", "hollow"];
+    const order: AffixId[] = ["shielded", "frenzied", "warded", "hollow", "verdant"];
     return order[(this.wave + this.spawnCount + this.mapIndex) % order.length];
   }
 
@@ -2730,6 +2803,11 @@ export class EmberEngine {
     } else if (affix) {
       this.float(start.x, start.y - 0.45, affix.name, affix.color);
       this.ring(start.x, start.y, affix.color);
+    }
+    if (kind === "gloam") {
+      sfx.hush();
+      this.float(start.x, start.y - 0.45, "Gloam", "#5b6d75");
+      this.ring(start.x, start.y, "#5b6d75");
     }
   }
 
@@ -3093,6 +3171,7 @@ export class EmberEngine {
     if (tower.kind === "pike" && target.kind === "lord") dmg *= 1.14;
     if (tower.kind === "cinder" && target.kind === "moth") dmg *= 1.28;
     if (tower.kind === "cinder" && target.kind === "grub") dmg *= 1.12;
+    if (tower.kind === "spark" && target.kind === "gloam") dmg *= 1.2;
     if (tower.volley) {
       if (this.relics.has("flint")) dmg *= 1.4;
       tower.volley = false;
@@ -3102,7 +3181,8 @@ export class EmberEngine {
       this.fieldRateMultiplier(tower) *
       this.kindredRate(tower) *
       (1 + this.setAmount("rate")) *
-      (this.omenNow()?.towerRate ?? 1);
+      (this.omenNow()?.towerRate ?? 1) *
+      (this.hushed(tower) ? GLOAM_HUSH_RATE : 1);
     tower.cooldown = 1 / rate;
     if (tower.volt > 0) {
       tower.volt -= 1;
@@ -3293,9 +3373,11 @@ export class EmberEngine {
             ? 400
             : creep.kind === "shaman"
               ? 180
-              : creep.kind === "ashfang"
-                ? 90
-                : 0);
+              : creep.kind === "gloam"
+                ? 140
+                : creep.kind === "ashfang"
+                  ? 90
+                  : 0);
         if (threat > score) {
           score = threat;
           best = creep;
@@ -3534,6 +3616,15 @@ export class EmberEngine {
             }
           }
           this.ring(creep.x, creep.y, "#7a9a58");
+        }
+      }
+      const regen = creep.elite ? (AFFIXES[creep.elite].regen ?? 0) : 0;
+      if (regen > 0) creep.hp = Math.min(creep.maxHp, creep.hp + regen * dt);
+      if (creep.kind === "gloam" && !this.reducedMotion) {
+        const hushPhase = (this.time / 2.6 + creep.id * 0.17) % 1;
+        if (hushPhase < dt / 2.6) {
+          this.ring(creep.x, creep.y, "#5b6d75");
+          this.burst(creep.x, creep.y, "#5b6d75", 2, "smoke");
         }
       }
       const stepLen = stats.speed * slow * dt * (this.wave % 4 === 0 ? 1.16 : 1);
@@ -3881,7 +3972,7 @@ export class EmberEngine {
   tick(frameDt: number) {
     try {
       if (!Number.isFinite(frameDt) || frameDt < 0) return;
-      if ((this.paused || this.help || this.codex || this.campaignOpen || this.hall) && this.phase !== "title") {
+      if ((this.paused || this.help || this.codex || this.campaignOpen || this.hall || this.settings) && this.phase !== "title") {
         this.finishWaveIfClear();
         this.maybeNotify();
         return;

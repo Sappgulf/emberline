@@ -2038,8 +2038,21 @@ describe("season systems", () => {
     assert.ok(omenFor(2, 3));
     assert.equal(omenFor(3, 2)?.id, omenFor(3, 2)?.id);
     assert.equal(omenFor(3, 2)?.id, "blood-tide");
-    assert.equal(omenFor(3, 1)?.id, "hollow-moon");
-    assert.equal(omenFor(3, 3)?.id, "bitter-wind");
+    assert.equal(omenFor(3, 1)?.id, "ash-fall");
+    assert.equal(omenFor(3, 3)?.id, "doused-pitch");
+  });
+
+  it("douses pitch under the new omen — burns gutter early", () => {
+    const e = play();
+    e.loadMap(3);
+    e.phase = "wave";
+    e.wave = 3;
+    e.notify();
+    assert.equal(e.hud().omen?.id, "doused-pitch");
+    assert.equal(e.omenNow()?.burnLife, 0.7);
+    e.wave = 1;
+    e.notify();
+    assert.ok(e.goldMult() > 1, "doused pitch pays a richer bounty");
   });
 
   it("folds the active omen into health and reports it to the HUD", () => {
@@ -2050,9 +2063,9 @@ describe("season systems", () => {
     e.notify();
     assert.equal(e.hud().omen?.id, "blood-tide");
     assert.ok(Math.abs(e.hpMult() - 1.1) < 0.0001, "blood tide should add 10% health");
-    e.wave = 3;
+    e.wave = 1;
     e.notify();
-    assert.equal(e.hud().omen?.id, "bitter-wind");
+    assert.equal(e.hud().omen?.id, "ash-fall");
   });
 
   it("celebrates a completed relic set and hints it in the shop", () => {
@@ -2088,6 +2101,122 @@ describe("season systems", () => {
     e.unlocked = 3;
     e.notify();
     assert.equal(e.hud().chronicle.find((entry) => entry.id === "omens")?.unlocked, true);
+  });
+
+  it("hushes nearby towers while a gloam walks the road", () => {
+    const e = play();
+    e.gold = 400;
+    const grass = emptyGrass(e);
+    e.selectedKind = "bow";
+    e.tapCell(grass.c, grass.r);
+    const tower = e.towers[0];
+    e.phase = "wave";
+    e.spawn("grub");
+    const grub = e.creeps[0];
+    grub.x = grass.c + 1.2;
+    grub.y = grass.r + 0.5;
+    e.fire(tower, grub);
+    const clearCooldown = tower.cooldown;
+    e.spawn("gloam");
+    const gloam = e.creeps[e.creeps.length - 1];
+    gloam.x = grass.c + 1.1;
+    gloam.y = grass.r + 0.5;
+    tower.cooldown = 0;
+    e.fire(tower, grub);
+    assert.equal(tower.cooldown > clearCooldown, true, "hushed towers should take longer between shots");
+    assert.equal(e.hushed(tower), true);
+    gloam.alive = false;
+    tower.cooldown = 0;
+    e.fire(tower, grub);
+    assert.equal(Math.abs(tower.cooldown - clearCooldown) < 1e-9, true, "hush must lift when the gloam falls");
+    assert.equal(leakCost("gloam"), 2);
+  });
+
+  it("orders the watch to still the hush when gloams walk", () => {
+    assert.equal(watchOrderFor([{ kind: "gloam", count: 2, gap: 1, delay: 0 }])?.id, "hush");
+    const e = play();
+    e.loadMap(6);
+    e.wave = 4;
+    e.notify();
+    assert.equal(e.hud().watchOrder?.id, "hush", "Ash Hollow wave 5 should carry the gloam order");
+  });
+
+  it("lets a verdant elite mend itself while it walks", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("shell");
+    const creep = e.creeps[0];
+    creep.elite = "verdant";
+    creep.maxHp = 100;
+    creep.hp = 50;
+    e.step(1);
+    assert.ok(creep.hp > 50 && creep.hp < 60, `verdant should mend ~9 hp/s, saw ${creep.hp}`);
+    creep.hp = 100;
+    e.step(1);
+    assert.equal(creep.hp, 100, "mending must not exceed the spawn health");
+  });
+
+  it("reaches farther for every lens mark spent", () => {
+    const e = play();
+    const grass = emptyGrass(e);
+    e.selectedKind = "bow";
+    e.tapCell(grass.c, grass.r);
+    const base = e.sightRange(e.towers[0]);
+    e.phase = "title";
+    e.marks = 12;
+    e.buyPerk("reach");
+    const one = e.sightRange(e.towers[0]);
+    e.buyPerk("reach");
+    e.buyPerk("reach");
+    const three = e.sightRange(e.towers[0]);
+    assert.ok(one > base);
+    assert.ok(Math.abs(three - base * 1.09) < 1e-9);
+    assert.equal(e.hud().perkOptions.find((perk) => perk.id === "reach")?.tier, 3);
+  });
+
+  it("persists volume and motion settings between watches", () => {
+    const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    const saved: string[] = [];
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => null,
+        setItem: (_key: string, value: string) => {
+          saved.push(value);
+        },
+      } satisfies Pick<Storage, "getItem" | "setItem">,
+    });
+    try {
+      const e = new EmberEngine();
+      e.volume = 0.3;
+      e.motionOverride = true;
+      e.reducedMotion = true;
+      e.persist();
+      assert.ok(saved[0]?.includes('"volume":0.3'));
+      const reload = JSON.parse(saved[0]) as { volume: number; motion: boolean | null };
+      assert.equal(reload.volume, 0.3);
+      assert.equal(reload.motion, true);
+
+      const raw = saved[0];
+      Object.defineProperty(globalThis, "localStorage", {
+        configurable: true,
+        value: {
+          getItem: () => raw,
+          setItem: () => undefined,
+        } satisfies Pick<Storage, "getItem" | "setItem">,
+      });
+      const fresh = new EmberEngine();
+      fresh.readSave();
+      assert.equal(fresh.volume, 0.3);
+      assert.equal(fresh.motionOverride, true);
+      assert.equal(fresh.reducedMotion, true);
+      assert.equal(fresh.hud().settings, false, "settings overlay never persists open");
+      fresh.toggleSettings();
+      assert.equal(fresh.hud().settings, true);
+    } finally {
+      if (previous) Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous });
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
   });
 });
 

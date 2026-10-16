@@ -25,9 +25,9 @@ With the local server running, `npm run test:game:browser` runs the installed Ch
 ## Watch
 
 - **Towers:** Longbow, Mortar, Frost, Spark, Bramble, Ash Ward, Watch Pike, Cinder Brazier. Pike unseals after Keep Stair; Cinder after River Ford.
-- **Prey:** Moths fly low (any air tower, mortar, pike, or cinder can reach them). Knaves dodge the first shot unless Frost, Bramble, or a mark catches them. Ashfangs howl on the first bite and speed the pack.
+- **Prey:** Moths fly low (any air tower, mortar, pike, or cinder can reach them). Knaves dodge the first shot unless Frost, Bramble, or a mark catches them. Ashfangs howl on the first bite and speed the pack. Gloams hush the road — towers near one fire 28% slower until it falls; spark the mist.
 - **Bosses:** From the river onward each road has a named boss with a taunt, a half-health second phase, and its own ground effect. Watch the boss bar over the board.
-- **Elites:** From the second road some prey run shielded, frenzied, warded, or hollow, with a colored aura and a richer bounty.
+- **Elites:** From the second road some prey run shielded, frenzied, warded, hollow, or verdant, with a colored aura and a richer bounty. Verdant elites mend themselves as they walk.
 - **Camps:** After each held road, choose a camp preparation for the next one — gold, lives, damage, cheap horn oil, an extra scout, or a watch mark.
 - **Rites:** At the brief choose spare purse, spare timber, or first ember.
 - **Scout:** Once a wave, K marks the toughest body.
@@ -46,8 +46,9 @@ With the local server running, `npm run test:game:browser` runs the installed Ch
 - **Forge:** Damage, Rate, or Reach. Highest of the three is the form: Timber → Bound → Tempered → Crowned.
 - **Emberlit:** At Crowned, choose one of two awakenings for each tower (C key ability, two branch buttons).
 - **Abilities:** Every tower has an active power on a cooldown — Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm.
-- **Watch hall:** Marks earned from held roads and bosses buy permanent perks. Hold all eight roads to unlock the endless Long Night.
+- **Watch hall:** Marks earned from held roads and bosses buy permanent perks, including the Hollow lens reach. Hold all eight roads to unlock the endless Long Night.
 - **Tools:** Horn (burn the road + slow), Scout flare (R during a wave; mark every live enemy for four seconds and deal +22% damage), Mend (lives + drag), Move, Sell. Pause is pause. 1× / 2× / 3× is speed.
+- **Settings:** Sound, master volume, and a bolder-motion override at the title (O). Saved between watches.
 - **Relics** persist between maps (including Watch cord, Gate flint, and Lantern wick). Stall prices drop each wave.
 
 ## Chronicle

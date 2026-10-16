@@ -1,4 +1,6 @@
 let ctx: AudioContext | null = null;
+let master: GainNode | null = null;
+let volume = 0.8;
 let muted = false;
 let lastHit = 0;
 let lastShot = 0;
@@ -11,12 +13,20 @@ export function setMuted(value: boolean) {
   if (!muted && ctx && ctx.state === "suspended") void ctx.resume();
 }
 
+export function setVolume(value: number) {
+  volume = Math.max(0, Math.min(1, value));
+  if (master) master.gain.value = volume;
+}
+
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!ctx) {
     const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     ctx = new Ctor();
+    master = ctx.createGain();
+    master.gain.value = volume;
+    master.connect(ctx.destination);
   }
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
@@ -46,7 +56,7 @@ function beep(freq: number, dur: number, type: OscillatorType, gain: number, sli
   g.gain.setValueAtTime(gain * 0.72, now);
   g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
   osc.connect(g);
-  g.connect(audio.destination);
+  g.connect(master ?? audio.destination);
   osc.start(now);
   osc.stop(now + dur + 0.02);
 }
@@ -129,4 +139,5 @@ export const sfx = {
   },
   lose: () => beep(90, 0.4, "sawtooth", 0.07, -50),
   deny: () => beep(140, 0.08, "square", 0.04),
+  hush: () => beep(300, 0.2, "sine", 0.028, -90),
 };
