@@ -347,14 +347,14 @@ export const CHRONICLE: ChronicleEntry[] = [
     id: "omens",
     kicker: "Weather",
     title: "Night omens",
-    body: "From the third road on, some waves carry an omen — bitter wind, blood tide, hollow moon, or ash fall. Read the forecast and send accordingly.",
+    body: "From the third road on, some waves carry an omen — bitter wind, blood tide, hollow moon, ash fall, or doused pitch. Read the forecast and send accordingly.",
     unlock: { type: "road", index: 2 },
   },
   {
     id: "elite-prey",
     kicker: "Prey",
     title: "Elite prey",
-    body: "Shielded, frenzied, warded, hollow. One in a handful of bodies is born wrong and pays better for it.",
+    body: "Shielded, frenzied, warded, hollow, or verdant. One in a handful of bodies is born wrong and pays better for it.",
     unlock: { type: "road", index: 1 },
   },
   {
@@ -372,11 +372,46 @@ export const CHRONICLE: ChronicleEntry[] = [
     unlock: { type: "road", index: 4 },
   },
   {
+    id: "mirrorskin",
+    kicker: "Boss",
+    title: "Mirrorskin",
+    body: "A fen-thing that wears the moonlit marsh like plate. At half strength its reflection hardens into a ward.",
+    unlock: { type: "road", index: 5 },
+  },
+  {
+    id: "hollowjaw",
+    kicker: "Boss",
+    title: "Hollowjaw",
+    body: "An ash-eater swollen on old coals in the ravine. Strike it past half and it splits to shed its brood.",
+    unlock: { type: "road", index: 6 },
+  },
+  {
     id: "wicker-crown",
     kicker: "Boss",
     title: "The Wicker Crown",
     body: "Emberlord ascendant, walking the last arch. It sets the draft alight and the pack sprints.",
     unlock: { type: "road", index: 7 },
+  },
+  {
+    id: "cauldron-and-horn",
+    kicker: "Arsenal",
+    title: "Pitch and brass",
+    body: "Ember Copse unseals the Pitch Cauldron to flood the road with tar; Glass Marsh raises the Muster Horn to steady every tower in its brass ring.",
+    unlock: { type: "road", index: 5 },
+  },
+  {
+    id: "warren-moles",
+    kicker: "Prey",
+    title: "Buried on the marsh",
+    body: "Moles tunnel beneath the turf where arrows and bolts cannot bite. Chill, roots, a mark, flare, or fire forces them into the open; splash catches them underground.",
+    unlock: { type: "road", index: 5 },
+  },
+  {
+    id: "gloams-and-mourners",
+    kicker: "Prey",
+    title: "The hush and the wail",
+    body: "Gloams drape nearby towers in a cold hush while Mourners wail away chill, roots, and bleed from the pack. Spark and bows answer them first.",
+    unlock: { type: "road", index: 6 },
   },
 ];
 

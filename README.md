@@ -1,6 +1,6 @@
 # Emberline
 
-Dusk woodland tower defense. Hold eight maps. Plant eight towers on the grass beside the road.
+Dusk woodland tower defense. Hold eight maps. Plant ten towers on the grass beside the road.
 
 ## Play
 
@@ -45,7 +45,7 @@ With the local server running, `npm run test:game:browser` runs the installed Ch
 - **Hard watch:** 14 lives, tougher creeps, richer bounties. Shells splinter into a grub. Three hounds run as a pack.
 - **Forge:** Damage, Rate, or Reach. Highest of the three is the form: Timber → Bound → Tempered → Crowned.
 - **Emberlit:** At Crowned, choose one of two awakenings for each tower (C key ability, two branch buttons).
-- **Abilities:** Every tower has an active power on a cooldown — Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm, Deluge, Reveille. The Muster Horn never fires; standing in its brass ring makes a tower hit 10%+ harder, its reach upgrades widen the ring.
+- **Abilities:** Every tower has an active power on a cooldown — Volley, Siege shell, Nova, Overcharge, Briar, Sanctum, Brace, Firestorm, Deluge, Reveille. The Muster Horn never fires; standing in its brass ring makes a tower hit 10%+ harder and fire faster with Tempo upgrades, while Reach and Wide call widen the ring.
 - **Watch hall:** Marks earned from held roads and bosses buy permanent perks, including the Hollow lens reach. Hold all eight roads to unlock the endless Long Night.
 - **Long Night:** Every third held night opens a market (and pays a watch mark), every sixth is a midnight hunt paying a third richer, named bands escalate the pack (First watch → Deep night → Howl rise → Ember tempest → Gloam vigil → Blood moon), and bosses walk every fourth night.
 - **Tools:** Horn (burn the road + slow), Scout flare (R during a wave; mark every live enemy for four seconds and deal +22% damage), Mend (lives + drag), Move, Sell. Pause is pause. 1× / 2× / 3× is speed.

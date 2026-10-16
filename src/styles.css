@@ -1103,8 +1103,14 @@
 }
 .counter-spark,
 .counter-mortar,
-.counter-ward {
+.counter-ward,
+.counter-pike,
+.counter-cinder,
+.counter-muster {
   border-color: rgba(212, 160, 84, 0.52);
+}
+.counter-cauldron {
+  border-color: rgba(143, 163, 176, 0.56);
 }
 .wave-recap {
   margin-top: 0.6rem;
@@ -2235,7 +2241,7 @@
 }
 .keep-arsenal ul {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.3rem;
 }
 .keep-arsenal li {

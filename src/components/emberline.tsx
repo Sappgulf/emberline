@@ -11,6 +11,7 @@ import { REACTIONS, REACTION_COOLDOWN, type CombatEntry } from "@/game/combat";
 import {
   COLS,
   CREEPS,
+  EMBERLIT,
   FORM_NAME,
   MAX_UPGRADE,
   ROWS,
@@ -44,8 +45,19 @@ const GLOAM_SPRITE_URL = `data:image/svg+xml,${encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 44'><ellipse cx='14' cy='16' rx='7' ry='10' fill='#8fa3b0' opacity='0.4'/><ellipse cx='26' cy='16' rx='7' ry='10' fill='#8fa3b0' opacity='0.4'/><path d='M4 30 L8 12 Q20 0 32 12 L36 30 Q28 26 20 32 Q12 26 4 30 Z' fill='#5b6d75'/><circle cx='15' cy='18' r='3' fill='#b8c8d2'/><circle cx='25' cy='18' r='3' fill='#b8c8d2'/></svg>",
 )}`;
 
+const MOLE_SPRITE_URL = `data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 40'><ellipse cx='22' cy='31' rx='18' ry='5' fill='#344028'/><ellipse cx='13' cy='28' rx='7' ry='3.5' fill='#5a7a48' opacity='0.65'/><ellipse cx='31' cy='29' rx='6' ry='3' fill='#5a7a48' opacity='0.65'/><ellipse cx='22' cy='21' rx='13' ry='9.5' fill='#3d3a44'/><ellipse cx='20' cy='17' rx='7.5' ry='4.5' fill='#56535e'/><circle cx='18' cy='19' r='1.6' fill='#1a171c'/><circle cx='26' cy='19' r='1.6' fill='#1a171c'/><ellipse cx='22' cy='23' rx='3' ry='2' fill='#d8977f'/><path d='M9 26 L5 31 M12 28 L8 33 M35 26 L39 31 M32 28 L36 33' stroke='#9c948e' stroke-width='2' stroke-linecap='round'/></svg>",
+)}`;
+
+const MOURNER_SPRITE_URL = `data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 44'><ellipse cx='20' cy='20' rx='14' ry='18' fill='#5f6d78' opacity='0.34'/><path d='M9 38 Q7 18 20 5 Q33 18 31 38 Q20 42 9 38 Z' fill='#4a545e'/><path d='M13 17 A7 8 0 0 1 27 17 Z' fill='#3a424b'/><ellipse cx='20' cy='18' rx='4.2' ry='5.2' fill='#8fa3b0'/><ellipse cx='18.2' cy='17.5' rx='1.1' ry='1.5' fill='#b8c8d2'/><ellipse cx='21.8' cy='17.5' rx='1.1' ry='1.5' fill='#b8c8d2'/></svg>",
+)}`;
+
 function creepSpriteUrl(kind: CreepKind) {
-  return kind === "gloam" ? GLOAM_SPRITE_URL : spriteUrl(kind);
+  if (kind === "gloam") return GLOAM_SPRITE_URL;
+  if (kind === "mole") return MOLE_SPRITE_URL;
+  if (kind === "mourner") return MOURNER_SPRITE_URL;
+  return spriteUrl(kind);
 }
 
 const CAULDRON_SPRITE_URL = `data:image/svg+xml,${encodeURIComponent(
@@ -76,6 +88,7 @@ const COUNTER_ORDER: TowerKind[] = [
   "ward",
   "pike",
   "cinder",
+  "cauldron",
 ];
 const COUNTERS: Record<CreepKind, TowerKind[]> = {
   grub: ["bow", "cinder"],
@@ -353,6 +366,8 @@ export function Emberline() {
       if (e.key === "6") engine.chooseKind("ward");
       if (e.key === "7") engine.chooseKind("pike");
       if (e.key === "8") engine.chooseKind("cinder");
+      if (e.key === "9") engine.chooseKind("cauldron");
+      if (e.key === "0") engine.chooseKind("muster");
       if (e.key === "h" || e.key === "H") engine.blowHorn();
       if (e.key === "v" || e.key === "V") engine.rallyWatch();
       if (e.key === "r" || e.key === "R") {
@@ -1048,7 +1063,10 @@ export function Emberline() {
           >
             <div className="orders-grid w-full text-left">
               {[
-                ["1–8", "Pick a packet. Pike unseals after Keep Stair; Cinder after River Ford."],
+                [
+                  "1–9, 0",
+                  "Pick a packet. Pike unseals after Keep Stair; Cinder after River Ford; Cauldron after Ember Copse; Horn after Glass Marsh.",
+                ],
                 [
                   "Click a creep",
                   "Focus fire for four seconds. Tap again to mark it for a stronger priority.",
@@ -1654,7 +1672,12 @@ export function Emberline() {
                   placementMessageValue
                 ) : (
                   <>
-                    {formBlurb(hud.selectedTower.kind, hud.formName, hud.selectedTower.empowered)}
+                    {formBlurb(
+                      hud.selectedTower.kind,
+                      hud.formName,
+                      hud.selectedTower.empowered,
+                      hud.selectedTower.emberlit,
+                    )}
                     {hud.bond && (
                       <span className="ml-2 text-frost">
                         Bond: {hud.bond.label} +{Math.round(hud.bond.bonus * 100)}%
@@ -1857,7 +1880,7 @@ export function Emberline() {
                   data-sealed={locked}
                   className={`pressable packet ${locked || hud.gold < def.cost ? "opacity-40" : ""}`}
                 >
-                  <span className="key">{i + 1}</span>
+                  <span className="key">{i === 9 ? 0 : i + 1}</span>
                   <img className="packet-sprite" src={towerSpriteUrl(kind)} alt="" />
                   <span className="mt-1 block text-[12px] font-semibold">{def.short}</span>
                   <span className="packet-role">
@@ -2043,18 +2066,21 @@ export function Emberline() {
   );
 }
 
-function formBlurb(kind: TowerKind, form: string, empowered = false) {
+function formBlurb(
+  kind: TowerKind,
+  form: string,
+  empowered = false,
+  emberlit: EmberlitBranch | null = null,
+) {
   if (empowered) {
-    if (kind === "bow") return "Emberlit. Arrows pierce one extra creep.";
-    if (kind === "mortar") return "Emberlit. Oil spreads wider and burns longer.";
-    if (kind === "frost") return "Emberlit. Chill splashes and pins a beat.";
-    if (kind === "spark") return "Emberlit. The bolt jumps one extra time.";
-    if (kind === "ward") return "Emberlit. The ring cracks plate.";
-    if (kind === "pike") return "Emberlit. The spear ignores plate.";
-    if (kind === "cinder") return "Emberlit. Coals cling and burn longer.";
-    return "Emberlit. Thorns root from the first timber.";
+    const branch = EMBERLIT[kind][emberlit ?? "a"];
+    return `Emberlit · ${branch.name}. ${branch.detail}`;
   }
-  if (form === "Bound") return "The ring holds. A little more bite and reach.";
+  if (form === "Bound") {
+    if (kind === "muster") return "The brass ring steadies. Allies inside hit harder and faster.";
+    if (kind === "cauldron") return "Heavier kettle. Pitch spreads hotter across the road.";
+    return "The ring holds. A little more bite and reach.";
+  }
   if (form === "Tempered") {
     if (kind === "bow") return "Arrows pierce one creep behind the first.";
     if (kind === "mortar") return "Oil lasts longer on the dirt.";
@@ -2063,6 +2089,8 @@ function formBlurb(kind: TowerKind, form: string, empowered = false) {
     if (kind === "ward") return "The ring chills harder.";
     if (kind === "pike") return "The spear pins the target.";
     if (kind === "cinder") return "The coal patch lasts.";
+    if (kind === "cauldron") return "Boiling pitch splashes wider and holds longer.";
+    if (kind === "muster") return "Clear brass call. Nearby towers strike harder and faster.";
     return "Thorns root the target.";
   }
   if (form === "Crowned") {
@@ -2073,6 +2101,8 @@ function formBlurb(kind: TowerKind, form: string, empowered = false) {
     if (kind === "ward") return "The ring holds a long chill.";
     if (kind === "pike") return "The spear cracks plate.";
     if (kind === "cinder") return "Wide clinging coals.";
+    if (kind === "cauldron") return "Deep tar pool slows and scorches the whole bend.";
+    if (kind === "muster") return "Crowned horn. Ready for Wide call or Drumbeat.";
     return "Long root.";
   }
   return "Green timber. Upgrade damage, rate, or reach to change form.";
@@ -2098,8 +2128,9 @@ function towerPower(
   rangeLevel = tower.rangeLvl,
 ) {
   if (tower.kind === "muster") {
-    // The horn does not shoot — its "power" is the call: +10% per base, +2% per level.
-    return Math.round((0.1 + 0.02 * (damageLevel - 1)) * 100);
+    // The horn does not shoot — its "power" is the call: +10% base, +2% per level, +8% Drumbeat, 1.5x Reveille.
+    const base = 0.1 + 0.02 * (damageLevel - 1) + (tower.emberlit === "b" ? 0.08 : 0);
+    return Math.round(base * ((tower.hymnT ?? 0) > 0 ? 1.5 : 1) * 100);
   }
   const form = towerForm(damageLevel, rateLevel, rangeLevel);
   return Math.round(
@@ -2121,6 +2152,9 @@ function towerRate(
   tower: NonNullable<HudSnap["selectedTower"]>,
   rateLevel = tower.rateLvl,
 ) {
+  if (tower.kind === "muster") {
+    return (rateLevel - 1) * 2 * ((tower.hymnT ?? 0) > 0 ? 1.5 : 1);
+  }
   return (
     rateAt(tower.kind, rateLevel) * (hud.fieldBoost?.rate ?? 1) *
       (hud.kindred ? 1.1 : 1) * (1 + (hud.setBonus?.rate ?? 0))
@@ -2132,8 +2166,11 @@ function towerReach(
   tower: NonNullable<HudSnap["selectedTower"]>,
   rangeLevel = tower.rangeLvl,
 ) {
+  const base =
+    rangeAt(tower.kind, rangeLevel) +
+    (tower.kind === "muster" && tower.emberlit === "a" ? 0.5 : 0);
   return (
-    rangeAt(tower.kind, rangeLevel) *
+    base *
     (hud.relics.includes("glass") ? 1.12 : 1) *
     (tower.empowered ? 1.18 : 1) *
     (tower.emberlit === "b" && tower.kind === "ward" ? 1.12 : 1) *
@@ -2153,7 +2190,9 @@ function upgradePreview(hud: HudSnap, branch: UpgradeBranch) {
     branch === "damage"
       ? `P ${towerPower(hud, tower)}→${towerPower(hud, tower, nextDamage, nextRate, nextRange)}`
       : branch === "rate"
-        ? `R ${towerRate(hud, tower).toFixed(1)}→${towerRate(hud, tower, nextRate).toFixed(1)}×`
+        ? tower.kind === "muster"
+          ? `T +${Math.round(towerRate(hud, tower))}%→+${Math.round(towerRate(hud, tower, nextRate))}%`
+          : `R ${towerRate(hud, tower).toFixed(1)}→${towerRate(hud, tower, nextRate).toFixed(1)}×`
         : `H ${towerReach(hud, tower).toFixed(1)}→${towerReach(hud, tower, nextRange).toFixed(1)}`;
   return nextForm === currentForm ? stat : `→ ${FORM_NAME[nextForm]} · ${stat}`;
 }
@@ -2444,10 +2483,12 @@ function WatchDesk({ hud, hint, tone }: { hud: HudSnap; hint: string; tone: stri
         {hud.campLabel && <p className="desk-meta">Camp · {hud.campLabel}</p>}
       </section>
       <section className="desk-card">
-        <span className="intel-kicker">
-          Now · {hud.endless ? "night" : "wave"} {hud.previewWave}
-          {hud.nightBand ? ` · ${hud.nightBand}` : ""}
-        </span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="intel-kicker">
+            Now · {hud.endless ? "night" : "wave"} {hud.previewWave}
+          </span>
+          {hud.nightBand && <span className="intel-kicker text-copper">{hud.nightBand}</span>}
+        </div>
         <DeskWave items={hud.wavePreview} />
         {hud.thenPreview.length > 0 && (
           <>
@@ -3056,8 +3097,8 @@ function TowerIntel({ hud }: { hud: HudSnap }) {
             <dd>{tower.kind === "muster" ? `+${power}%` : power}</dd>
           </div>
           <div>
-            <dt>Rate</dt>
-            <dd>{tower.kind === "muster" ? "—" : `${rate.toFixed(2)}×`}</dd>
+            <dt>{tower.kind === "muster" ? "Tempo" : "Rate"}</dt>
+            <dd>{tower.kind === "muster" ? `+${Math.round(rate)}%` : `${rate.toFixed(2)}×`}</dd>
           </div>
           <div>
             <dt>Reach</dt>

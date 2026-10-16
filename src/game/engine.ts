@@ -823,6 +823,22 @@ export class EmberEngine {
     return 1 + bonus;
   }
 
+  /** Tempo upgrades on the Muster Horn speed the cadence of allies inside its call ring. */
+  musterRateMultiplier(tower: Tower) {
+    let bonus = 0;
+    for (const other of this.towers) {
+      if (other.kind !== "muster" || other.id === tower.id) continue;
+      const reach = this.sightRange(other);
+      const dx = other.c + 0.5 - (tower.c + 0.5);
+      const dy = other.r + 0.5 - (tower.r + 0.5);
+      if (dx * dx + dy * dy > reach * reach) continue;
+      let value = 0.02 * (other.rateLvl - 1);
+      if ((other.hymnT ?? 0) > 0 && value > 0) value *= 1.5;
+      bonus = Math.max(bonus, value);
+    }
+    return 1 + bonus;
+  }
+
   crownedCount() {
     let n = 0;
     for (const tower of this.towers) {
@@ -832,8 +848,11 @@ export class EmberEngine {
   }
 
   sightRange(tower: Tower) {
+    const base =
+      rangeAt(tower.kind, tower.rangeLvl) +
+      (tower.kind === "muster" && tower.emberlit === "a" ? 0.5 : 0);
     return (
-      rangeAt(tower.kind, tower.rangeLvl) *
+      base *
       (1 + this.perks.reach * 0.03) *
       (this.relics.has("glass") ? 1.12 : 1) *
       (tower.empowered ? 1.18 : 1) *
@@ -870,6 +889,10 @@ export class EmberEngine {
       maxHp: prey.maxHp,
       armor: stats.armor + (prey.elite ? AFFIXES[prey.elite].armor : 0),
       statuses: [
+        prey.kind === "mole" ? (this.surfaced(prey) ? "Surfaced" : "Buried") : null,
+        prey.kind === "gloam" ? "Hush aura" : null,
+        prey.kind === "mourner" ? "Wail cleanses" : null,
+        prey.elite === "verdant" ? "Regenerating" : null,
         (prey.chillT ?? 0) > 0 ? "Chilled" : prey.slowT > 0 ? "Slowed" : null,
         prey.rootT > 0 ? "Rooted" : null,
         (prey.wardT ?? 0) > 0 ? "Warded" : null,
@@ -1285,9 +1308,19 @@ export class EmberEngine {
       watchOrder: this.watchOrderSnapshot(),
       fieldBoost: t
         ? {
-            damage: this.fieldDamageMultiplier(t) * (this.omenNow()?.towerDamage ?? 1),
-            rate: this.fieldRateMultiplier(t) * (this.omenNow()?.towerRate ?? 1),
-            range: this.fieldRangeMultiplier(t) * (this.omenNow()?.towerRange ?? 1),
+            damage:
+              this.fieldDamageMultiplier(t) *
+              (this.omenNow()?.towerDamage ?? 1) *
+              this.musterMultiplier(t),
+            rate:
+              this.fieldRateMultiplier(t) *
+              (this.omenNow()?.towerRate ?? 1) *
+              this.musterRateMultiplier(t) *
+              (this.hushed(t) ? GLOAM_HUSH_RATE : 1),
+            range:
+              this.fieldRangeMultiplier(t) *
+              (this.omenNow()?.towerRange ?? 1) *
+              (1 + this.perks.reach * 0.03),
           }
         : null,
       nextCosts: t
@@ -2261,8 +2294,13 @@ export class EmberEngine {
 
   placementRange(kind: TowerKind, c: number, r: number) {
     const glass = this.relics.has("glass") ? 1.12 : 1;
-    return rangeAt(kind, 1) * glass * this.fieldRangeMultiplier({ kind, c, r }) *
-      (this.omenNow()?.towerRange ?? 1);
+    return (
+      rangeAt(kind, 1) *
+      (1 + this.perks.reach * 0.03) *
+      glass *
+      this.fieldRangeMultiplier({ kind, c, r }) *
+      (this.omenNow()?.towerRange ?? 1)
+    );
   }
 
   roadCoverage(c: number, r: number, range: number) {
@@ -2450,7 +2488,7 @@ export class EmberEngine {
         this.ring(tower.c + 0.5, tower.r + 0.5, "#efbb65");
       }
       chargeFx("#efbb65");
-      sfx.horn();
+      sfx.reveille();
     } else {
       const slow = t.kind === "ward" ? 0.5 : t.kind === "frost" ? 0.6 : 0;
       const dmg =
@@ -2471,7 +2509,7 @@ export class EmberEngine {
       );
       this.burst(cx, cy, t.kind === "frost" ? "#6aa8b4" : "#d4a054", 10, "spark");
     }
-    t.abilityCd = def.cd;
+    t.abilityCd = t.kind === "muster" ? Math.max(10, def.cd - (t.rateLvl - 1) * 1.5) : def.cd;
     this.banner = { text: `${def.name} — ${def.detail}`, life: 1.5, max: 1.5 };
     sfx.upgrade();
     this.notify();
@@ -3312,6 +3350,7 @@ export class EmberEngine {
     const rate =
       rateAt(tower.kind, tower.rateLvl) *
       this.fieldRateMultiplier(tower) *
+      this.musterRateMultiplier(tower) *
       this.kindredRate(tower) *
       (1 + this.setAmount("rate")) *
       (this.omenNow()?.towerRate ?? 1) *
@@ -3461,7 +3500,8 @@ export class EmberEngine {
             : "#d4a054";
     if (tower.kind === "mortar" || tower.kind === "cinder" || tower.kind === "cauldron") this.burst(sx, sy, spark, 2, "spark");
     if (tower.kind === "bow" || tower.kind === "pike") sfx.shootBow();
-    else if (tower.kind === "mortar" || tower.kind === "cinder" || tower.kind === "cauldron") sfx.shootMortar();
+    else if (tower.kind === "cauldron") sfx.shootCauldron();
+    else if (tower.kind === "mortar" || tower.kind === "cinder") sfx.shootMortar();
     else if (tower.kind === "bramble") sfx.shootBramble();
     else sfx.shootFrost();
 
@@ -3767,6 +3807,7 @@ export class EmberEngine {
           if (cleansed > 0) {
             this.ring(creep.x, creep.y, "#9fb7c6");
             this.float(creep.x, creep.y - 0.5, `Cleanse ${cleansed}`, "#9fb7c6");
+            sfx.wail();
           }
         }
       }
@@ -4158,7 +4199,7 @@ export class EmberEngine {
     const flared = this.creeps.filter((creep) => creep.alive && creep.markedT > 0).length;
     const ability = this.selectedTower()?.abilityCd ?? 0;
     const tower = this.selectedTower();
-    const chargeKey = tower ? `${tower.volt}|${tower.siege}|${tower.storm}|${tower.brace}` : "none";
+    const chargeKey = tower ? `${tower.volt}|${tower.siege}|${tower.storm}|${tower.brace}|${Math.ceil(tower.hymnT ?? 0)}` : "none";
     const boss = this.bossCreep();
     const bossKey = boss ? `${boss.id}|${Math.ceil(boss.hp)}|${boss.bossPhase}` : "none";
     const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${Math.ceil(this.flareCd)}|${Math.ceil(this.flareT)}|${flared}|${heroKey}|${this.canUndo()}|${this.banner?.text ?? ""}|${this.lastResult?.wave ?? 0}|${this.waveKills}|${this.waveLeaks}|${this.waveEarned}|${this.watchChain}|${objective.current}|${this.markedId}|${marked?.hp ?? 0}|${this.focusId}|${Math.ceil(this.focusT)}|${this.hard}|${this.help}|${this.hall}|${this.marks}|${this.campChoice ?? ""}|${this.endless}|${this.scoutsLeft}|${Math.ceil(ability)}|${this.bestEndless}`;

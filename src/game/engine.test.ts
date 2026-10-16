@@ -3143,4 +3143,92 @@ describe("new arms and burrowed prey", () => {
     assert.ok(deluge.r >= 2, `Deluge spreads wide, saw ${deluge.r}`);
     assert.ok(e.towers[0].abilityCd > 0);
   });
+
+  it("widens the muster horn with Wide call and speeds allies with tempo upgrades", () => {
+    const e = play();
+    e.unlocked = 7;
+    e.loadMap(0);
+    e.clearField();
+    e.phase = "ready";
+    e.gold = 2000;
+    e.selectedKind = "muster";
+    const grass = emptyGrass(e);
+    e.tapCell(grass.c, grass.r);
+    const muster = e.towers[0];
+    const baseRange = e.sightRange(muster);
+    muster.dmgLvl = 4;
+    e.selectedId = muster.id;
+    e.empowerSelected("a");
+    assert.ok(
+      Math.abs(e.sightRange(muster) - (baseRange + 0.5) * 1.18) < 1e-9,
+      "Wide call adds 0.5 base reach before Emberlit multiplier",
+    );
+    e.selectedKind = "bow";
+    const near = [
+      { c: grass.c + 1, r: grass.r },
+      { c: grass.c - 1, r: grass.r },
+      { c: grass.c, r: grass.r + 1 },
+      { c: grass.c, r: grass.r - 1 },
+    ].find((p) => e.canBuild(p.c, p.r))!;
+    e.tapCell(near.c, near.r);
+    const bow = e.towers.find((t) => t.kind === "bow")!;
+    assert.equal(e.bondFor(bow)?.id, "hornline");
+    assert.equal(e.musterRateMultiplier(bow), 1);
+    muster.rateLvl = 4;
+    assert.ok(Math.abs(e.musterRateMultiplier(bow) - 1.06) < 1e-9);
+    e.selectedId = muster.id;
+    e.useAbility();
+    assert.equal(muster.abilityCd, 13.5, "tempo upgrades shorten Reveille cooldown");
+    assert.ok(Math.abs(e.musterRateMultiplier(bow) - 1.09) < 1e-9, "Reveille surges tempo aura by 1.5x");
+  });
+
+  it("synchronizes Hollow lens reach in placement previews and HUD field boosts", () => {
+    const e = play();
+    const grass = emptyGrass(e);
+    const basePreview = e.placementRange("bow", grass.c, grass.r);
+    e.perks.reach = 2;
+    assert.ok(Math.abs(e.placementRange("bow", grass.c, grass.r) - basePreview * 1.06) < 1e-9);
+    e.selectedKind = "bow";
+    e.tapCell(grass.c, grass.r);
+    assert.ok(Math.abs((e.hud().fieldBoost?.range ?? 0) - 1.06) < 1e-9);
+  });
+
+  it("reports mole burial, gloam hush, mourner wail, and verdant regen in prey statuses", () => {
+    const e = play();
+    e.phase = "wave";
+    e.spawn("mole");
+    const mole = e.creeps[0];
+    assert.ok(e.preySnapshot(mole)?.statuses.includes("Buried"));
+    mole.surfaceT = 2;
+    assert.ok(e.preySnapshot(mole)?.statuses.includes("Surfaced"));
+    e.spawn("gloam");
+    const gloam = e.creeps.at(-1)!;
+    assert.ok(e.preySnapshot(gloam)?.statuses.includes("Hush aura"));
+    e.spawn("mourner");
+    const mourner = e.creeps.at(-1)!;
+    mourner.elite = "verdant";
+    const mournerSnap = e.preySnapshot(mourner);
+    assert.ok(mournerSnap?.statuses.includes("Wail cleanses"));
+    assert.ok(mournerSnap?.statuses.includes("Regenerating"));
+  });
+
+  it("unlocks chronicle lore for Mirrorskin, Hollowjaw, pitch and brass, moles, and mourners", () => {
+    const e = play();
+    e.unlocked = 4;
+    e.notify();
+    assert.equal(e.hud().chronicle.find((c) => c.id === "mirrorskin")?.unlocked, false);
+    assert.equal(e.hud().chronicle.find((c) => c.id === "cauldron-and-horn")?.unlocked, false);
+    assert.equal(e.hud().chronicle.find((c) => c.id === "warren-moles")?.unlocked, false);
+    e.unlocked = 6;
+    e.notify();
+    assert.equal(e.hud().chronicle.find((c) => c.id === "mirrorskin")?.unlocked, true);
+    assert.equal(e.hud().chronicle.find((c) => c.id === "cauldron-and-horn")?.unlocked, true);
+    assert.equal(e.hud().chronicle.find((c) => c.id === "warren-moles")?.unlocked, true);
+    assert.equal(e.hud().chronicle.find((c) => c.id === "hollowjaw")?.unlocked, false);
+    assert.equal(e.hud().chronicle.find((c) => c.id === "gloams-and-mourners")?.unlocked, false);
+    e.unlocked = 7;
+    e.notify();
+    assert.equal(e.hud().chronicle.find((c) => c.id === "hollowjaw")?.unlocked, true);
+    assert.equal(e.hud().chronicle.find((c) => c.id === "gloams-and-mourners")?.unlocked, true);
+  });
 });

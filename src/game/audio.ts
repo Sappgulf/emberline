@@ -78,9 +78,15 @@ export const sfx = {
   },
   shootBow: () => shotBeep(520, 0.05, "square", 0.03, -180),
   shootMortar: () => shotBeep(90, 0.12, "sawtooth", 0.05, -40),
+  shootCauldron: () => shotBeep(72, 0.14, "triangle", 0.05, 36),
   shootFrost: () => shotBeep(640, 0.07, "sine", 0.035, 80),
   shootSpark: () => shotBeep(880, 0.06, "square", 0.04, -320),
   shootBramble: () => shotBeep(210, 0.04, "triangle", 0.03, 40),
+  reveille: () => {
+    beep(262, 0.16, "triangle", 0.05, 65);
+    setTimeout(() => beep(392, 0.22, "triangle", 0.05, 98), 75);
+  },
+  wail: () => beep(380, 0.18, "sine", 0.025, -140),
   horn: () => {
     beep(160, 0.22, "sawtooth", 0.06, 80);
     setTimeout(() => beep(220, 0.18, "triangle", 0.05), 80);
