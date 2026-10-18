@@ -253,8 +253,16 @@ export function Emberline() {
     engine.toggleHelp();
     restoreOverlayTrigger(helpRestoreRef.current);
   }, [restoreOverlayTrigger]);
+  const prevPhaseRef = useRef<string | null>(null);
   useEffect(() => {
-    if (hud.phase === "ready") readyActionRef.current?.focus({ preventScroll: true });
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = hud.phase;
+    if (
+      hud.phase === "ready" &&
+      (prev === "title" || prev === "brief" || prev === "lost" || prev === null)
+    ) {
+      readyActionRef.current?.focus({ preventScroll: true });
+    }
   }, [hud.phase]);
 
   useEffect(() => {
@@ -349,8 +357,14 @@ export function Emberline() {
         }
         return;
       }
+      if (engine.phase === "brief") {
+        if (e.key === " " || e.code === "Space") {
+          e.preventDefault();
+          engine.dismissBrief();
+        }
+        return;
+      }
       if (
-        engine.phase === "brief" ||
         engine.phase === "shop" ||
         engine.phase === "stall" ||
         engine.phase === "won" ||
@@ -380,7 +394,7 @@ export function Emberline() {
       if (e.key === "x" || e.key === "X") engine.sellSelected();
       if (e.key === "z" || e.key === "Z") engine.undoLast();
       if (e.key === "Tab") {
-        if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLSelectElement) return;
+        if (e.target !== canvasRef.current) return;
         e.preventDefault();
         engine.inspectLast();
       }
@@ -740,6 +754,7 @@ export function Emberline() {
           <canvas
             ref={canvasRef}
             className={`stage-frame touch-none xl:max-h-full ${hud.selectedKind ? "cursor-crosshair" : "cursor-pointer"}`}
+            role="img"
             aria-label="Emberline tower defense board. Use number keys to choose a tower, click grass beside the road to plant it, or tap an enemy during a wave to focus fire; tap again to mark it."
             tabIndex={0}
             onPointerMove={onMove}
@@ -1567,6 +1582,7 @@ export function Emberline() {
                 {hud.endless ? "Walk again" : "Hold this map"}
               </button>
               <Restart />
+              <CopyResult text={resultLine(hud, false)} />
             </div>
           </Overlay>
         )}
@@ -1601,6 +1617,7 @@ export function Emberline() {
                 Walk the Long Night
               </button>
               <Restart />
+              <CopyResult text={resultLine(hud, true)} />
             </div>
           </Overlay>
         )}
@@ -1835,7 +1852,7 @@ export function Emberline() {
             )}
           </div>
         ) : (
-          <p className="tray-hint max-w-2xl" data-placement={placementToneValue} aria-live="polite">
+          <p className="tray-hint max-w-2xl" data-placement={placementToneValue}>
             {hud.selectedKind ? (
               <>
                 <strong className="tray-hint-status">{placementMessageValue}</strong>
@@ -1981,6 +1998,7 @@ export function Emberline() {
               type="button"
               className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
               aria-label={hornLabel}
+              aria-keyshortcuts="H"
               title={hornLabel}
               disabled={hud.phase !== "wave" || hud.hornCd > 0 || hud.gold < hud.hornCost}
               onClick={() => {
@@ -1996,6 +2014,7 @@ export function Emberline() {
               type="button"
               className="pressable packet command-control command-flare min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
               aria-label={flareLabel}
+              aria-keyshortcuts="R"
               title={`${flareLabel}. Shortcut R.`}
               disabled={hud.phase !== "wave" || hud.flareCd > 0 || hud.gold < hud.flareCost}
               data-ready={hud.phase === "wave" && hud.flareCd <= 0 && hud.gold >= hud.flareCost}
@@ -2012,6 +2031,7 @@ export function Emberline() {
               type="button"
               className="pressable packet command-control command-stall min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
               aria-label={stallHint}
+              aria-keyshortcuts="S"
               title={stallHint}
               disabled={hud.phase !== "ready" || hud.wave < 1}
               onClick={() => engine.openStall()}
@@ -2025,6 +2045,7 @@ export function Emberline() {
               type="button"
               className="pressable packet command-control min-h-11 px-2 text-[11px] text-dust disabled:opacity-40"
               aria-label={mendHint}
+              aria-keyshortcuts="M"
               title={mendHint}
               disabled={!playing || hud.lives >= hud.maxLives || hud.gold < hud.mendCost}
               onClick={() => {
@@ -2040,6 +2061,7 @@ export function Emberline() {
               ref={readyActionRef}
               className={`pressable send-flag command-send min-h-12 px-5 text-sm disabled:opacity-35 ${hud.phase === "wave" ? "command-send-live" : ""}`}
               title={hud.nextWave}
+              aria-keyshortcuts="Space"
               disabled={hud.phase !== "ready" && !(hud.phase === "wave" && hud.remaining === 0)}
               onClick={() => {
                 unlockAudio();
@@ -3059,6 +3081,37 @@ function StoryLine({ story }: { story: NonNullable<HudSnap["story"]> }) {
   );
 }
 
+function CopyResult({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard unavailable — quietly keep hands to the table */
+    }
+  }, [text]);
+  return (
+    <button
+      type="button"
+      className="pressable stamp min-h-11 px-4 text-xs text-dust"
+      onClick={() => void copy()}
+    >
+      {copied ? "Result copied" : "Copy result"}
+    </button>
+  );
+}
+
+function resultLine(hud: HudSnap, held: boolean) {
+  const grade = hud.grade ? ` · ${hud.grade}` : "";
+  const night = hud.endless ? ` · night ${hud.wave} · best ${hud.bestEndless}` : "";
+  return held
+    ? `Emberline — held ${hud.mapName}${grade}.`
+    : `Emberline — ${hud.mapName} lost on wave ${hud.wave}${night}.`;
+}
+
+
 function TowerIntel({ hud }: { hud: HudSnap }) {
   const tower = hud.selectedTower;
   if (!tower) return null;
@@ -3169,7 +3222,7 @@ function Overlay({
     const focusables = () =>
       Array.from(
         dialog.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"]), summary:not([disabled])',
         ),
       );
     (initialFocusRef?.current ?? focusables()[0])?.focus({ preventScroll: true });
@@ -3205,6 +3258,7 @@ function Overlay({
         className="veil absolute inset-0"
         onClick={() => {
           if (dimmer && onAction) onAction();
+          else onClose?.();
         }}
       />
       <div

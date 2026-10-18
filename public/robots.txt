@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /ui/
+Disallow: /assets/
+
+Sitemap: https://emberline-xi.vercel.app/sitemap.xml

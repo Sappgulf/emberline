@@ -22,3 +22,5 @@ data
 .grok
 AGENTS.md
 AGENTS.project.md
+progress.md
+.node_modules.lock

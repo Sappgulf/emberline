@@ -15,7 +15,7 @@ export function setMuted(value: boolean) {
 
 export function setVolume(value: number) {
   volume = Math.max(0, Math.min(1, value));
-  if (master) master.gain.value = volume;
+  if (master && ctx) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.02);
 }
 
 function ac(): AudioContext | null {
@@ -46,7 +46,7 @@ function shotBeep(freq: number, dur: number, type: OscillatorType, gain: number,
 function beep(freq: number, dur: number, type: OscillatorType, gain: number, slide = 0) {
   if (muted) return;
   const audio = ac();
-  if (!audio) return;
+  if (!audio || audio.state !== "running") return;
   const now = audio.currentTime;
   const osc = audio.createOscillator();
   const g = audio.createGain();

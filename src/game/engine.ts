@@ -692,8 +692,8 @@ export class EmberEngine {
       for (const id of Array.isArray(data.relics) ? data.relics : []) {
         if (known.has(id)) this.relics.add(id);
       }
-      this.marks = Math.max(0, Math.floor(num(data.marks)));
-      this.bestEndless = Math.max(0, Math.floor(num(data.bestEndless)));
+      this.marks = Math.max(0, Math.min(999999, Math.floor(num(data.marks))));
+      this.bestEndless = Math.max(0, Math.min(999999, Math.floor(num(data.bestEndless))));
       for (const perk of PERKS) {
         const tier = Math.max(0, Math.min(perk.max, Math.floor(num(data.perks?.[perk.id]))));
         this.perks[perk.id] = tier;
@@ -2970,7 +2970,7 @@ export class EmberEngine {
     }
   }
 
-  spawnAt(kind: CreepKind, x: number, y: number) {
+  spawnAt(kind: CreepKind, x: number, y: number, wp = 1) {
     const stats = CREEPS[kind];
     const hp = Math.round(stats.hp * this.hpMult());
     this.creeps.push({
@@ -2980,7 +2980,7 @@ export class EmberEngine {
       y: Math.max(0.2, Math.min(ROWS - 0.2, y)),
       hp,
       maxHp: hp,
-      wp: 1,
+      wp: Math.max(1, Math.min(this.path.length - 1, Math.floor(wp))),
       slowT: 0,
       alive: true,
       progress: 0,
@@ -3020,6 +3020,7 @@ export class EmberEngine {
           i % 2 === 0 ? "hound" : "grub",
           creep.x + (i - 1) * 0.7,
           creep.y + (i % 2 === 0 ? 0.5 : -0.5),
+          Math.floor(creep.progress) + 1,
         );
       }
     } else if (def.effect === "burn") {
@@ -4189,7 +4190,6 @@ export class EmberEngine {
       if (f.life > 0) this.floaters[floatersWrite++] = f;
     }
     this.floaters.length = floatersWrite;
-    this.maybeNotify();
   }
 
   maybeNotify() {
@@ -4202,8 +4202,9 @@ export class EmberEngine {
     const chargeKey = tower ? `${tower.volt}|${tower.siege}|${tower.storm}|${tower.brace}|${Math.ceil(tower.hymnT ?? 0)}` : "none";
     const boss = this.bossCreep();
     const bossKey = boss ? `${boss.id}|${Math.ceil(boss.hp)}|${boss.bossPhase}` : "none";
-    const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${Math.ceil(this.flareCd)}|${Math.ceil(this.flareT)}|${flared}|${heroKey}|${this.canUndo()}|${this.banner?.text ?? ""}|${this.lastResult?.wave ?? 0}|${this.waveKills}|${this.waveLeaks}|${this.waveEarned}|${this.watchChain}|${objective.current}|${this.markedId}|${marked?.hp ?? 0}|${this.focusId}|${Math.ceil(this.focusT)}|${this.hard}|${this.help}|${this.hall}|${this.marks}|${this.campChoice ?? ""}|${this.endless}|${this.scoutsLeft}|${Math.ceil(ability)}|${this.bestEndless}`;
-    const preyKey = JSON.stringify(this.preySnapshot(this.focusedCreep() ?? this.markedCreep()));
+    const key = `${this.gold}|${this.lives}|${this.wave}|${this.phase}|${this.mapIndex}|${this.relics.size}|${this.creeps.length}|${this.spawnQ.length}|${this.selectedId}|${this.selectedKind}|${this.aim}|${this.paused}|${this.speed}|${this.streak}|${Math.ceil(this.hornCd)}|${Math.ceil(this.flareCd)}|${Math.ceil(this.flareT)}|${flared}|${heroKey}|${this.canUndo()}|${this.banner?.text ?? ""}|${this.lastResult?.wave ?? 0}|${this.waveKills}|${this.waveLeaks}|${this.waveEarned}|${this.watchChain}|${objective.current}|${this.markedId}|${marked?.hp ?? 0}|${this.focusId}|${Math.ceil(this.focusT)}|${this.hard}|${this.help}|${this.hall}|${this.marks}|${this.campChoice ?? ""}|${this.endless}|${this.scoutsLeft}|${Math.ceil(ability)}|${this.bestEndless}|${this.unlocked}|${this.spawnQ.length > 0 ? Math.min(999, Math.max(0, Math.ceil(this.spawnQ[0].t - this.time))) : "none"}`;
+    const preyTarget = this.focusedCreep() ?? this.markedCreep();
+    const preyKey = preyTarget ? JSON.stringify(this.preySnapshot(preyTarget)) : "none";
     const nextKey = `${key}|${chargeKey}|${bossKey}|${this.rallyCharge}|${Math.ceil(this.rallyT)}|${Math.floor(this.waveDuration)}|${this.creeps.filter(c => c.alive && c.progress >= this.path.length - 3).length}|${preyKey}|${Object.values(this.combatLedger).map(entry => Math.floor(entry.damage / 10)).join(",")}`;
     if (nextKey !== this.hudKey) {
       this.hudKey = nextKey;

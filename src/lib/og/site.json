@@ -1,5 +1,6 @@
 {
   "title": "Emberline",
+  "description": "Dusk woodland tower defense. Hold eight maps, plant ten towers, and stop the creeps.",
   "type": "x:game",
   "card": "custom",
   "color": "12160f"

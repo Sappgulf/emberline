@@ -3232,3 +3232,64 @@ describe("new arms and burrowed prey", () => {
     assert.equal(e.hud().chronicle.find((c) => c.id === "gloams-and-mourners")?.unlocked, true);
   });
 });
+
+describe("audit regressions", () => {
+  it("sends boss summons down the road from the boss, not back to the gate", () => {
+    const e = play();
+    e.loadMap(3); // River Ford — Mirefather summons on phase two
+    e.phase = "shop";
+    e.chooseCamp("gold");
+    e.phase = "brief";
+    e.dismissBrief();
+    const boss = e.spawn("lord") ?? e.creeps[e.creeps.length - 1];
+    boss.progress = e.path.length - 4;
+    boss.wp = Math.min(e.path.length - 1, Math.floor(boss.progress));
+    boss.x = e.waypoint(boss.wp).x;
+    boss.y = e.waypoint(boss.wp).y;
+    e.triggerBossPhase(boss);
+    const summons = e.creeps.slice(-(3 as number));
+    assert.equal(summons.length, 3);
+    const forwardWp = Math.min(e.path.length - 1, Math.floor(boss.progress) + 1);
+    for (const summon of summons) {
+      assert.ok(summon.kind === "hound" || summon.kind === "grub");
+      assert.equal(summon.wp, forwardWp, "summons must inherit the boss waypoint");
+      assert.ok(summon.wp > 1, "summons must not march back toward the entry");
+    }
+  });
+
+  it("clamps absurd marks and endless records read from a corrupted save", () => {
+    const previous = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    const junk = JSON.stringify({
+      marks: 1e12,
+      bestEndless: 5e11,
+      unlocked: 4,
+      perks: {},
+    });
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: { getItem: () => junk, setItem: () => {} },
+    });
+    try {
+      const e = new EmberEngine();
+      e.readSave();
+      assert.equal(e.marks, 999999);
+      assert.equal(e.bestEndless, 999999);
+      e.startFromTitle();
+      e.finishWaveIfClear();
+      assert.ok(e.marks < 1e6, "no runaway marks after a save rewrite");
+    } finally {
+      if (previous) Object.defineProperty(globalThis, "localStorage", { configurable: true, value: previous });
+      else Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
+
+  it("keeps maybeNotify refreshing the HUD through the guard key", () => {
+    const e = play();
+    e.notify();
+    const before = e.hud().gold;
+    e.gold = before + 25;
+    e.maybeNotify();
+    assert.equal(e.hud().gold, before + 25);
+    assert.notEqual(e.hud().gold, before);
+  });
+});
